@@ -41,6 +41,22 @@ Last update: 2026-11-20 23:35 UTC (cloud work paused here; continue locally) · 
 - ✅ `/app/case/[id]` mobile case page with "Per Sprache korrigieren" (critique notes in `.impeccable/critique/`).
 - ✅ `/admin/case/[id]` office case page (`src/app/admin/case/[id]/case-detail.tsx`): header with status, deadline, **Validieren** (shows why it is blocked), **Zurück zur Ergänzung** dialog, **E-Mail vorbereiten** once validated (M4 composer still a shell); tabs Dokument (HTML letter preview from the same DocBody, version switch, SHA-256, PDF/Word download), Nachweise (transcript, weather), Verlauf, Hinweise; right rail with checks and facts. Critiqued (29/40) and the findings fixed.
 
+### Live voice test (2026-11-20, 23:20 UTC, cloud session, real keys)
+
+Path tested over HTTP (no browser): `POST /api/conversations` (kind call) → `POST /api/voice` (multipart audio + conversation_id) → `GET /api/tts`.
+
+| Step | Result | Time |
+|---|---|---|
+| `GET /api/tts?lang=de` (gpt-4o-mini-tts) | 200, `audio/mpeg`, 79 KB MP3 | first byte 1.75 s, full 2.2 s |
+| STT only (`/api/voice` without conversation_id) | transcript exact: "Die Elektriker sind im zweiten Stock noch nicht fertig. Vier Leute warten." | 1.15 s |
+| Turn 1 (STT + live Claude) | `source: "live"` (no Testmodus). Behinderungsanzeige draft, 2.OG, Elektro, 4 idle staff, client sphere green; missing `start_at` (amber). Reply: "Seit wann genau? Bitte Datum und Uhrzeit." | **9.3 s** |
+| Turn 2 (flite English voice saying German) | STT garbled ("Saeidhoiud morgenum siebenwehr"), a test-audio artifact, not an app bug. Klara asked again for the time, correctly. | **11.4 s** |
+
+Findings:
+1. **Latency misses the SPEC target (< 4 s).** STT is ~1.1 s, so ~8–10 s is the Claude turn (main model `KLARA_ANTHROPIC_MODEL`, default effort, `max_tokens` 4000 in `src/lib/agent/llm.ts`). Ideas: use the fast model and `effort: "low"` for call turns, smaller `max_tokens`, stream the reply and start TTS on the first sentence. Add per-step timing logs to `/api/voice` to confirm.
+2. In cloud sessions `api.openai.com` was missing from the Default environment allowlist (proxy 403, "fetch failed"). Added 2026-11-20 23:20 UTC. Locally this does not apply.
+3. Real phone test of hands-free VAD still to do (needs a browser + mic).
+
 ### Next steps, in order
 
 1. **Verify M3 with the real keys** (locally: put the keys in `.env.local`).
