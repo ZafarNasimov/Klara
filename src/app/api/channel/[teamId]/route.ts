@@ -6,6 +6,7 @@ import { NotFoundError } from "@/lib/db/store";
 import { clockBase, withOffset } from "@/lib/clock";
 import { berlinDay, TZ } from "@/lib/deadlines";
 import { llmMode } from "@/lib/runtime";
+import { readbackView } from "@/lib/agent/phrase";
 import type { ChannelFeed } from "@/lib/types";
 
 const hourFmt = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-digit", hourCycle: "h23" });
@@ -42,6 +43,16 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/channel/[teamId
         planned_per_day: s.planned_per_day,
         actual_today: progress.find((p) => p.schedule_item_id === s.id)?.actual_qty ?? null,
       }));
+    const lead = team.lead_user_id ? await store().get("app_user", team.lead_user_id) : null;
+    const language = chat?.language ?? lead?.language ?? "de";
+    const awaiting = chat?.state.awaiting_confirm ?? [];
+    const confirm = awaiting.length
+      ? readbackView(
+          awaiting.map((id) => cases.find((c) => c.id === id)).filter((c) => !!c),
+          language,
+          now,
+        )
+      : null;
     const entries = Array.isArray(report?.data.entries) ? (report.data.entries as { kind?: string }[]) : [];
 
     return {
@@ -50,7 +61,9 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/channel/[teamId
       now: now.toISOString(),
       llm_mode: llmMode(),
       conversation: chat,
+      language,
       turns,
+      confirm,
       cases: await toCaseViews(
         cases.filter((c) => c.team_id === teamId && c.status !== "entwurf"),
         pctx,

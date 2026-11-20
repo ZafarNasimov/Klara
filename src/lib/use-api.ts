@@ -58,9 +58,19 @@ export function useApi<T>(url: string | null, opts: { live?: boolean; pollMs?: n
   return { data, error, loading, reload };
 }
 
+/** A failed API call; 4xx messages are German and meant for the user, 5xx are not. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 export async function postJson<T>(url: string, body: unknown): Promise<T> {
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const out = await r.json().catch(() => null);
-  if (!r.ok) throw new Error(out?.error ?? `Fehler ${r.status}`);
+  if (!r.ok) throw new ApiError(out?.error ?? `Fehler ${r.status}`, r.status);
   return out as T;
 }

@@ -4,7 +4,8 @@ import type { CheckResult, Light } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const LIGHT_DE: Record<Light, string> = { green: "Grün", yellow: "Gelb", red: "Rot" };
-const LIGHT_STATE_DE: Record<Light, string> = { green: "bereit", yellow: "prüfen", red: "blockiert" };
+/** State words for screen readers (DESIGN.md), never the colour name alone. */
+export const LIGHT_STATE_DE: Record<Light, string> = { green: "bereit", yellow: "Hinweis", red: "blockiert" };
 
 const DOT: Record<Light, string> = {
   green: "bg-light-green",
@@ -48,7 +49,7 @@ export function LightSummary({ checks, className, compact = false }: { checks: C
   return (
     <p className={cn("flex min-w-0 items-center gap-2 text-sm", className)}>
       <LightDot light={light} />
-      <span className="sr-only">{LIGHT_DE[light]}:</span>
+      <span className="sr-only">{LIGHT_STATE_DE[light]}:</span>
       <span className={cn("min-w-0", compact ? "truncate" : "", light === "green" ? "text-foreground" : TEXT[light])}>
         {light === "green" ? "Alle Prüfungen bestanden" : lead.reason_de}
         {light !== "green" && others > 0 ? <span className="text-muted-foreground"> (+{others} weitere)</span> : null}

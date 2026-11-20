@@ -6,7 +6,7 @@ import "server-only";
 import { berlinDay } from "@/lib/deadlines";
 import { getDocType, hasValue, type FieldDef } from "@/lib/doctypes";
 import { fmtDate, fmtNumber, fmtTime } from "@/lib/labels";
-import type { Case } from "@/lib/types";
+import type { Case, ConfirmView } from "@/lib/types";
 import { callTool, fastModel, llmMode } from "./llm";
 import { DOC_SPOKEN, fill, LINES, READBACK_LABELS, WORDS, type LineKey } from "./lines";
 import { PHRASE_SYSTEM, SAY_TOOL } from "./prompt";
@@ -108,6 +108,35 @@ function readbackTemplate(cases: Case[], lang: string, now: Date): string {
     return `${titles[c.doc_type] ?? def.title_de}: ${facts.join("; ")}.`;
   });
   return [table.readbackIntro, ...parts, table.readbackOutro].join(" ");
+}
+
+/** The readback as rows for the confirm card: label and value in the user's language, German value alongside. */
+export function readbackView(cases: Case[], lang: string, now: Date): ConfirmView {
+  const labels = READBACK_LABELS[lang] ?? READBACK_LABELS.en;
+  const titles = DOC_SPOKEN[lang] ?? DOC_SPOKEN.en;
+  return {
+    language: lang,
+    docs: cases.map((c) => {
+      const def = getDocType(c.doc_type)!;
+      const title = lang === "de" ? null : (titles[c.doc_type] ?? null);
+      return {
+        case_id: c.id,
+        doc_type: c.doc_type,
+        title_de: def.title_de,
+        title: title && title !== def.title_de ? title : null,
+        rows: def.readback_fields
+          .map((k) => def.fields.find((f) => f.key === k))
+          .filter((f): f is FieldDef => !!f && hasValue(c.facts[f.key]))
+          .map((f) => ({
+            key: f.key,
+            label: labels[f.key] ?? f.label_de,
+            value: formatValue(f, c.facts[f.key], lang, now),
+            value_de: formatValue(f, c.facts[f.key], "de", now),
+            mono: f.type === "number" || f.type === "date" || f.type === "datetime",
+          })),
+      };
+    }),
+  };
 }
 
 /** Readback of all cases waiting for confirmation. Returns the line and its German version. */

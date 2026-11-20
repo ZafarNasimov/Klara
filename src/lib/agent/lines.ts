@@ -43,7 +43,7 @@ export const LINES: Record<string, Table> = {
     notBuilt: "Noted. I've passed this on to the site manager.",
     smalltalk: "I'm here. What happened on site?",
     stillThere: "Is there anything else I should note?",
-    progressNoted: "Noted: {item}, {qty} today, that is {pct} % of the plan.",
+    progressNoted: "Noted: {item}, {qty} today, that is {pct}\u00a0% of the plan.",
     deviationNote: "At this rate we'll be about {days} working days late. I'm preparing a notice for {successor}.",
     unconfirmedSaved: "Okay. I've saved what we have; the site manager will follow up.",
   },
@@ -65,7 +65,7 @@ export const LINES: Record<string, Table> = {
     notBuilt: "Notiert. Ich habe das an die Bauleitung weitergegeben.",
     smalltalk: "Ich bin da. Was ist auf der Baustelle passiert?",
     stillThere: "Gibt es noch etwas, das ich notieren soll?",
-    progressNoted: "Notiert: {item}, heute {qty}, das sind {pct} % vom Plan.",
+    progressNoted: "Notiert: {item}, heute {qty}, das sind {pct}\u00a0% vom Plan.",
     deviationNote: "Bei diesem Tempo rechnen wir mit etwa {days} Arbeitstagen Verzug. Ich bereite eine Information an {successor} vor.",
     unconfirmedSaved: "In Ordnung. Ich habe das Bisherige gespeichert, die Bauleitung meldet sich.",
   },
@@ -87,7 +87,7 @@ export const LINES: Record<string, Table> = {
     notBuilt: "Записала. Передала руководителю.",
     smalltalk: "Я на связи. Что произошло на объекте?",
     stillThere: "Есть ещё что-нибудь, что нужно записать?",
-    progressNoted: "Записала: {item}, сегодня {qty}, это {pct} % от плана.",
+    progressNoted: "Записала: {item}, сегодня {qty}, это {pct}\u00a0% от плана.",
     deviationNote: "При таком темпе отставание около {days} рабочих дней. Готовлю уведомление для {successor}.",
     unconfirmedSaved: "Хорошо. Я сохранила то, что есть, руководитель свяжется с вами.",
   },
@@ -109,7 +109,7 @@ export const LINES: Record<string, Table> = {
     notBuilt: "Zanotowane. Przekazałam to kierownikowi budowy.",
     smalltalk: "Jestem. Co się stało na budowie?",
     stillThere: "Czy mam jeszcze coś zanotować?",
-    progressNoted: "Zanotowane: {item}, dziś {qty}, to {pct} % planu.",
+    progressNoted: "Zanotowane: {item}, dziś {qty}, to {pct}\u00a0% planu.",
     deviationNote: "W tym tempie opóźnienie wyniesie około {days} dni roboczych. Przygotowuję informację dla {successor}.",
     unconfirmedSaved: "Dobrze. Zapisałam to, co mamy, kierownik się odezwie.",
   },
@@ -131,7 +131,7 @@ export const LINES: Record<string, Table> = {
     notBuilt: "Not aldım. Şantiye şefine ilettim.",
     smalltalk: "Buradayım. Şantiyede ne oldu?",
     stillThere: "Not almam gereken başka bir şey var mı?",
-    progressNoted: "Not edildi: {item}, bugün {qty}, planın % {pct}'i.",
+    progressNoted: "Not edildi: {item}, bugün {qty}, planın %{pct}'i.",
     deviationNote: "Bu hızla yaklaşık {days} iş günü gecikme olacak. {successor} için bir bilgilendirme hazırlıyorum.",
     unconfirmedSaved: "Tamam. Elimizdekini kaydettim, şantiye şefi sizinle iletişime geçecek.",
   },
@@ -153,7 +153,7 @@ export const LINES: Record<string, Table> = {
     notBuilt: "Notat. Am transmis șefului de șantier.",
     smalltalk: "Sunt aici. Ce s-a întâmplat pe șantier?",
     stillThere: "Mai e ceva ce trebuie să notez?",
-    progressNoted: "Notat: {item}, azi {qty}, adică {pct} % din plan.",
+    progressNoted: "Notat: {item}, azi {qty}, adică {pct}\u00a0% din plan.",
     deviationNote: "În acest ritm vom avea o întârziere de circa {days} zile lucrătoare. Pregătesc o informare pentru {successor}.",
     unconfirmedSaved: "Bine. Am salvat ce avem, șeful de șantier revine.",
   },
@@ -186,9 +186,30 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     anordnung_bestaetigung: "Подтверждение устного указания",
     verzug_nu: "Требование к субподрядчику",
   },
+  pl: {
+    behinderungsanzeige: "Zgłoszenie przeszkody",
+    behinderung_ende: "Zgłoszenie ustania przeszkody",
+    mehrkostenanzeige: "Zgłoszenie kosztów dodatkowych",
+    anordnung_bestaetigung: "Potwierdzenie ustnego polecenia",
+    verzug_nu: "Wezwanie podwykonawcy do usunięcia",
+  },
+  tr: {
+    behinderungsanzeige: "Engel bildirimi",
+    behinderung_ende: "Engelin kalktığı bildirimi",
+    mehrkostenanzeige: "Ek maliyet bildirimi",
+    anordnung_bestaetigung: "Sözlü talimatın teyidi",
+    verzug_nu: "Taşerona giderme talebi",
+  },
+  ro: {
+    behinderungsanzeige: "Notificare de impediment",
+    behinderung_ende: "Notificare de încetare a impedimentului",
+    mehrkostenanzeige: "Notificare de costuri suplimentare",
+    anordnung_bestaetigung: "Confirmarea dispoziției verbale",
+    verzug_nu: "Somație către subantreprenor",
+  },
 };
 
-/** Short labels for the readback (en/de/ru; other languages are phrased by the LLM). */
+/** Short labels for the readback (other languages are phrased by the LLM). */
 export const READBACK_LABELS: Record<string, Record<string, string>> = {
   en: {
     start_at: "since",
@@ -256,10 +277,169 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
     resumed_at: "возобновлено",
     still_affected: "последствия",
   },
+  pl: {
+    start_at: "od",
+    area: "miejsce",
+    cause: "przyczyna",
+    affected_works: "dotyczy",
+    idle_staff: "pracownicy bez pracy",
+    idle_equipment: "sprzęt",
+    expected_duration: "przewidywany czas",
+    description: "praca",
+    instructed_by: "polecił",
+    instruction_date: "data",
+    instruction_time: "godzina",
+    place: "miejsce",
+    instruction_text: "treść",
+    witnesses: "obecni",
+    work_started: "już rozpoczęte",
+    planned_start: "planowany start",
+    estimate_eur: "szacunek",
+    end_at: "ustało",
+    resumed_at: "wznowiono",
+    still_affected: "skutki",
+  },
+  tr: {
+    start_at: "başlangıç",
+    area: "alan",
+    cause: "sebep",
+    affected_works: "etkilenen",
+    idle_staff: "boşta bekleyen işçi",
+    idle_equipment: "ekipman",
+    expected_duration: "tahmini süre",
+    description: "iş",
+    instructed_by: "talimat veren",
+    instruction_date: "tarih",
+    instruction_time: "saat",
+    place: "yer",
+    instruction_text: "talimat",
+    witnesses: "hazır bulunanlar",
+    work_started: "başladı",
+    planned_start: "planlanan başlangıç",
+    estimate_eur: "tahmin",
+    end_at: "bitti",
+    resumed_at: "yeniden başladı",
+    still_affected: "etkisi sürüyor",
+  },
+  ro: {
+    start_at: "de la",
+    area: "zona",
+    cause: "cauza",
+    affected_works: "afectat",
+    idle_staff: "muncitori fără lucru",
+    idle_equipment: "utilaje",
+    expected_duration: "durata estimată",
+    description: "lucrare",
+    instructed_by: "dispus de",
+    instruction_date: "data",
+    instruction_time: "ora",
+    place: "locul",
+    instruction_text: "formularea",
+    witnesses: "prezenți",
+    work_started: "deja început",
+    planned_start: "început planificat",
+    estimate_eur: "estimare",
+    end_at: "încetat",
+    resumed_at: "reluat",
+    still_affected: "efecte",
+  },
 };
 
 export const WORDS: Record<string, { today: string; yesterday: string; yes: string; no: string; people: string }> = {
   en: { today: "today", yesterday: "yesterday", yes: "yes", no: "no", people: "people" },
   de: { today: "heute", yesterday: "gestern", yes: "ja", no: "nein", people: "Personen" },
   ru: { today: "сегодня", yesterday: "вчера", yes: "да", no: "нет", people: "чел." },
+  pl: { today: "dziś", yesterday: "wczoraj", yes: "tak", no: "nie", people: "os." },
+  tr: { today: "bugün", yesterday: "dün", yes: "evet", no: "hayır", people: "kişi" },
+  ro: { today: "azi", yesterday: "ieri", yes: "da", no: "nu", people: "pers." },
 };
+
+/**
+ * Text on the channel's tap cards, in the user's language. Quick replies are
+ * sent as the user's own words, so each must be understood by the extractor
+ * (ALL_GOOD and YES in mock.ts).
+ */
+export type CardLines = {
+  morningAsk: string;
+  morningOk: string;
+  morningDeviation: string;
+  deviationHint: string;
+  eveningAsk: string;
+  eveningAsPlanned: string;
+  eveningOther: string;
+  confirmYes: string;
+  confirmChange: string;
+};
+
+export const CARD_LINES: Record<string, CardLines> = {
+  de: {
+    morningAsk: "Guten Morgen. Läuft heute alles nach Plan?",
+    morningOk: "Alles nach Plan",
+    morningDeviation: "Abweichung melden",
+    deviationHint: "z. B. Elektro im 2.OG nicht fertig",
+    eveningAsk: "Feierabend. Wie viel haben Sie heute geschafft?",
+    eveningAsPlanned: "Wie geplant",
+    eveningOther: "Andere Menge",
+    confirmYes: "Stimmt so",
+    confirmChange: "Ändern",
+  },
+  en: {
+    morningAsk: "Good morning. Is everything going to plan today?",
+    morningOk: "All according to plan",
+    morningDeviation: "Report a problem",
+    deviationHint: "e.g. electrics on 2.OG not finished",
+    eveningAsk: "End of the day. How much did you get done today?",
+    eveningAsPlanned: "As planned",
+    eveningOther: "Other amount",
+    confirmYes: "That's right",
+    confirmChange: "Change",
+  },
+  ru: {
+    morningAsk: "Доброе утро. Сегодня всё по плану?",
+    morningOk: "Всё по плану",
+    morningDeviation: "Сообщить о проблеме",
+    deviationHint: "напр. электрика на 2.OG не готова",
+    eveningAsk: "Конец смены. Сколько сделали сегодня?",
+    eveningAsPlanned: "По плану",
+    eveningOther: "Другое количество",
+    confirmYes: "Всё верно",
+    confirmChange: "Изменить",
+  },
+  pl: {
+    morningAsk: "Dzień dobry. Czy dziś wszystko idzie zgodnie z planem?",
+    morningOk: "Wszystko zgodnie z planem",
+    morningDeviation: "Zgłoś problem",
+    deviationHint: "np. elektryka na 2.OG niegotowa",
+    eveningAsk: "Fajrant. Ile dziś zrobiliście?",
+    eveningAsPlanned: "Zgodnie z planem",
+    eveningOther: "Inna ilość",
+    confirmYes: "Zgadza się",
+    confirmChange: "Zmień",
+  },
+  tr: {
+    morningAsk: "Günaydın. Bugün her şey plana göre mi?",
+    morningOk: "Her şey plana göre",
+    morningDeviation: "Sorun bildir",
+    deviationHint: "örn. 2.OG'de elektrik bitmedi",
+    eveningAsk: "İş bitti. Bugün ne kadar yaptınız?",
+    eveningAsPlanned: "Plana göre",
+    eveningOther: "Başka miktar",
+    confirmYes: "Doğru",
+    confirmChange: "Değiştir",
+  },
+  ro: {
+    morningAsk: "Bună dimineața. Merge totul conform planului azi?",
+    morningOk: "Totul conform planului",
+    morningDeviation: "Raportez o problemă",
+    deviationHint: "ex. electrica la 2.OG nu e gata",
+    eveningAsk: "Gata pe azi. Cât ați reușit să faceți?",
+    eveningAsPlanned: "Conform planului",
+    eveningOther: "Altă cantitate",
+    confirmYes: "Corect",
+    confirmChange: "Modific",
+  },
+};
+
+export function cardLines(lang: string | null | undefined): CardLines {
+  return CARD_LINES[lang ?? "de"] ?? CARD_LINES.en;
+}

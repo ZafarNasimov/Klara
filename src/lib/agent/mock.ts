@@ -13,9 +13,9 @@ export function guessLanguage(text: string): string {
   if (/[а-яё]/i.test(t)) return /[їєі]/.test(t) ? "uk" : "ru";
   if (/[ăâîșşțţ]/.test(t) && !/[äöüß]/.test(t)) return "ro";
   if (/[ğış]/.test(t)) return "tr";
-  if (/[ąćęłńśźż]/u.test(t) || /(?<![\p{L}\p{N}_])(jest|nie|się|ludzi|są|piętro|budow)(?![\p{L}\p{N}_])/u.test(t)) return "pl";
+  if (/[ąćęłńśźż]/u.test(t) || /(?<![\p{L}\p{N}_])(jest|nie|się|ludzi|są|piętro|budow|wszystko|zgodnie|planem|dzisiaj|dziś|tak)(?![\p{L}\p{N}_])/u.test(t)) return "pl";
   if (/[äöüß]/u.test(t) || /(?<![\p{L}\p{N}_])(der|die|das|ist|nicht|und|sind|wir|seit|heute|leute|uhr|schon|noch|ja|nein|stimmt|genau|alles|nach|auf|im|es|war|bitte|danke|haben|hat|kein|keine|bis|wird|wie|warten|gekommen)(?![\p{L}\p{N}_])/u.test(t)) return "de";
-  if (/(?<![\p{L}\p{N}_])(și|nu|este|oameni|etaj)(?![\p{L}\p{N}_])/u.test(t)) return "ro";
+  if (/(?<![\p{L}\p{N}_])(și|nu|este|oameni|etaj|totul|conform|planului|azi|corect)(?![\p{L}\p{N}_])/u.test(t)) return "ro";
   if (/(?<![\p{L}\p{N}_])(ve|bir|değil|kişi|kat)(?![\p{L}\p{N}_])/u.test(t)) return "tr";
   return "en";
 }

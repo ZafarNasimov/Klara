@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // The dev badge sits on top of the mobile composer.
+  devIndicators: false,
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

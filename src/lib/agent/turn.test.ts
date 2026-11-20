@@ -50,8 +50,16 @@ describe("golden path (English)", () => {
     expect(r2.reply).toMatch(/^Let me read it back\./);
     expect(r2.reply).toMatch(/Is that correct\?$/);
     expect(r2.reply_de).toMatch(/^Ich fasse zusammen\./);
+    // The same readback as rows for the confirm card: English labels and values, German next to them.
+    expect(r2.confirm?.language).toBe("en");
+    expect(r2.confirm?.docs).toHaveLength(1);
+    const doc = r2.confirm!.docs[0];
+    expect(doc).toMatchObject({ title_de: "Behinderungsanzeige", title: "Hindrance notice" });
+    expect(doc.rows.find((r) => r.key === "start_at")).toMatchObject({ label: "since", value: "today 07:00", value_de: "heute 07:00", mono: true });
+    expect(doc.rows.find((r) => r.key === "idle_staff")).toMatchObject({ value: "4 people", value_de: "4 Personen" });
 
     const r3 = await say("Yes.");
+    expect(r3.confirm).toBeNull();
     expect(r3.reply).toBe("Thank you. The document is now with the site manager for checking.");
     const [c] = await live();
     expect(c.doc_type).toBe("behinderungsanzeige");
@@ -149,7 +157,7 @@ describe("scenario 6: evening quantity below plan", () => {
     clock = berlinTime(DAY, 16, 0);
     const say = await chat();
     const r = await say("Estrich 2.OG heute nur 15 m²");
-    expect(r.reply).toContain("38 %");
+    expect(r.reply).toContain("38\u00a0%");
     expect(r.reply).toContain("Huber Bodenbeläge");
     const [c] = await live();
     expect(c).toMatchObject({ doc_type: "info_folgegewerk", status: "bereit" });

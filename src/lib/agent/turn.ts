@@ -46,7 +46,7 @@ import type { AppUser, Case, Conversation, ConversationState, ScheduleItem, Sphe
 import { generateDocument } from "@/lib/documents/generate";
 import { extract } from "./extract";
 import type { LineKey } from "./lines";
-import { line, question, readback } from "./phrase";
+import { line, question, readback, readbackView } from "./phrase";
 import type { ExtractContext, ExtractedEvent, Extraction, Intent, TurnResponse } from "./types";
 
 type Part =
@@ -167,6 +167,13 @@ class TurnRun {
       klara_turn: klaraTurn,
       cases: await toCaseViews(touched, this.ctx),
       awaiting_confirm: !!this.state.awaiting_confirm?.length,
+      confirm: this.state.awaiting_confirm?.length
+        ? readbackView(
+            this.state.awaiting_confirm.map((id) => this.cases.get(id)).filter((c): c is Case => !!c),
+            lang,
+            this.now,
+          )
+        : null,
       question: this.state.asked ?? null,
       ended: this.ended,
     };
@@ -542,7 +549,7 @@ class TurnRun {
       this.parts.push({
         kind: "line",
         key: "progressNoted",
-        vars: { item: label, qty: `${fmtNumber(p.qty)} ${unit}`.trim(), pct: pct ?? "–" },
+        vars: { item: label, qty: `${fmtNumber(p.qty)}\u00a0${unit}`.trim(), pct: pct ?? "–" },
       });
 
       if (!pa?.deviation) continue;

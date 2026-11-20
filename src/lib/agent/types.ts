@@ -71,6 +71,8 @@ export type TurnResponse = {
   /** Cases created or changed in this turn (drafts included). */
   cases: import("@/lib/types").CaseView[];
   awaiting_confirm: boolean;
+  /** The readback as structured rows while waiting for the user's yes. */
+  confirm: import("@/lib/types").ConfirmView | null;
   question: { case_id: string; field: string } | null;
   ended: boolean;
 };

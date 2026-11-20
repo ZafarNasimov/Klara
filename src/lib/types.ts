@@ -331,6 +331,20 @@ export type CaseView = Case & {
   author_name: string | null;
 };
 
+/** Structured readback waiting for the user's yes (shown as a card in the chat). */
+export type ConfirmView = {
+  /** Language of the labels and the user-facing values. */
+  language: string;
+  docs: {
+    case_id: string;
+    doc_type: string;
+    title_de: string;
+    /** Name of the document in the user's language (null when German). */
+    title: string | null;
+    rows: { key: string; label: string; value: string; value_de: string; mono: boolean }[];
+  }[];
+};
+
 /** Team channel feed for the mobile app (GET /api/channel/[teamId]). */
 export type ChannelFeed = {
   team: Team;
@@ -340,7 +354,11 @@ export type ChannelFeed = {
   llm_mode: "live" | "mock";
   /** The team's open chat with Klara (null until the first message). */
   conversation: Conversation | null;
+  /** Language Klara speaks with this team (the chat's, else the lead's preference). */
+  language: string;
   turns: Turn[];
+  /** Readback waiting for confirmation, if any. */
+  confirm: ConfirmView | null;
   /** The team's cases (drafts excluded). */
   cases: CaseView[];
   /** Calls with Klara, newest first. */
