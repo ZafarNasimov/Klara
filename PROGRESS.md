@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-20 22:35 UTC · branch `claude/project-thread-jrqak8`
+Last update: 2026-11-20 22:50 UTC · branch `claude/project-thread-jrqak8`
 
 ## Milestones (SPEC §11)
 
@@ -32,16 +32,15 @@ Last update: 2026-11-20 22:35 UTC · branch `claude/project-thread-jrqak8`
 
 ### In progress (M2)
 
-- `/admin/case/[id]` office case page. Written: `src/components/documents/letter-preview.tsx` (HTML preview of the letter), `CaseDetail` type and `GET /api/cases/[id]` (now returns `validation_blocker` and `askable_fields`). Still to build: the page itself (`src/app/admin/case/[id]/page.tsx` is a shell): header with status, deadline, buttons **Validieren**, **Zurück zur Ergänzung** (dialog: pick field, optional note), **Word/PDF herunterladen**, **E-Mail vorbereiten** (M4, enabled once `validiert`); tabs Dokument (preview + version switch + sha256), Nachweise (transcript, weather), Verlauf (events), Hinweise (legal basis, deadline rule, sphere, flags, linked cases); right rail with checks and facts.
+- ✅ `/admin/case/[id]` office case page (`src/app/admin/case/[id]/case-detail.tsx`): header with status, deadline, **Validieren** (shows why it is blocked), **Zurück zur Ergänzung** dialog, **E-Mail vorbereiten** once validated (M4 composer still a shell); tabs Dokument (HTML letter preview from the same DocBody, version switch, SHA-256, PDF/Word download), Nachweise (transcript, weather), Verlauf, Hinweise; right rail with checks and facts. Critiqued (29/40) and the findings fixed.
 
 ### Next steps, in order
 
-1. Finish `/admin/case/[id]` (above), then per CLAUDE.md: `/impeccable critique` → fix → `/impeccable polish`, screenshots at 1440×900.
-2. Mobile case page `/app/case/[id]` (SPEC §8: type, status, traffic light, "PDF öffnen", "Per Sprache korrigieren"). Case card text for returned cases ("Die Bauleitung braucht noch eine Angabe von Ihnen").
-3. Bautagesbericht: template + PDF from `daily_report` + progress entries + weather (SPEC §5.2 `bautagesbericht`).
-4. Seed historical cases KL-2026-0039..0041 so the demo case is 0042 on a busy board.
-5. Verify Supabase end to end (see Setup) and commit any fixes.
-6. M3 voice, then M4–M6 per SPEC §11.
+1. Mobile case page `/app/case/[id]` (SPEC §8: type, status, traffic light, "PDF öffnen", "Per Sprache korrigieren"). Case card text for returned cases ("Die Bauleitung braucht noch eine Angabe von Ihnen").
+2. Bautagesbericht: template + PDF from `daily_report` + progress entries + weather (SPEC §5.2 `bautagesbericht`).
+3. Seed historical cases KL-2026-0039..0041 so the demo case is 0042 on a busy board.
+4. Verify Supabase end to end (see Setup) and commit any fixes.
+5. M3 voice, then M4–M6 per SPEC §11.
 
 ## Run it locally
 

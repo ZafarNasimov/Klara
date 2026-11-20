@@ -4,7 +4,6 @@ import { bare, fact, has, isVob, type Template } from "./kit";
 
 export const mehrkostenanzeige: Template = (t) => {
   const started = t.c.facts.work_started === true;
-  const estimate = has(t, "estimate_eur") ? `ca. ${fmtNumber(Number(t.c.facts.estimate_eur))} € netto` : "– werden derzeit ermittelt –";
   return {
     subject: isVob(t)
       ? "Ankündigung eines Anspruchs auf besondere Vergütung gemäß § 2 Abs. 6 Nr. 1 VOB/B"
@@ -22,7 +21,12 @@ export const mehrkostenanzeige: Template = (t) => {
           ? "Wir kündigen hiermit unseren Anspruch auf besondere Vergütung an."
           : "Wir kündigen hiermit vor Beginn der Ausführung unseren Anspruch auf besondere Vergütung an.",
       },
-      { kind: "p", text: `Die Mehrkosten betragen nach erster Einschätzung ${estimate}. Ein Nachtragsangebot reichen wir kurzfristig nach.` },
+      {
+        kind: "p",
+        text: has(t, "estimate_eur")
+          ? `Die Mehrkosten betragen nach erster Einschätzung ca. ${fmtNumber(Number(t.c.facts.estimate_eur))}\u00a0€ netto. Ein Nachtragsangebot reichen wir kurzfristig nach.`
+          : "Die Höhe der Mehrkosten wird derzeit ermittelt. Ein Nachtragsangebot reichen wir kurzfristig nach.",
+      },
       { kind: "p", text: `Geplanter Ausführungsbeginn: ${fact(t, "planned_start")}.` },
       { kind: "p", text: "Wir bitten um schriftliche Bestätigung der Beauftragung." },
     ],

@@ -5,7 +5,7 @@ import { RoleProvider } from "@/lib/role";
 export default function AdminLayout({ children }: LayoutProps<"/admin">) {
   return (
     <RoleProvider fallback="bauleiter">
-      <div className="flex min-h-dvh flex-col bg-surface">
+      <div className="flex h-dvh flex-col bg-surface">
         <AdminTopbar />
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </div>

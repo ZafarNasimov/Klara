@@ -76,7 +76,7 @@ export function LetterPreview({ body, className }: { body: DocBody; className?: 
     <article
       aria-label={`Schreiben ${body.reference}`}
       className={cn(
-        "mx-auto aspect-[210/297] w-full max-w-[720px] overflow-hidden rounded-sm border border-border bg-white px-[11.9%] pt-[8.5%] pb-[9.5%] pr-[9.5%] text-[13px] leading-[1.45] text-zinc-900 shadow-[0_1px_2px_rgb(24_24_27/0.06),0_8px_24px_-8px_rgb(24_24_27/0.12)]",
+        "mx-auto aspect-[210/297] w-full max-w-[720px] rounded-sm border border-border bg-white px-[11.9%] pt-[8.5%] pb-[9.5%] pr-[9.5%] text-[13px] leading-[1.45] text-zinc-900 shadow-[0_1px_2px_rgb(24_24_27/0.06),0_8px_24px_-8px_rgb(24_24_27/0.12)]",
         className,
       )}
     >

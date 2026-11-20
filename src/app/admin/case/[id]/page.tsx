@@ -1,6 +1,10 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
+import { CaseDetailView } from "./case-detail";
 
-/** Case detail (SPEC §8 /admin/case/[id], built in M2). */
+export const metadata: Metadata = { title: "Vorgang" };
+
+/** Case detail for the office (SPEC §8 /admin/case/[id]). */
 export default function AdminCasePage({ params }: PageProps<"/admin/case/[id]">) {
   return (
     <Suspense>
@@ -11,5 +15,5 @@ export default function AdminCasePage({ params }: PageProps<"/admin/case/[id]">)
 
 async function AdminCase({ params }: { params: PageProps<"/admin/case/[id]">["params"] }) {
   const { id } = await params;
-  return <main className="p-6 text-sm text-muted-foreground">Vorgang {id}</main>;
+  return <CaseDetailView id={id} />;
 }
