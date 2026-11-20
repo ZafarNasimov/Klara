@@ -127,7 +127,8 @@ class TurnRun {
   async run(text: string, langHint: string | null): Promise<TurnResponse> {
     const hint = langHint && langHint !== "auto" ? langHint : null;
     const loaded = await Promise.all(this.state.pending_case_ids.map((id) => store().get("case", id)));
-    this.pending = loaded.filter((c): c is Case => !!c && c.status === "entwurf");
+    // Drafts, plus cases the office sent back for completion ("Zurück zur Ergänzung").
+    this.pending = loaded.filter((c): c is Case => !!c && (c.status === "entwurf" || c.flags.includes("returned")));
     this.state.pending_case_ids = this.pending.map((c) => c.id);
     for (const c of this.pending) this.cases.set(c.id, c);
 
@@ -187,7 +188,7 @@ class TurnRun {
 
   private async documentedCases(): Promise<Case[]> {
     const all = await listCases(this.ctx.project.id);
-    return all.filter((c) => c.conversation_id === this.conv.id && c.status !== "entwurf");
+    return all.filter((c) => c.conversation_id === this.conv.id && c.status !== "entwurf" && !c.flags.includes("returned"));
   }
 
   private todaysItems(): ScheduleItem[] {
@@ -379,6 +380,7 @@ class TurnRun {
       // The card follows Klara's confirming line (user turn at now, Klara at now + 1 ms).
       const saved = await this.save(c, {
         status,
+        flags: c.flags.filter((f) => f !== "returned"),
         facts: {
           _confirmed_at: new Date(this.now.getTime() + 2).toISOString(),
           ...(w ? { _weather: { summary_de: w.summary_de, unusual: w.unusual } } : {}),

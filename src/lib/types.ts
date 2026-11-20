@@ -331,6 +331,21 @@ export type CaseView = Case & {
   author_name: string | null;
 };
 
+/** One case with everything the office case view shows (GET /api/cases/[id]). */
+export type CaseDetail = {
+  case: CaseView;
+  parent: CaseView | null;
+  children: CaseView[];
+  /** Newest first. */
+  versions: DocumentVersion[];
+  evidence: Evidence[];
+  events: AppEvent[];
+  /** Why "Validieren" is not possible yet (null when it is, or already validated). */
+  validation_blocker: string | null;
+  /** Fields the office can ask the Polier about, missing ones first. */
+  askable_fields: { key: string; label: string; missing: boolean }[];
+};
+
 /** Structured readback waiting for the user's yes (shown as a card in the chat). */
 export type ConfirmView = {
   /** Language of the labels and the user-facing values. */

@@ -9,14 +9,14 @@ const FONT = "Arial";
 const SIZE = 21; // half-points: 10.5 pt
 const MM = 56.7; // twips per mm
 
-/** Runs with "[fehlt: …]" placeholders in bold red. */
+/** Runs with "[fehlt: …]" placeholders in bold amber (missing, DESIGN.md). */
 function runs(text: string, opts: { bold?: boolean; italics?: boolean; size?: number; color?: string } = {}): TextRun[] {
   return text
     .split(/(\[fehlt: [^\]]+\])/g)
     .filter(Boolean)
     .map((p) =>
       p.startsWith("[fehlt:")
-        ? new TextRun({ text: p, bold: true, color: "B91C1C", font: FONT, size: opts.size ?? SIZE })
+        ? new TextRun({ text: p, bold: true, color: "B45309", font: FONT, size: opts.size ?? SIZE })
         : new TextRun({ text: p, font: FONT, size: opts.size ?? SIZE, bold: opts.bold, italics: opts.italics, color: opts.color }),
     );
 }

@@ -60,12 +60,19 @@ export async function line(key: LineKey, lang: string, vars: Record<string, stri
   return (await phraseWithLlm(en, lang, "Translate this line.")) ?? en;
 }
 
+/** A note from the office (German) in the user's language; German when no model is available. */
+export async function translateNote(note_de: string, lang: string): Promise<string> {
+  if (lang === "de") return note_de;
+  return (await phraseWithLlm(note_de, lang, "Translate this note from the site manager.")) ?? note_de;
+}
+
 /** The question for one field, in the user's language. */
 export async function question(docType: string, field: string, lang: string): Promise<string> {
   const f = getDocType(docType)?.fields.find((x) => x.key === field);
   if (!f) return line("clarify", lang);
   const pre = f.ask?.[lang as keyof NonNullable<FieldDef["ask"]>];
   if (pre) return pre;
+  if (lang === "de") return `Bitte noch angeben: ${f.label_de}.`;
   const en = f.ask?.en ?? f.question_hint;
   return (await phraseWithLlm(en, lang, "Ask this question.")) ?? en;
 }

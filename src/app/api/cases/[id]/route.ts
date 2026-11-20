@@ -2,11 +2,13 @@ import { connection } from "next/server";
 import { handle } from "@/lib/api";
 import { getCase, listDocumentVersions, listEvents, listEvidence, requireCase, toCaseViews } from "@/lib/db/repo";
 import { store } from "@/lib/db";
+import type { CaseDetail } from "@/lib/types";
+import { askableFields, validationBlocker } from "@/lib/cases/actions";
 
 /** One case with versions, evidence, timeline and linked cases. */
 export async function GET(_req: Request, ctx: RouteContext<"/api/cases/[id]">) {
   await connection();
-  return handle(async () => {
+  return handle(async (): Promise<CaseDetail> => {
     const { id } = await ctx.params;
     const c = await requireCase(id);
     const [versions, evidence, events, children, parent] = await Promise.all([
@@ -24,6 +26,8 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/cases/[id]">) {
       versions,
       evidence,
       events,
+      validation_blocker: c.status === "validiert" ? null : validationBlocker(c),
+      askable_fields: askableFields(c),
     };
   });
 }

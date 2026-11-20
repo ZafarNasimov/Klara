@@ -95,7 +95,8 @@ const s = StyleSheet.create({
     lineHeight: 1.4,
   },
   bullet: { flexDirection: "row", marginBottom: 1.5, paddingLeft: 2 * MM },
-  missing: { color: C.red, fontFamily: "Helvetica-Bold" },
+  // Amber = missing (DESIGN.md traffic light), so a gap is visible on paper.
+  missing: { color: C.yellow, fontFamily: "Helvetica-Bold" },
   footerRule: {
     position: "absolute",
     left: 25 * MM,

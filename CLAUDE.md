@@ -1,5 +1,8 @@
 @AGENTS.md
 
+# Build status
+Read [PROGRESS.md](PROGRESS.md) first: milestone status, how to run, env setup, known issues and the exact next steps. Update it and push at every checkpoint.
+
 # Klara – UI Rules
 - Stack: Next.js (App Router), TypeScript, Tailwind CSS, shadcn/ui, Motion, Lucide icons, shadcn charts.
 - Language: UI in German. The agent Klara replies in the user's language; all documents/PDFs are German.
