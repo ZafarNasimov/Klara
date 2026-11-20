@@ -43,6 +43,7 @@ import {
   type CauseKind,
 } from "@/lib/rules";
 import type { AppUser, Case, Conversation, ConversationState, ScheduleItem, Sphere, Team, Trade, Turn } from "@/lib/types";
+import { generateDocument } from "@/lib/documents/generate";
 import { extract } from "./extract";
 import type { LineKey } from "./lines";
 import { line, question, readback } from "./phrase";
@@ -345,7 +346,7 @@ class TurnRun {
       if (status === "unvollstaendig") incomplete++;
       // The card follows Klara's confirming line (user turn at now, Klara at now + 1 ms).
       const saved = await this.save(c, { status, facts: { _confirmed_at: new Date(this.now.getTime() + 2).toISOString() } });
-      // M2 adds the document version (PDF + DOCX) here.
+      await this.makeDocument(saved);
       await addEvidence(
         { case_id: c.id, kind: "transcript", ref: this.conv.id, data: { conversation_id: this.conv.id, kind: this.conv.kind, turns: transcript } },
         this.now,
@@ -380,6 +381,15 @@ class TurnRun {
     const n = confirmed.length;
     if (n > 1) this.parts.push({ kind: "line", key: "createdMany", vars: { n } });
     else this.parts.push({ kind: "line", key: incomplete ? "createdIncomplete" : "created" });
+  }
+
+  /** SPEC §6.2 step 6: version 1 of the letter (PDF + DOCX are rendered from it). A failure never breaks the call. */
+  private async makeDocument(c: Case): Promise<void> {
+    try {
+      await generateDocument(c.id, this.now);
+    } catch (err) {
+      console.error("[klara] document generation failed", c.reference, err);
+    }
   }
 
   private async endCall(): Promise<void> {
@@ -558,6 +568,7 @@ class TurnRun {
           _confirmed_at: this.now.toISOString(),
         };
         const created = await this.createCase("info_folgegewerk", facts, { status: "bereit", flags: ["suggested"], sphere: null });
+        await this.makeDocument(created);
         await addEvent(
           {
             project_id: this.ctx.project.id,
