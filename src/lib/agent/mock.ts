@@ -369,7 +369,9 @@ export function mockExtract(text: string, ctx: ExtractContext): Extraction {
 
   if (ALL_GOOD.test(t)) return { ...base, intent: "diary_answer", diary_note: "Arbeiten nach Plan, keine besonderen Vorkommnisse." };
 
-  const qty = t.match(QTY);
+  // "Estrich 2.OG heute: 15" from the evening card, unit implied by the schedule item.
+  const evening = /(heute|today|сегодня|dzisiaj|dziś|bugün|azi)\s*:?\s*(?:nur|only|только|tylko|sadece|doar)?\s*(\d+(?:[.,]\d+)?)\s*$/iu.exec(t);
+  const qty = t.match(QTY) ?? (evening ? [evening[0], evening[2]] : null);
   if (qty) {
     const tw = resolveTrade(t, ctx.trades.map((name, i) => ({ id: String(i), project_id: "", name, contracted_by: "us", contact_id: null, team_id: null })));
     const progress: ProgressReport = {

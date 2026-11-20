@@ -330,3 +330,28 @@ export type CaseView = Case & {
   team_name: string | null;
   author_name: string | null;
 };
+
+/** Team channel feed for the mobile app (GET /api/channel/[teamId]). */
+export type ChannelFeed = {
+  team: Team;
+  project_name: string;
+  /** Demo clock. */
+  now: string;
+  llm_mode: "live" | "mock";
+  /** The team's open chat with Klara (null until the first message). */
+  conversation: Conversation | null;
+  turns: Turn[];
+  /** The team's cases (drafts excluded). */
+  cases: CaseView[];
+  /** Calls with Klara, newest first. */
+  calls: { id: string; started_at: string; ended_at: string | null; turns: number }[];
+  today: {
+    day: string;
+    /** Hour of the demo clock in Berlin (morning / evening cards). */
+    hour: number;
+    /** "Alles nach Plan" or another note is already in today's diary. */
+    diary_done: boolean;
+    /** Today's schedule items of the team's own trade, for the evening report. */
+    items: { id: string; label: string; unit: string | null; planned_per_day: number | null; actual_today: number | null }[];
+  };
+};

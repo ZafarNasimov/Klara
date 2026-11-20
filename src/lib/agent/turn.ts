@@ -343,7 +343,8 @@ class TurnRun {
     for (const c of confirmed) {
       const status = c.missing_fields.length ? "unvollstaendig" : "bereit";
       if (status === "unvollstaendig") incomplete++;
-      const saved = await this.save(c, { status, facts: { _confirmed_at: this.now.toISOString() } });
+      // The card follows Klara's confirming line (user turn at now, Klara at now + 1 ms).
+      const saved = await this.save(c, { status, facts: { _confirmed_at: new Date(this.now.getTime() + 2).toISOString() } });
       // M2 adds the document version (PDF + DOCX) here.
       await addEvidence(
         { case_id: c.id, kind: "transcript", ref: this.conv.id, data: { conversation_id: this.conv.id, kind: this.conv.kind, turns: transcript } },

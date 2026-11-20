@@ -79,3 +79,7 @@ export const LANGUAGE_DE: Record<string, string> = {
   ro: "Rumänisch",
   uk: "Ukrainisch",
 };
+
+const isoDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
+/** Berlin calendar day (YYYY-MM-DD), client-safe (no holiday data). */
+export const berlinDayOf = (v: string | Date) => isoDayFmt.format(asDate(v));

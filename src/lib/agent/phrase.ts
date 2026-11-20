@@ -91,7 +91,8 @@ export function formatValue(f: FieldDef, v: unknown, lang: string, now: Date): s
     const dayWord = day === today ? w.today : day === yesterday ? w.yesterday : fmtDate(day);
     return isDate ? dayWord : `${dayWord} ${fmtTime(d)}`;
   }
-  return Array.isArray(v) ? v.join(", ") : String(v);
+  // Values are read inside a sentence; their own final period would double up.
+  return (Array.isArray(v) ? v.join(", ") : String(v)).replace(/[.\s]+$/, "");
 }
 
 function readbackTemplate(cases: Case[], lang: string, now: Date): string {
