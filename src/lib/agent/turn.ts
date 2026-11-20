@@ -23,6 +23,8 @@ import { store } from "@/lib/db";
 import { fmtDateTime } from "@/lib/labels";
 import { computeSphere, CONFIDENCE_THRESHOLD, evaluateCase, nextQuestionField, routeHindrance } from "@/lib/rules";
 import type { Case, Conversation, ConversationState, Turn } from "@/lib/types";
+import { after } from "next/server";
+import { ensureWeatherEvidence, generateVersion } from "@/lib/documents/generate";
 import { extract } from "./extract";
 import { llmMode } from "./llm";
 import { line, question, readback } from "./phrase";
@@ -475,7 +477,7 @@ async function persistEvaluation(c: Case, ctx: ProjectContext, now: Date): Promi
 async function finalizeCase(c: Case, ctx: ProjectContext, conv: Conversation, now: Date) {
   const updated = await persistEvaluation(c, ctx, now);
   const status = updated.missing_fields.length ? "unvollstaendig" : "bereit";
-  await updateCase(c.id, { status });
+  const finalCase = await updateCase(c.id, { status });
   const turns = await listTurns(conv.id);
   await addEvidence(
     {
@@ -498,4 +500,13 @@ async function finalizeCase(c: Case, ctx: ProjectContext, conv: Conversation, no
     },
     now,
   );
+  // German document v1 (PDF + DOCX are rendered from it on demand).
+  await generateVersion(c.id);
+  // Weather of the event day as evidence; never block the call on the network.
+  const weather = () => ensureWeatherEvidence(finalCase).catch(() => {});
+  try {
+    after(weather);
+  } catch {
+    void weather();
+  }
 }
