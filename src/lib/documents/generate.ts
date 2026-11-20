@@ -5,7 +5,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { BadRequestError } from "@/lib/api";
 import { store } from "@/lib/db";
-import { addEvent, getCase, getProjectContext, listDocumentVersions, listEvidence, requireCase, uid } from "@/lib/db/repo";
+import { addEvent, getCase, getProjectContext, listDocumentVersions, listEvidence, requireCase, uid, type ProjectContext } from "@/lib/db/repo";
 import { NotFoundError } from "@/lib/db/store";
 import { berlinDay } from "@/lib/deadlines";
 import { requireDocType } from "@/lib/doctypes";
@@ -27,15 +27,24 @@ async function related(c: Case): Promise<{ parent: Case | null; mehrkosten: Case
   return { parent, mehrkosten };
 }
 
-/** Build and store the next version of a case's letter. Returns null for types without a template. */
-export async function generateDocument(caseId: string, at: Date): Promise<DocumentVersion | null> {
-  const c = await requireCase(caseId);
+type NewEvent = Parameters<typeof addEvent>[0];
+
+/**
+ * Build and store the next version of a case's letter. Returns null for types without a template.
+ * `opts.ctx`: the project context the caller already loaded (saves the round trips).
+ * `opts.queueEvent`: the caller writes the "document_generated" event itself (an agent turn writes all its events last).
+ */
+export async function generateDocument(
+  caseId: string,
+  at: Date,
+  opts: { ctx?: ProjectContext; queueEvent?: (e: NewEvent) => void } = {},
+): Promise<DocumentVersion | null> {
+  const [c, versions] = await Promise.all([requireCase(caseId), listDocumentVersions(caseId)]);
   if (!hasTemplate(c.doc_type)) return null;
-  const versions = await listDocumentVersions(caseId);
   if (versions.some((v) => v.immutable)) throw new BadRequestError("Das Schreiben ist versendet und kann nicht mehr geändert werden");
 
-  const ctx = await getProjectContext(c.project_id);
-  const body = buildBody({ c, letterDate: berlinDay(at), related: await related(c) }, ctx);
+  const [ctx, rel] = await Promise.all([opts.ctx ?? getProjectContext(c.project_id), related(c)]);
+  const body = buildBody({ c, letterDate: berlinDay(at), related: rel }, ctx);
   const md = toMarkdown(body);
   const hash = sha256(md);
   const latest = versions[0];
@@ -65,10 +74,10 @@ export async function generateDocument(caseId: string, at: Date): Promise<Docume
     delivery_status: null,
     immutable: false,
   });
-  await addEvent(
-    { project_id: c.project_id, case_id: c.id, kind: "document_generated", payload: { reference: c.reference, version, sha256: hash } },
-    at,
-  );
+  // After the row: the event triggers the office screen's refetch.
+  const event: NewEvent = { project_id: c.project_id, case_id: c.id, kind: "document_generated", payload: { reference: c.reference, version, sha256: hash } };
+  if (opts.queueEvent) opts.queueEvent(event);
+  else await addEvent(event, at);
   return v;
 }
 

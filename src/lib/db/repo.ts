@@ -51,19 +51,22 @@ export async function listProjects(): Promise<Project[]> {
   return store().list("project", { order: { column: "name" } });
 }
 
+/** Two database round trips: everything keyed by the project id, then company and progress. */
 export async function getProjectContext(projectId: string = DEFAULT_PROJECT_ID): Promise<ProjectContext> {
   const s = store();
-  const project = await getProject(projectId);
-  const [company, contacts, trades, teams, users, schedule] = await Promise.all([
-    s.get("company", project.company_id),
+  const [project, contacts, trades, teams, users, schedule] = await Promise.all([
+    getProject(projectId),
     s.list("contact", { where: { project_id: projectId } }),
     s.list("trade", { where: { project_id: projectId } }),
     s.list("team", { where: { project_id: projectId }, order: { column: "name" } }),
     s.list("app_user", { order: { column: "name" } }),
     s.list("schedule_item", { where: { project_id: projectId }, order: { column: "start_date" } }),
   ]);
+  const [company, progress] = await Promise.all([
+    s.get("company", project.company_id),
+    Promise.all(schedule.map((it) => s.list("progress_entry", { where: { schedule_item_id: it.id } }))).then((x) => x.flat()),
+  ]);
   if (!company) throw new NotFoundError("company", project.company_id);
-  const progress = (await Promise.all(schedule.map((it) => s.list("progress_entry", { where: { schedule_item_id: it.id } })))).flat();
   return { project, company, contacts, trades, teams, users, schedule, progress };
 }
 

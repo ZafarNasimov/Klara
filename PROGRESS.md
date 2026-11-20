@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-20 23:35 UTC (cloud work paused here; continue locally) · branch `claude/project-thread-jrqak8`
+Last update: 2026-11-21 00:00 UTC (local session: call latency) · branch `claude/project-thread-jrqak8`
 
 ## Milestones (SPEC §11)
 
@@ -12,7 +12,7 @@ Last update: 2026-11-20 23:35 UTC (cloud work paused here; continue locally) · 
 | M0 | Skeleton: Next.js, store, schema, seed, role switcher, screen shells | ✅ done |
 | M1 | Text pipeline: rules engine, `/api/agent/turn`, readback/confirm, text chat | ✅ done |
 | M2 | Documents: templates, PDF + DOCX, sha256, versions, admin case view | ✅ done |
-| M3 | Voice: call screen, hands-free + push-to-talk, STT/TTS (needs `OPENAI_API_KEY`) | 🟡 built; live-key verification pending |
+| M3 | Voice: call screen, hands-free + push-to-talk, STT/TTS (needs `OPENAI_API_KEY`) | 🟡 built; latency cut to 2.6–4.3 s per voice turn (server side); real-phone test pending |
 | M4 | E-mail: composer, Postmark send, inbound reply analysis | ⬜ |
 | M5 | Realtime, polish, fallbacks ("Antwort simulieren") | ⬜ |
 | M6 | Eval set (`eval/utterances.json`, ≥30) and `eval/run.ts` | ⬜ |
@@ -33,7 +33,9 @@ Last update: 2026-11-20 23:35 UTC (cloud work paused here; continue locally) · 
 - **Bautagesbericht** (`src/lib/reports/daily.ts`, template `templates/bautagesbericht.ts`): one case per team and day (reference `BTB-YYYYMMDD-<KOLONNE>`, outside KL numbering), compiled from the evening quantities (plan vs. actual table), the team's cases of the day (Besondere Vorkommnisse, Anordnungen), diary notes, site weather and names. Rebuilt after every evening quantity; missing Personal is asked in the chat (flag `collecting`), the yes writes the next version. DocBody has `form: "report"` plus `heading` / `table` / `signatures` blocks (PDF, DOCX, HTML preview). `POST /api/teams/[teamId]/daily-report {date?}` compiles on demand.
 - **Voice, step 1 push-to-talk** (`src/lib/voice/`, `src/app/app/call/[callId]/call-view.tsx`): call screen with phases ready/ringing → listening → recording → processing → speaking, Klara greets by first name, hold-to-talk or tap-to-start/tap-to-send, live waveform from the mic, transcript with German subtitles, case cards, hang-up → "Gespräch beendet" with the cases and the protocol. `POST /api/voice` (multipart audio → OpenAI `gpt-4o-transcribe` → noise filter `segment.ts` → same agent turn), `GET /api/tts` (OpenAI `gpt-4o-mini-tts` MP3 stream; the browser voice when there is no key or it fails), `POST /api/conversations/[id]/end`. Typing works any time and is the only input without `OPENAI_API_KEY`. iOS: audio is unlocked inside the start tap. Verified with Playwright (typed call, and push-to-talk with a stubbed `/api/voice`); real OpenAI audio is untested.
 - **Voice, step 2 hands-free** (`src/lib/voice/vad.ts`): default mode once the mic is open. Silero VAD (`@ricky0123/vad-web`, model v5) runs on the call's own mic stream and AudioContext (created in the start tap for iOS); each utterance goes as a 16 kHz WAV to the same `/api/voice`. Paused while Klara thinks and speaks, resumed 300 ms after she stops (no barge-in). Toggle "Freihändig" ⇄ "Push-to-Talk" keeps the conversation; in hands-free the centre button mutes. If the detector cannot load, the screen falls back to push-to-talk with a notice. Settings (silence before end of turn, minimum speech, threshold) come from `/admin/demo` (`POST /api/demo/vad`) via `GET /api/voice`. `npm install` copies the model, worklet and ONNX runtime to `public/vad/` (`scripts/copy-vad-assets.mjs`, gitignored output). Verified with Playwright and a fake mic playing synthetic speech (`--use-file-for-fake-audio-capture`): three spoken turns to a confirmed Behinderungsanzeige; `/api/voice` was stubbed because this session has no OpenAI key. Noise filter keeps one-word answers ("Ja", "2") on purpose, otherwise confirm by voice would break (SPEC says "under 2 words").
-- **Tests:** 108 Vitest tests, incl. SPEC §10 scenarios (`src/lib/agent/turn.test.ts`) and office/Polier actions (`src/lib/cases/actions.test.ts`).
+- **Turn timing** (`src/lib/timing.ts`): `/api/voice` and `/api/agent/turn` log one line per request (`[klara] timing POST /api/voice total=… stt=… db=…(23x) llm.record_turn=… render=… document=…`, plus model, effort and token counts) and send the same steps as a `Server-Timing` header (browser network panel). `db` is wall time with a store call in flight. `scripts/bench-call.mjs` replays the golden-path call turn by turn (text or real audio) and prints those steps.
+- **Fewer database round trips per turn** (each is ~110 ms to Supabase from a laptop): `loadTurn` reads conversation → team, open cases, last turns, the conversation's cases side by side → project context (2 rounds instead of 3); `/api/voice` runs these reads while speech-to-text runs. During a turn case changes stay in memory and are written once per case (`flush` before anything reads cases from the store: letter, Bautagesbericht, open hindrance lookup); evidence and Klara's turn are written side by side; **events are written last** (they trigger the office screen's refetch, so the data must be stored first), +1 ms each to keep their order in "Verlauf". `generateDocument` takes the caller's project context and queued events.
+- **Tests:** 110 Vitest tests, incl. SPEC §10 scenarios (`src/lib/agent/turn.test.ts`) and office/Polier actions (`src/lib/cases/actions.test.ts`).
 
 ### M2 screens
 
@@ -41,33 +43,40 @@ Last update: 2026-11-20 23:35 UTC (cloud work paused here; continue locally) · 
 - ✅ `/app/case/[id]` mobile case page with "Per Sprache korrigieren" (critique notes in `.impeccable/critique/`).
 - ✅ `/admin/case/[id]` office case page (`src/app/admin/case/[id]/case-detail.tsx`): header with status, deadline, **Validieren** (shows why it is blocked), **Zurück zur Ergänzung** dialog, **E-Mail vorbereiten** once validated (M4 composer still a shell); tabs Dokument (HTML letter preview from the same DocBody, version switch, SHA-256, PDF/Word download), Nachweise (transcript, weather), Verlauf, Hinweise; right rail with checks and facts. Critiqued (29/40) and the findings fixed.
 
-### Live voice test (2026-11-20, 23:20 UTC, cloud session, real keys)
+### Call latency work (2026-11-21, local, real keys)
 
-Path tested over HTTP (no browser): `POST /api/conversations` (kind call) → `POST /api/voice` (multipart audio + conversation_id) → `GET /api/tts`.
+Measured on the laptop with `npm run dev` (port 3100), memory store with `DB_SIMULATED_LATENCY_MS=110` (same delay as Supabase from here, measured read-only: median 110 ms per call, first call ~900 ms), live Claude (`claude-sonnet-5-5`, effort low), OpenAI STT. Golden path (SPEC §1), 2 English + 1 German call per setting. Timings are from one machine and a few runs: directions, not exact numbers.
 
-| Step | Result | Time |
+| Turn | DB wait before → after | Whole turn after (voice, incl. STT) |
 |---|---|---|
-| `GET /api/tts?lang=de` (gpt-4o-mini-tts) | 200, `audio/mpeg`, 79 KB MP3 | first byte 1.75 s, full 2.2 s |
-| STT only (`/api/voice` without conversation_id) | transcript exact: "Die Elektriker sind im zweiten Stock noch nicht fertig. Vier Leute warten." | 1.15 s |
-| Turn 1 (STT + live Claude) | `source: "live"` (no Testmodus). Behinderungsanzeige draft, 2.OG, Elektro, 4 idle staff, client sphere green; missing `start_at` (amber). Reply: "Seit wann genau? Bitte Datum und Uhrzeit." | **9.3 s** |
-| Turn 2 (flite English voice saying German) | STT garbled ("Saeidhoiud morgenum siebenwehr"), a test-audio artifact, not an app bug. Klara asked again for the time, correctly. | **11.4 s** |
+| 1 report → question | 1.66–1.69 s → 0.93–0.95 s (reads now run during STT) | 3.8–4.2 s EN, 4.0 s DE |
+| 2 answer → readback | 1.27–1.29 s → 0.70–0.72 s | 3.9–4.3 s EN (incl. 1.2–1.3 s phrasing call), 2.6 s DE |
+| 3 yes → letter v1 | 2.56 s → 1.30–1.33 s | 2.9–3.5 s EN, 3.2 s DE |
 
-Findings:
-1. **Latency misses the SPEC target (< 4 s).** STT is ~1.1 s, so ~8–10 s is the Claude turn (main model `KLARA_ANTHROPIC_MODEL`, default effort, `max_tokens` 4000 in `src/lib/agent/llm.ts`). Ideas: use the fast model and `effort: "low"` for call turns, smaller `max_tokens`, stream the reply and start TTS on the first sentence. Add per-step timing logs to `/api/voice` to confirm.
-2. In cloud sessions `api.openai.com` was missing from the Default environment allowlist (proxy 403, "fetch failed"). Added 2026-11-20 23:20 UTC. Locally this does not apply.
-3. Real phone test of hands-free VAD still to do (needs a browser + mic).
+Still in a turn: Claude `record_turn` 1.5–2.8 s, STT 0.5–1.3 s, the phrasing call 1.1–1.3 s (only readbacks in languages other than German), Klara's voice starts 0.6–1.2 s after the reply (`/api/tts`, independent of line length).
+
+Why the cloud test showed 9–11 s (likely, not re-measured in the cloud): each turn made 21–41 store calls, mostly one after another, through the egress proxy; locally the Claude call alone was never more than ~3 s.
+
+Tried and rejected (probe of 11 utterances, SPEC §10 + golden path, interleaved):
+- Effort low vs default on `record_turn`: same speed (median 2.17 s vs 2.05 s). The effort setting did not cause the cloud latency.
+- `claude-haiku-5-5` for `record_turn`: faster (median 1.25 s) but it returned **no event** for the golden-path sentence and blamed Elektro for an unreleased slab in the two-event case. Sonnet stays.
+- Thinking off (`thinking: {type: "between_tools"}`): slower (median 3.1–3.2 s vs 2.1 s in two runs).
+- `gpt-4o-mini-transcribe`: same speed as `gpt-4o-transcribe` (0.63 s vs 0.60 s median) and same transcripts on clean audio. Kept `gpt-4o-transcribe`.
+- Splitting Klara's line into sentences for TTS: first audio comes after 0.6–1.2 s whatever the length, so no gain.
+
+Open options (need a decision, see Next steps 1):
+- (a) No phrasing call for en/ru readbacks (SPEC "latency tip"): `record_turn` would also return the free-text facts in the user's language and the readback uses the template. Saves ~1.2 s on the readback turn; changes the extraction prompt, so it needs the M6 eval first.
+- (b) Paid: `claude-opus-5-5` with fast mode for `record_turn` (list price $8/$40 per MTok, about $0.02 per turn vs ~$0.005 now; prices from the API skill, not re-checked). Not measured.
+- (c) Write the events after the response (`after()`): one round trip less (~0.1 s).
+
+Earlier cloud test (2026-11-20, 23:20 UTC, HTTP only): STT exact and 1.15 s, TTS first byte 1.75 s, turns 9.3 s and 11.4 s. In cloud sessions `api.openai.com` had to be added to the environment allowlist.
 
 ### Next steps, in order
 
-1. **Fix call latency, then finish M3** (live test above: 9–11 s per turn, target < 4 s; STT ~1.1 s and TTS first byte ~1.75 s are fine, the Claude turn takes ~8–10 s).
-   - First add per-step timing logs to `/api/voice` and `runTurn` (STT, extraction, phrasing, save) to see where the time goes.
-   - A live turn makes one extraction call (`src/lib/agent/extract.ts`, main model) plus fast-model phrasing calls for questions and readback in the user's language (`src/lib/agent/phrase.ts` → `phraseWithLlm`).
-   - Levers, cheapest first:
-     - **(a)** Use the pre-written per-field phrasings in `lines.ts` / the doc type `question_hint`s for questions in the 6 languages, and call the model only for languages without a pre-written line. This removes one round trip on most turns.
-     - **(b)** Use `fastModel()` with `effort: "low"` for `record_turn` on call turns, and keep the main model for chat or as a retry when validation fails.
-     - **(c)** Set `max_tokens` to ~1200 for `record_turn`; it is 4000 now in `callTool`.
-     - **(d)** Start TTS on the first sentence while the rest is still being built.
-   - Re-measure with the same HTTP test, then on a real phone over HTTPS (iOS start tap, VAD defaults in `/admin/demo` for a loud site). Then mark M3 ✅.
+1. **Finish M3** (latency work done, see above).
+   - Real phone over HTTPS (`next dev --experimental-https` or a tunnel) with the Supabase backend: check the `[klara] timing` lines (or `Server-Timing` in the browser) against the numbers above, the iOS start tap, and the VAD defaults in `/admin/demo` for a loud site. Then mark M3 ✅.
+   - Ask Zafar whether to do option (a) (after M6 eval) or (b) (paid) from "Call latency work". Without them a readback turn in English is ~4 s on the server plus ~1 s until Klara speaks.
+   - Where the app runs for the demo matters: hosted in the same region as the Supabase project (e.g. Vercel), a store call should take a few ms instead of ~110 ms, so most of the remaining DB wait would go (not measured).
 2. **M4 e-mail loop** (SPEC §6.4, §8 `/admin/mail/[draftId]`, §11 M4). Pieces that already exist:
    - tables and types `email_out` (status default `entwurf`) and `email_in`;
    - doc type and template `stellungnahme_zurueckweisung`;
@@ -112,6 +121,13 @@ Without any keys Klara runs fully: memory store + keyword reader (only simple se
 - `npm install` also copies the voice-detector files to `public/vad/` (postinstall). If hands-free says it cannot start, run `node scripts/copy-vad-assets.mjs`.
 - The microphone needs a secure page: `http://localhost` works; for a phone on your network use `next dev --experimental-https` or a tunnel.
 - Memory mode keeps data in `.data/db.json` (`MEMORY_PERSIST=1`). `/admin/demo` → "Demo zurücksetzen" reloads the seed.
+- Measure call latency without touching Supabase:
+  ```bash
+  # PowerShell: $env:DATA_BACKEND='memory'; $env:MEMORY_PERSIST='0'; $env:DB_SIMULATED_LATENCY_MS='110'; npx next dev -p 3100
+  DATA_BACKEND=memory MEMORY_PERSIST=0 DB_SIMULATED_LATENCY_MS=110 npx next dev -p 3100
+  node scripts/bench-call.mjs --base http://localhost:3100 --lang en --runs 2 --voice   # --lang de; drop --voice for text turns
+  ```
+  Live Claude and OpenAI calls are billed (a run of 2 calls costs a few cents). Recordings are cached in `.data/bench-audio/`. `TIMING_DB_DETAIL=1` splits the `db` step per table.
 
 ## Environment
 
@@ -141,7 +157,7 @@ Status (2026-11-20, checked from a separate session): all 18 tables exist and th
 
 ## Known issues and open decisions
 
-- Keys were checked on 2026-11-20 from a separate cloud session (Supabase with 2 teams, Anthropic, OpenAI). The live voice path works over HTTP (see "Live voice test"), but a turn takes 9–11 s against the 4 s target (Next steps 1). The browser call screen has not run with real keys yet. Newer models reject forced `tool_choice`; `src/lib/agent/llm.ts` falls back to auto + instruction.
+- Keys were checked on 2026-11-20 from a separate cloud session (Supabase with 2 teams, Anthropic, OpenAI). The live voice path works over HTTP; after the 2026-11-21 latency work a voice turn takes 2.6–4.3 s on the server locally (see "Call latency work"). The browser call screen has not run with real keys yet. Newer models reject forced `tool_choice`; `src/lib/agent/llm.ts` falls back to auto + instruction.
 - Hands-free was verified only with a simulated mic (Playwright `--use-file-for-fake-audio-capture` with synthetic speech) and a stubbed `/api/voice`.
 - Open-Meteo's free tier rate-limits shared cloud IPs ("Daily API request limit exceeded"); then no weather is attached.
 - All letter texts are prototype drafts: **TODO legal review** (SPEC D8). Weather "unusual" thresholds are a heuristic.

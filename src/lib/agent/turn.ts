@@ -46,6 +46,7 @@ import {
 import type { AppUser, Case, CaseView, Conversation, ConversationState, DocumentVersion, ScheduleItem, Sphere, Team, Trade, Turn } from "@/lib/types";
 import { generateDocument } from "@/lib/documents/generate";
 import { compileDailyReport } from "@/lib/reports/daily";
+import { timed } from "@/lib/timing";
 import { fetchWeather, type WeatherRecord } from "@/lib/weather";
 import { extract } from "./extract";
 import type { LineKey } from "./lines";
@@ -88,17 +89,46 @@ const nowBerlinFmt = new Intl.DateTimeFormat("en-GB", {
 const publicFacts = (facts: Record<string, unknown>) => Object.fromEntries(Object.entries(facts).filter(([k]) => !k.startsWith("_")));
 const tradeKey = (guess: string | null) => (canonicalTradeName(guess) ?? "").toLowerCase();
 
-export async function runTurn(input: TurnInput): Promise<TurnResponse> {
-  const text = input.text.trim();
-  if (!text) throw new BadRequestError("Text fehlt");
-  const conv = await getConversation(input.conversationId);
-  if (!conv) throw new NotFoundError("conversation", input.conversationId);
+/** The conversation's open cases, read by id (they may belong to an earlier conversation when reopened). */
+const loadCases = (conv: Conversation) => Promise.all((conv.state?.pending_case_ids ?? []).map((id) => store().get("case", id)));
+
+/** Everything a turn reads before the model call. */
+export type LoadedTurn = {
+  conv: Conversation;
+  team: Team;
+  ctx: ProjectContext;
+  pending: (Case | null)[];
+  history: Turn[];
+  convCases: Case[];
+};
+
+/**
+ * Database round trips are the other big share of a turn besides the model
+ * call (each one is ~100 ms to Supabase), so reads run side by side: the
+ * conversation, then everything keyed by it, then the project context.
+ * They do not need the user's words: /api/voice starts this while speech-to-text runs.
+ */
+export async function loadTurn(conversationId: string): Promise<LoadedTurn> {
+  const conv = await getConversation(conversationId);
+  if (!conv) throw new NotFoundError("conversation", conversationId);
   if (conv.status === "closed") throw new BadRequestError("Das Gespräch ist bereits beendet");
-  const team = await store().get("team", conv.team_id);
+  const [team, pending, history, convCases] = await Promise.all([
+    store().get("team", conv.team_id),
+    loadCases(conv),
+    listTurns(conv.id, 10),
+    store().list("case", { where: { conversation_id: conv.id }, order: { column: "created_at", ascending: false } }),
+  ]);
   if (!team) throw new NotFoundError("team", conv.team_id);
   const ctx = await getProjectContext(team.project_id);
+  return { conv, team, ctx, pending, history, convCases };
+}
+
+export async function runTurn(input: TurnInput & { loaded?: Promise<LoadedTurn> }): Promise<TurnResponse> {
+  const text = input.text.trim();
+  if (!text) throw new BadRequestError("Text fehlt");
+  const { conv, team, ctx, pending, history, convCases } = await (input.loaded ?? loadTurn(input.conversationId));
   const now = input.now ?? withOffset(clockBase(), ctx.project.settings.demo_clock_offset_ms);
-  return new TurnRun(ctx, conv, team, now).run(text, input.language ?? null);
+  return new TurnRun(ctx, conv, team, now, pending).run(text, input.language ?? null, history, convCases);
 }
 
 /** End a call without a spoken goodbye (the "Auflegen" button). Chats stay open. */
@@ -107,11 +137,13 @@ export async function hangUp(conversationId: string, now?: Date): Promise<{ conv
   if (!conv) throw new NotFoundError("conversation", conversationId);
   if (conv.kind !== "call") throw new BadRequestError("Nur Anrufe können aufgelegt werden");
   if (conv.status === "closed") return { conversation: conv, cases: [] };
-  const team = await store().get("team", conv.team_id);
+  const [team, pending] = await Promise.all([store().get("team", conv.team_id), loadCases(conv)]);
   if (!team) throw new NotFoundError("team", conv.team_id);
   const ctx = await getProjectContext(team.project_id);
-  return new TurnRun(ctx, conv, team, now ?? withOffset(clockBase(), ctx.project.settings.demo_clock_offset_ms)).hangUp();
+  return new TurnRun(ctx, conv, team, now ?? withOffset(clockBase(), ctx.project.settings.demo_clock_offset_ms), pending).hangUp();
 }
+
+type NewEvent = Parameters<typeof addEvent>[0];
 
 class TurnRun {
   private readonly today: string;
@@ -126,12 +158,21 @@ class TurnRun {
   private userText = "";
   private userTextDe: string | null = null;
   private ended = false;
+  /** The user's turn, stored while the turn is worked out; awaited before anything reads the turns. */
+  private userTurn: Promise<Turn> | null = null;
+  /** Case changes kept in memory and written once per case (`flush`), by changed column. */
+  private readonly dirty = new Map<string, Set<string>>();
+  /** Writes nothing in this turn reads back (evidence), awaited before the turn returns. */
+  private readonly writes: Promise<unknown>[] = [];
+  /** Events go last: each one makes open screens refetch, so the data they announce must be stored first. */
+  private readonly events: NewEvent[] = [];
 
   constructor(
     private readonly ctx: ProjectContext,
     private readonly conv: Conversation,
     private readonly team: Team,
     private readonly now: Date,
+    loaded: (Case | null)[],
   ) {
     this.today = berlinDay(now);
     this.region = holidayRegion(ctx.project);
@@ -139,10 +180,6 @@ class TurnRun {
     this.user = ctx.users.find((u) => u.id === conv.user_id) ?? null;
     const s = conv.state ?? { pending_case_ids: [] };
     this.state = { ...s, pending_case_ids: [...(s.pending_case_ids ?? [])] };
-  }
-
-  private async loadPending(): Promise<void> {
-    const loaded = await Promise.all(this.state.pending_case_ids.map((id) => store().get("case", id)));
     // Drafts, plus cases reopened in this chat (office "Zurück zur Ergänzung", Polier "Per Sprache korrigieren").
     this.pending = loaded.filter((c): c is Case => !!c && (c.status === "entwurf" || isReopened(c)));
     this.state.pending_case_ids = this.pending.map((c) => c.id);
@@ -151,46 +188,54 @@ class TurnRun {
 
   /** "Auflegen": unconfirmed drafts are kept for the office, the call is closed. */
   async hangUp(): Promise<{ conversation: Conversation; cases: CaseView[] }> {
-    await this.loadPending();
     await this.endCall();
-    const conversation = await updateConversation(this.conv.id, { state: this.state, status: "closed", ended_at: this.now.toISOString() });
+    const [conversation] = await Promise.all([
+      updateConversation(this.conv.id, { state: this.state, status: "closed", ended_at: this.now.toISOString() }),
+      this.flushWrites(),
+    ]);
+    await this.writeEvents();
     const touched = [...this.touched].map((id) => this.cases.get(id)).filter((c): c is Case => !!c);
     return { conversation, cases: await toCaseViews(touched, this.ctx) };
   }
 
-  async run(text: string, langHint: string | null): Promise<TurnResponse> {
+  async run(text: string, langHint: string | null, history: Turn[], convCases: Case[]): Promise<TurnResponse> {
     const hint = langHint && langHint !== "auto" ? langHint : null;
-    await this.loadPending();
-
-    const [history, convCases] = await Promise.all([listTurns(this.conv.id, 10), this.documentedCases()]);
-    const { extraction: ex, source } = await extract(text, this.extractContext(history, convCases, hint));
+    const documented = convCases.filter((c) => c.status !== "entwurf" && !isReopened(c));
+    const { extraction: ex, source } = await timed("extract", () => extract(text, this.extractContext(history, documented, hint)));
 
     const words = text.split(/\s+/).length;
     const lang = hint ?? (this.conv.language && words < 4 ? this.conv.language : ex.reply_language) ?? this.conv.language ?? "de";
     this.userText = text;
     this.userTextDe = lang === "de" ? text : ex.text_de;
 
-    const userTurn = await addTurn(
-      { conversation_id: this.conv.id, role: "user", text_original: text, text_de: this.userTextDe, language: lang, audio_url: null },
-      this.now,
+    this.userTurn = this.later(
+      addTurn(
+        { conversation_id: this.conv.id, role: "user", text_original: text, text_de: this.userTextDe, language: lang, audio_url: null },
+        this.now,
+      ),
     );
 
     this.state.confirm_intro = null;
     await this.handle(ex);
 
     if (!this.parts.length) this.parts.push({ kind: "line", key: "smalltalk" });
-    const [reply, replyDe] = await Promise.all([this.render(lang), lang === "de" ? null : this.render("de")]);
-    const klaraTurn = await addTurn(
-      { conversation_id: this.conv.id, role: "klara", text_original: reply, text_de: replyDe ?? reply, language: lang, audio_url: null },
-      new Date(this.now.getTime() + 1),
-    );
+    const [reply, replyDe] = await timed("render", () => Promise.all([this.render(lang), lang === "de" ? null : this.render("de")]));
 
     const closing = this.ended && this.conv.kind === "call";
-    await updateConversation(this.conv.id, {
-      state: this.state,
-      language: lang,
-      ...(closing ? { status: "closed" as const, ended_at: this.now.toISOString() } : {}),
-    });
+    const [userTurn, klaraTurn] = await Promise.all([
+      this.userTurn,
+      addTurn(
+        { conversation_id: this.conv.id, role: "klara", text_original: reply, text_de: replyDe ?? reply, language: lang, audio_url: null },
+        new Date(this.now.getTime() + 1),
+      ),
+      updateConversation(this.conv.id, {
+        state: this.state,
+        language: lang,
+        ...(closing ? { status: "closed" as const, ended_at: this.now.toISOString() } : {}),
+      }),
+      this.flushWrites(),
+    ]);
+    await this.writeEvents();
 
     const touched = [...this.touched].map((id) => this.cases.get(id)).filter((c): c is Case => !!c);
     return {
@@ -215,12 +260,42 @@ class TurnRun {
     };
   }
 
-  // ── Context for the extractor ───────────────────────────────────────
+  // ── Writes ──────────────────────────────────────────────────────────
 
-  private async documentedCases(): Promise<Case[]> {
-    const all = await listCases(this.ctx.project.id);
-    return all.filter((c) => c.conversation_id === this.conv.id && c.status !== "entwurf" && !isReopened(c));
+  /** Track a write started now; failures surface when the turn awaits it. */
+  private later<T>(p: Promise<T>): Promise<T> {
+    p.catch(() => {}); // awaited in flushWrites; avoids an unhandled rejection until then
+    this.writes.push(p);
+    return p;
   }
+
+  private queueEvent(input: NewEvent): void {
+    this.events.push(input);
+  }
+
+  /** Store the case changes made in memory: one update per case, side by side. */
+  private async flush(): Promise<void> {
+    const batch = [...this.dirty];
+    this.dirty.clear();
+    await Promise.all(
+      batch.map(([id, keys]) => {
+        const c = this.cases.get(id)!;
+        const patch = Object.fromEntries([...keys].map((k) => [k, c[k as keyof Case]])) as Partial<Case>;
+        return updateCase(id, patch, this.now);
+      }),
+    );
+  }
+
+  private async flushWrites(): Promise<void> {
+    await Promise.all([this.flush(), ...this.writes]);
+  }
+
+  /** One round trip for all events; +1 ms each keeps their order in the case history ("Verlauf"). */
+  private async writeEvents(): Promise<void> {
+    await Promise.all(this.events.splice(0).map((e, i) => addEvent(e, new Date(this.now.getTime() + i))));
+  }
+
+  // ── Context for the extractor ───────────────────────────────────────
 
   private todaysItems(): ScheduleItem[] {
     return this.ctx.schedule.filter((s) => s.start_date <= this.today && this.today <= s.end_date);
@@ -361,10 +436,7 @@ class TurnRun {
     if (misses >= 3) {
       const note = this.userTextDe ?? this.userText;
       await addDiaryEntry(this.team.id, this.today, { kind: "note", text: `Unklare Meldung: ${note}`, at: this.now.toISOString() });
-      await addEvent(
-        { project_id: this.ctx.project.id, case_id: null, kind: "diary_entry", payload: { text: `Unklare Meldung: ${note}`, team_id: this.team.id } },
-        this.now,
-      );
+      this.queueEvent({ project_id: this.ctx.project.id, case_id: null, kind: "diary_entry", payload: { text: `Unklare Meldung: ${note}`, team_id: this.team.id } });
       this.state.clarify_count = 0;
       this.state.tentative = null;
       this.parts.push({ kind: "line", key: "clarifyGiveUp" });
@@ -395,14 +467,18 @@ class TurnRun {
   private async confirm(): Promise<void> {
     const ids = new Set(this.state.awaiting_confirm ?? []);
     const confirmed = this.pending.filter((c) => ids.has(c.id));
-    const transcript = (await listTurns(this.conv.id)).map((t) => ({
+    // The transcript includes this turn's "yes", so it waits for that write; the weather lookup runs alongside.
+    const [turns, weather] = await Promise.all([
+      (this.userTurn ?? Promise.resolve()).then(() => listTurns(this.conv.id)),
+      timed("weather", () => this.weatherFor(confirmed)),
+    ]);
+    const transcript = turns.map((t) => ({
       role: t.role,
       text: t.text_original,
       text_de: t.text_de,
       language: t.language,
       at: t.created_at,
     }));
-    const weather = await this.weatherFor(confirmed);
     let incomplete = 0;
     for (const c of confirmed) {
       const status = c.missing_fields.length ? "unvollstaendig" : "bereit";
@@ -417,33 +493,29 @@ class TurnRun {
           ...(w ? { _weather: { summary_de: w.summary_de, unusual: w.unusual } } : {}),
         },
       });
-      if (w) await addEvidence({ case_id: c.id, kind: "weather", ref: w.source, data: { ...w } }, this.now);
+      if (w) this.later(addEvidence({ case_id: c.id, kind: "weather", ref: w.source, data: { ...w } }, this.now));
+      this.later(
+        addEvidence(
+          { case_id: c.id, kind: "transcript", ref: this.conv.id, data: { conversation_id: this.conv.id, kind: this.conv.kind, turns: transcript } },
+          this.now,
+        ),
+      );
       const doc = await this.makeDocument(saved);
       // A correction that changed nothing keeps the office's approval of the same letter.
       if (doc?.validated_at && status === "bereit") await this.save(saved, { status: "validiert" });
-      await addEvidence(
-        { case_id: c.id, kind: "transcript", ref: this.conv.id, data: { conversation_id: this.conv.id, kind: this.conv.kind, turns: transcript } },
-        this.now,
-      );
-      await addEvent(
-        {
+      this.queueEvent({
+        project_id: this.ctx.project.id,
+        case_id: c.id,
+        kind: "case_confirmed",
+        payload: { reference: c.reference, doc_type: c.doc_type, status, by: this.user?.name ?? null },
+      });
+      if (saved.flags.includes("escalate")) {
+        this.queueEvent({
           project_id: this.ctx.project.id,
           case_id: c.id,
-          kind: "case_confirmed",
-          payload: { reference: c.reference, doc_type: c.doc_type, status, by: this.user?.name ?? null },
-        },
-        this.now,
-      );
-      if (saved.flags.includes("escalate")) {
-        await addEvent(
-          {
-            project_id: this.ctx.project.id,
-            case_id: c.id,
-            kind: "risk_flag",
-            payload: { reference: c.reference, reason_de: "Ankündigung vor Ausführung versäumt – bitte Bauleitung einbinden" },
-          },
-          this.now,
-        );
+          kind: "risk_flag",
+          payload: { reference: c.reference, reason_de: "Ankündigung vor Ausführung versäumt – bitte Bauleitung einbinden" },
+        });
       }
     }
     this.pending = this.pending.filter((c) => !ids.has(c.id));
@@ -460,7 +532,9 @@ class TurnRun {
   /** SPEC §6.2 step 6: version 1 of the letter (PDF + DOCX are rendered from it). A failure never breaks the call. */
   private async makeDocument(c: Case): Promise<DocumentVersion | null> {
     try {
-      return await generateDocument(c.id, this.now);
+      // The letter is built from the stored case.
+      await this.flush();
+      return await timed("document", () => generateDocument(c.id, this.now, { ctx: this.ctx, queueEvent: (e) => this.queueEvent(e) }));
     } catch (err) {
       console.error("[klara] document generation failed", c.reference, err);
       return null;
@@ -474,23 +548,20 @@ class TurnRun {
       }
       this.parts.push({ kind: "line", key: "unconfirmedSaved" });
     }
-    await addEvent(
-      {
-        project_id: this.ctx.project.id,
-        case_id: null,
-        kind: "call_ended",
-        payload: {
-          conversation_id: this.conv.id,
-          team_id: this.team.id,
-          summary_de: this.pending.length
-            ? `${this.pending.length} Vorgang ohne Bestätigung gespeichert`
-            : this.conv.kind === "call"
-              ? "Anruf beendet"
-              : "Unterhaltung beendet",
-        },
+    this.queueEvent({
+      project_id: this.ctx.project.id,
+      case_id: null,
+      kind: "call_ended",
+      payload: {
+        conversation_id: this.conv.id,
+        team_id: this.team.id,
+        summary_de: this.pending.length
+          ? `${this.pending.length} Vorgang ohne Bestätigung gespeichert`
+          : this.conv.kind === "call"
+            ? "Anruf beendet"
+            : "Unterhaltung beendet",
       },
-      this.now,
-    );
+    });
     this.pending = [];
     this.state = { pending_case_ids: [], hired_by: this.state.hired_by };
     this.parts.push({ kind: "line", key: "goodbye" });
@@ -562,10 +633,7 @@ class TurnRun {
   private async applyDiary(ex: Extraction): Promise<boolean> {
     if (!ex.diary_note) return false;
     await addDiaryEntry(this.team.id, this.today, { kind: "note", text: ex.diary_note, at: this.now.toISOString(), by: this.user?.name ?? null });
-    await addEvent(
-      { project_id: this.ctx.project.id, case_id: null, kind: "diary_entry", payload: { text: ex.diary_note, team_id: this.team.id } },
-      this.now,
-    );
+    this.queueEvent({ project_id: this.ctx.project.id, case_id: null, kind: "diary_entry", payload: { text: ex.diary_note, team_id: this.team.id } });
     this.parts.push({ kind: "line", key: "diaryNoted" });
     return true;
   }
@@ -610,10 +678,7 @@ class TurnRun {
         planned: item.planned_per_day,
         at: this.now.toISOString(),
       });
-      await addEvent(
-        { project_id: this.ctx.project.id, case_id: null, kind: "progress_recorded", payload: { summary_de: summary, schedule_item_id: item.id, team_id: this.team.id } },
-        this.now,
-      );
+      this.queueEvent({ project_id: this.ctx.project.id, case_id: null, kind: "progress_recorded", payload: { summary_de: summary, schedule_item_id: item.id, team_id: this.team.id } });
       this.parts.push({
         kind: "line",
         key: "progressNoted",
@@ -623,10 +688,7 @@ class TurnRun {
       if (!pa?.deviation) continue;
       const delay = Number.isFinite(pa.forecast_delay_days) ? Math.ceil(pa.forecast_delay_days) : null;
       const reason = `${summary}. Prognose: ${delay ? `ca. ${delay} Arbeitstage` : "nicht absehbar"} Verzug.`;
-      await addEvent(
-        { project_id: this.ctx.project.id, case_id: null, kind: "deviation", payload: { reason_de: reason, schedule_item_id: item.id, team_id: this.team.id } },
-        this.now,
-      );
+      this.queueEvent({ project_id: this.ctx.project.id, case_id: null, kind: "deviation", payload: { reason_de: reason, schedule_item_id: item.id, team_id: this.team.id } });
       for (const dep of dependents(item.id, this.ctx.schedule)) {
         const depTrade = this.ctx.trades.find((t) => t.id === dep.trade_id) ?? null;
         const contact = this.ctx.contacts.find((c) => c.id === depTrade?.contact_id) ?? null;
@@ -644,15 +706,12 @@ class TurnRun {
         };
         const created = await this.createCase("info_folgegewerk", facts, { status: "bereit", flags: ["suggested"], sphere: null });
         await this.makeDocument(created);
-        await addEvent(
-          {
-            project_id: this.ctx.project.id,
-            case_id: created.id,
-            kind: "followup_proposed",
-            payload: { reference: created.reference, doc_type: created.doc_type, summary_de: `Information an ${contact?.organisation ?? depTrade?.name ?? "Folgegewerk"} vorbereitet` },
-          },
-          this.now,
-        );
+        this.queueEvent({
+          project_id: this.ctx.project.id,
+          case_id: created.id,
+          kind: "followup_proposed",
+          payload: { reference: created.reference, doc_type: created.doc_type, summary_de: `Information an ${contact?.organisation ?? depTrade?.name ?? "Folgegewerk"} vorbereitet` },
+        });
         this.parts.push({
           kind: "line",
           key: "deviationNote",
@@ -667,7 +726,9 @@ class TurnRun {
   /** The evening quantities go straight into today's Bautagesbericht (SPEC §5.2). */
   private async refreshDailyReport(): Promise<void> {
     try {
-      const report = await compileDailyReport(this.team.id, this.today, this.now);
+      // The report lists the team's cases of the day from the store.
+      await this.flush();
+      const report = await timed("report", () => compileDailyReport(this.team.id, this.today, this.now));
       this.cases.set(report.id, report);
       this.touched.add(report.id);
       // Gaps (Personal) are asked right here, like any other missing fact; the yes writes the next version.
@@ -688,20 +749,17 @@ class TurnRun {
     if (ev.doc_type === "diary_only") {
       const text = (typeof ev.facts.note === "string" && ev.facts.note) || this.userTextDe || this.userText;
       await addDiaryEntry(this.team.id, this.today, { kind: "note", text, at: this.now.toISOString(), by: this.user?.name ?? null });
-      await addEvent({ project_id: this.ctx.project.id, case_id: null, kind: "diary_entry", payload: { text, team_id: this.team.id } }, this.now);
+      this.queueEvent({ project_id: this.ctx.project.id, case_id: null, kind: "diary_entry", payload: { text, team_id: this.team.id } });
       this.parts.push({ kind: "line", key: "diaryNoted" });
       return;
     }
     if (ev.doc_type in NOT_BUILT_DE) {
-      await addEvent(
-        {
-          project_id: this.ctx.project.id,
-          case_id: null,
-          kind: "unsupported_event",
-          payload: { doc_type: ev.doc_type, text_de: this.userTextDe ?? this.userText, facts: ev.facts, team_id: this.team.id },
-        },
-        this.now,
-      );
+      this.queueEvent({
+        project_id: this.ctx.project.id,
+        case_id: null,
+        kind: "unsupported_event",
+        payload: { doc_type: ev.doc_type, text_de: this.userTextDe ?? this.userText, facts: ev.facts, team_id: this.team.id },
+      });
       this.parts.push({ kind: "line", key: "notBuilt" });
       return;
     }
@@ -771,18 +829,15 @@ class TurnRun {
           if (isNew) {
             const org = contact?.organisation ?? tradeName ?? "Nachunternehmer";
             this.parts.push({ kind: "line", key: "subcontractorNote", vars: { org } });
-            await addEvent(
-              {
-                project_id: this.ctx.project.id,
-                case_id: c.id,
-                kind: "risk_flag",
-                payload: {
-                  reference: c.reference,
-                  reason_de: `Hinweis: vermutlich eigene Sphäre (eigener Nachunternehmer ${org}) – keine Behinderungsanzeige, Abhilfe beim Nachunternehmer fordern, bitte prüfen`,
-                },
+            this.queueEvent({
+              project_id: this.ctx.project.id,
+              case_id: c.id,
+              kind: "risk_flag",
+              payload: {
+                reference: c.reference,
+                reason_de: `Hinweis: vermutlich eigene Sphäre (eigener Nachunternehmer ${org}) – keine Behinderungsanzeige, Abhilfe beim Nachunternehmer fordern, bitte prüfen`,
               },
-              this.now,
-            );
+            });
           }
           return;
         }
@@ -800,15 +855,13 @@ class TurnRun {
     const what = [facts.cause, facts.area].filter((x) => typeof x === "string" && x).join(", ") || this.userTextDe || this.userText;
     const reason = `Hinweis: vermutlich eigene Sphäre (eigene Kolonne${tradeName ? `, ${tradeName}` : ""}) – interner Vermerk, bitte prüfen`;
     await addDiaryEntry(this.team.id, this.today, { kind: "incident", text: what, internal_risk: true, at: this.now.toISOString() });
-    await addEvent(
-      { project_id: this.ctx.project.id, case_id: null, kind: "risk_flag", payload: { reason_de: `${reason}: ${what}`, team_id: this.team.id } },
-      this.now,
-    );
+    this.queueEvent({ project_id: this.ctx.project.id, case_id: null, kind: "risk_flag", payload: { reason_de: `${reason}: ${what}`, team_id: this.team.id } });
     this.parts.push({ kind: "line", key: "ownTeamNoted" });
   }
 
   /** Latest open hindrance of this team (parent of a "Wegfall der Behinderung"). */
   private async openHindranceFor(tradeGuess: string | null): Promise<Case | null> {
+    await this.flush();
     const all = await listCases(this.ctx.project.id);
     const open = all.filter(
       (c) => c.doc_type === "behinderungsanzeige" && c.team_id === this.team.id && !["entwurf", "abgeschlossen"].includes(c.status),
@@ -876,25 +929,26 @@ class TurnRun {
     const c = await createCase({ ...base, ...evaluated }, this.now);
     this.cases.set(c.id, c);
     this.touched.add(c.id);
-    await addEvent(
-      {
-        project_id: this.ctx.project.id,
-        case_id: c.id,
-        kind: "case_created",
-        payload: { reference: c.reference, doc_type: c.doc_type, status: c.status, team_id: this.team.id },
-      },
-      this.now,
-    );
+    this.queueEvent({
+      project_id: this.ctx.project.id,
+      case_id: c.id,
+      kind: "case_created",
+      payload: { reference: c.reference, doc_type: c.doc_type, status: c.status, team_id: this.team.id },
+    });
     return c;
   }
 
+  /** Change a case in memory; `flush` stores it (before anything reads cases from the store, and at the end of the turn). */
   private async save(c: Case, patch: Partial<Case>): Promise<Case> {
     const current = this.cases.get(c.id) ?? c;
     const merged: Case = { ...current, ...patch };
     // Fact patches add to what is stored (callers may hold an older copy of the case).
     merged.facts = this.withInferred(merged.doc_type, patch.facts ? { ...current.facts, ...patch.facts } : current.facts);
     const evaluated = this.evaluate(merged);
-    const saved = await updateCase(c.id, { ...patch, facts: merged.facts, ...evaluated }, this.now);
+    const saved: Case = { ...merged, ...evaluated, updated_at: this.now.toISOString() };
+    const keys = this.dirty.get(saved.id) ?? new Set<string>();
+    for (const k of [...Object.keys(patch), "facts", ...Object.keys(evaluated)]) keys.add(k);
+    this.dirty.set(saved.id, keys);
     this.cases.set(saved.id, saved);
     this.pending = this.pending.map((p) => (p.id === saved.id ? saved : p));
     this.touched.add(saved.id);

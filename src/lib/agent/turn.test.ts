@@ -5,7 +5,7 @@ import { createConversation, getDailyReport, listCases, listEvents, listEvidence
 import { buildSeed, IDS } from "@/lib/db/seed";
 import { berlinTime } from "@/lib/deadlines";
 import type { Case } from "@/lib/types";
-import { runTurn } from "./turn";
+import { hangUp, runTurn } from "./turn";
 
 // Friday 20.11.2026, 09:30 in Munich: a normal Werktag.
 const DAY = "2026-11-20";
@@ -80,6 +80,46 @@ describe("golden path (English)", () => {
     expect(c.missing_fields).toEqual([]);
     const kinds = (await listEvents({ caseId: c.id })).map((e) => e.kind);
     expect(kinds).toContain("case_confirmed");
+  });
+
+  // Case changes are kept in memory during a turn and written once at the end (fewer round trips).
+  it("stores every case change and event of a turn before it answers", async () => {
+    const say = await chat();
+    const r1 = await say("The electricians haven't cleared the second floor. Our screed crew has been standing since seven, four people waiting.");
+    const [shown] = r1.cases;
+    const stored = await store().get("case", shown.id);
+    expect(stored).toMatchObject({
+      status: "entwurf",
+      sphere: shown.sphere,
+      facts: shown.facts,
+      asked_fields: ["expected_duration"],
+      missing_fields: shown.missing_fields,
+      flags: shown.flags,
+      checks: shown.checks,
+    });
+    expect((await listEvents({ caseId: shown.id })).map((e) => e.kind)).toEqual(["case_created"]);
+
+    await say("About two days.");
+    const r3 = await say("Yes.");
+    const confirmed = await store().get("case", shown.id);
+    expect(confirmed).toMatchObject({ status: "bereit", facts: r3.cases[0].facts });
+    expect((await listEvidence(shown.id)).map((e) => e.kind)).toContain("transcript");
+    // Oldest first: created, letter v1, confirmed.
+    const history = (await listEvents({ caseId: shown.id })).map((e) => e.kind).reverse();
+    expect(history).toEqual(["case_created", "document_generated", "case_confirmed"]);
+  });
+});
+
+describe("hang up (Auflegen)", () => {
+  it("keeps the unconfirmed draft for the office and closes the call", async () => {
+    const conv = await createConversation({ team_id: IDS.teamEstrich, user_id: IDS.userPolierEstrich, kind: "call" }, clock);
+    const r1 = await runTurn({ conversationId: conv.id, text: "Die Elektriker haben das 2.OG nicht freigegeben, 4 Leute stehen seit 7 Uhr.", now: tick() });
+    const [draft] = r1.cases;
+    const { conversation, cases } = await hangUp(conv.id, tick());
+    expect(conversation.status).toBe("closed");
+    expect(cases.map((c) => c.id)).toEqual([draft.id]);
+    expect(await store().get("case", draft.id)).toMatchObject({ status: "unvollstaendig", flags: expect.arrayContaining(["unconfirmed"]) });
+    expect((await listEvents({ projectId: IDS.project })).map((e) => e.kind)).toContain("call_ended");
   });
 });
 

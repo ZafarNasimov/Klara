@@ -5,6 +5,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { anthropicEnv, llmMode } from "@/lib/runtime";
+import { timed, timingNote } from "@/lib/timing";
 
 export { llmMode };
 
@@ -68,15 +69,22 @@ export async function callTool<T>(opts: {
   const forced = supportsForcedTool(model);
 
   const request = (instruction: string, useForced: boolean) =>
-    anthropic().messages.create({
-      model,
-      // Room for adaptive thinking plus the tool call (SPEC: ≥ 2000).
-      max_tokens: opts.maxTokens ?? 4000,
-      system: [{ type: "text", text: opts.system, ...(opts.cache ? { cache_control: { type: "ephemeral" as const } } : {}) }],
-      tools: [tool],
-      tool_choice: useForced ? { type: "tool", name: tool.name } : { type: "auto" },
-      ...(effort ? { output_config: { effort } } : {}),
-      messages: [{ role: "user", content: instruction ? `${opts.user}\n\n${instruction}` : opts.user }],
+    timed(`llm.${tool.name}`, async () => {
+      const msg = await anthropic().messages.create({
+        model,
+        // Room for adaptive thinking plus the tool call (SPEC: ≥ 2000).
+        max_tokens: opts.maxTokens ?? 4000,
+        system: [{ type: "text", text: opts.system, ...(opts.cache ? { cache_control: { type: "ephemeral" as const } } : {}) }],
+        tools: [tool],
+        tool_choice: useForced ? { type: "tool", name: tool.name } : { type: "auto" },
+        ...(effort ? { output_config: { effort } } : {}),
+        messages: [{ role: "user", content: instruction ? `${opts.user}\n\n${instruction}` : opts.user }],
+      });
+      const u = msg.usage;
+      timingNote(
+        `${tool.name}[${model} effort=${effort ?? "default"} in=${u.input_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} out=${u.output_tokens} stop=${msg.stop_reason}]`,
+      );
+      return msg;
     });
 
   let msg: Anthropic.Message;

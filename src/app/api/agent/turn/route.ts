@@ -1,19 +1,22 @@
 import { handle, readJson, requireString } from "@/lib/api";
 import { runTurn } from "@/lib/agent/turn";
+import { withTiming } from "@/lib/timing";
 
 // Extraction + phrasing can take a few seconds with the live model.
 export const maxDuration = 60;
 
 type Body = { conversation_id?: string; text_original?: string; language?: string | null };
 
-/** One turn with Klara (SPEC §6.2): `{ conversation_id, text_original, language }`. */
+/** One turn with Klara (SPEC §6.2): `{ conversation_id, text_original, language }`. Logs step timings (`Server-Timing`). */
 export async function POST(req: Request) {
-  return handle(async () => {
-    const body = await readJson<Body>(req);
-    return runTurn({
-      conversationId: requireString(body.conversation_id, "conversation_id"),
-      text: requireString(body.text_original, "text_original"),
-      language: body.language ?? null,
-    });
-  });
+  return withTiming("POST /api/agent/turn", () =>
+    handle(async () => {
+      const body = await readJson<Body>(req);
+      return runTurn({
+        conversationId: requireString(body.conversation_id, "conversation_id"),
+        text: requireString(body.text_original, "text_original"),
+        language: body.language ?? null,
+      });
+    }),
+  );
 }
