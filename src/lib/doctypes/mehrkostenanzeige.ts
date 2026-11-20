@@ -1,0 +1,103 @@
+import type { DocTypeDef } from "./types";
+
+export const mehrkostenanzeige: DocTypeDef = {
+  id: "mehrkostenanzeige",
+  title_de: "Ankündigung Mehrvergütung",
+  legal_basis: "§ 2 Abs. 6 Nr. 1 VOB/B",
+  tier: "A",
+  build_priority: "must",
+  recipient: "client_with_authority",
+  // Must reach the client before execution starts.
+  deadline: { kind: "before_event", event: "work_start" },
+  event_time_field: "instruction_date",
+  checks: ["required_fields", "recipient", "timing_mehrkosten", "lv_coverage", "channel", "confidence"],
+  max_questions: 3,
+  when_de: "Bauherr, Architekt oder Bauleitung des Bauherrn verlangt eine zusätzliche oder geänderte Leistung.",
+  fields: [
+    {
+      // SPEC: always ask first.
+      key: "work_started",
+      label_de: "Ausführung bereits begonnen",
+      type: "bool",
+      required: true,
+      question_hint: "Have you already started this work?",
+      ask: {
+        en: "Have you already started this extra work?",
+        de: "Haben Sie mit dieser Zusatzleistung schon begonnen?",
+        ru: "Вы уже начали эту дополнительную работу?",
+      },
+      extract_hint: "true/false, only if the user said so.",
+    },
+    {
+      key: "instruction_date",
+      label_de: "Datum der Anordnung",
+      type: "date",
+      required: true,
+      question_hint: "When was this requested? Date.",
+      ask: {
+        en: "When was this requested, today or another day?",
+        de: "Wann wurde das angeordnet, heute oder an einem anderen Tag?",
+        ru: "Когда это поручили, сегодня или в другой день?",
+      },
+      extract_hint: "YYYY-MM-DD resolved against today ('heute', 'gestern'). Only if stated.",
+    },
+    {
+      key: "instructed_by",
+      label_de: "Angeordnet durch",
+      type: "text",
+      required: true,
+      question_hint: "Who requested it, and what is their role?",
+      ask: {
+        en: "Who asked for it, and in what role?",
+        de: "Wer hat das angeordnet, und in welcher Funktion?",
+        ru: "Кто это поручил и в какой должности?",
+      },
+      extract_hint: "'Name (Rolle)', e.g. 'Thomas Weber (Architekt)'.",
+    },
+    {
+      key: "description",
+      label_de: "Geforderte Leistung",
+      type: "text",
+      required: true,
+      question_hint: "What exactly was requested?",
+      ask: {
+        en: "What exactly was requested?",
+        de: "Was genau wurde gefordert?",
+        ru: "Что именно потребовали?",
+      },
+      extract_hint: "German, factual, e.g. 'Lieferung und Einbau von 3 zusätzlichen Brandschutztüren T30 im 2.OG'.",
+    },
+    {
+      key: "planned_start",
+      label_de: "Geplanter Ausführungsbeginn",
+      type: "date",
+      required: true,
+      question_hint: "When do you plan to start this work?",
+      ask: {
+        en: "When do you plan to start this work?",
+        de: "Wann wollen Sie mit der Ausführung beginnen?",
+        ru: "Когда вы планируете начать эту работу?",
+      },
+      extract_hint: "YYYY-MM-DD.",
+    },
+    {
+      key: "estimate_eur",
+      label_de: "Erste Kosteneinschätzung (netto)",
+      type: "number",
+      required: false,
+      unknown_value_de: "wird ermittelt",
+      question_hint: "Do you have a first cost estimate?",
+      extract_hint: "Net EUR amount, only if stated.",
+    },
+    {
+      key: "verbal",
+      label_de: "Mündlich angeordnet",
+      type: "bool",
+      required: false,
+      source: "computed",
+      question_hint: "",
+      extract_hint: "true if the instruction was given verbally (said, told, on site), false if in writing.",
+    },
+  ],
+  readback_fields: ["description", "instructed_by", "instruction_date", "work_started", "planned_start", "estimate_eur"],
+};

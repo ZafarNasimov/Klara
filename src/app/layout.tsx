@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
+import { RoleProvider } from "@/lib/role";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,8 +16,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Klara",
-  description: "KI-Berichtssystem für die Baustelle",
+  title: { default: "Klara", template: "%s – Klara" },
+  description: "Baustellenmeldungen in jeder Sprache, deutsche Schreiben nach VOB/B.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#ffffff",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -25,9 +33,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="de"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        <TooltipProvider>{children}</TooltipProvider>
-        <Toaster />
+      <body className="flex min-h-full flex-col bg-background text-foreground">
+        <RoleProvider>
+          <TooltipProvider>{children}</TooltipProvider>
+        </RoleProvider>
+        <Toaster position="top-center" />
       </body>
     </html>
   );
