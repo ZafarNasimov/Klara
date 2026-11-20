@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-20 22:52 UTC · branch `claude/project-thread-jrqak8`
+Last update: 2026-11-20 22:53 UTC · branch `claude/project-thread-jrqak8`
 
 ## Milestones (SPEC §11)
 
@@ -11,8 +11,8 @@ Last update: 2026-11-20 22:52 UTC · branch `claude/project-thread-jrqak8`
 |---|---|---|
 | M0 | Skeleton: Next.js, store, schema, seed, role switcher, screen shells | ✅ done |
 | M1 | Text pipeline: rules engine, `/api/agent/turn`, readback/confirm, text chat | ✅ done |
-| M2 | Documents: templates, PDF + DOCX, sha256, versions, admin case view | 🟡 in progress |
-| M3 | Voice: call screen, STT/TTS (needs `OPENAI_API_KEY`) | ⬜ next |
+| M2 | Documents: templates, PDF + DOCX, sha256, versions, admin case view | ✅ done |
+| M3 | Voice: call screen, STT/TTS (needs `OPENAI_API_KEY`) | 🟡 in progress |
 | M4 | E-mail: composer, Postmark send, inbound reply analysis | ⬜ |
 | M5 | Realtime, polish, fallbacks ("Antwort simulieren") | ⬜ |
 | M6 | Eval set (`eval/utterances.json`, ≥30) and `eval/run.ts` | ⬜ |
@@ -33,7 +33,7 @@ Last update: 2026-11-20 22:52 UTC · branch `claude/project-thread-jrqak8`
 - **Bautagesbericht** (`src/lib/reports/daily.ts`, template `templates/bautagesbericht.ts`): one case per team and day (reference `BTB-YYYYMMDD-<KOLONNE>`, outside KL numbering), compiled from the evening quantities (plan vs. actual table), the team's cases of the day (Besondere Vorkommnisse, Anordnungen), diary notes, site weather and names. Rebuilt after every evening quantity; missing Personal is asked in the chat (flag `collecting`), the yes writes the next version. DocBody has `form: "report"` plus `heading` / `table` / `signatures` blocks (PDF, DOCX, HTML preview). `POST /api/teams/[teamId]/daily-report {date?}` compiles on demand.
 - **Tests:** 106 Vitest tests, incl. SPEC §10 scenarios (`src/lib/agent/turn.test.ts`) and office/Polier actions (`src/lib/cases/actions.test.ts`).
 
-### In progress (M2)
+### M2 screens
 
 - ✅ Bautagesbericht: report form PDF/DOCX/preview, compiled each evening, crew asked in the chat.
 - ✅ `/app/case/[id]` mobile case page with "Per Sprache korrigieren" (critique notes in `.impeccable/critique/`).
@@ -41,9 +41,11 @@ Last update: 2026-11-20 22:52 UTC · branch `claude/project-thread-jrqak8`
 
 ### Next steps, in order
 
-1. Seed historical cases KL-2026-0039..0041 so the demo case is 0042 on a busy board.
-2. Verify Supabase end to end (see Setup) and commit any fixes.
-3. M3 voice, then M4–M6 per SPEC §11.
+1. M3 voice (SPEC §11 "Voice mode details"): step 1 push-to-talk end to end (`/api/voice` STT → `/api/agent/turn` → `/api/tts`), step 2 hands-free with `@ricky0123/vad-web` on the same pipeline, VAD settings in `/admin/demo`.
+2. Verify Supabase end to end (see Setup) and commit any fixes (a separate thread is on it).
+3. M4–M6 per SPEC §11.
+
+Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-0039..0041 so the board is not empty before the demo case.
 
 ## Run it locally
 
