@@ -37,3 +37,13 @@ const t = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2
 export const fmtDateTime = (iso: string | Date) => dt.format(new Date(iso));
 export const fmtDate = (iso: string | Date) => d.format(new Date(iso));
 export const fmtTime = (iso: string | Date) => t.format(new Date(iso));
+
+const short = new Intl.DateTimeFormat("de-DE", {
+  timeZone: "Europe/Berlin",
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+/** "20.11., 07:00" for dense tables. */
+export const fmtShort = (iso: string | Date) => short.format(new Date(iso));

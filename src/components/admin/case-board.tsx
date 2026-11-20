@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Building2, ChevronRight, Users } from "lucide-react";
 import { CheckList, LightSummary } from "@/components/klara/traffic-light";
-import { CASE_STATUS_DE, SPHERE_DE, fmtDateTime } from "@/lib/labels";
+import { CASE_STATUS_DE, SPHERE_DE, fmtShort } from "@/lib/labels";
 import { docTitle } from "@/lib/doctypes/titles";
 import type { ProjectContext } from "@/lib/db/repo";
 import type { Case } from "@/lib/types";
@@ -22,7 +22,7 @@ export function CaseBoard() {
   const userName = (id: string | null) => ctx?.users.find((u) => u.id === id)?.name ?? "–";
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[240px_minmax(0,1fr)_380px]">
+    <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)_340px]">
       {/* Project tree */}
       <aside className="border-r border-border bg-background p-3" aria-label="Projekte">
         {ctx && (
@@ -68,7 +68,15 @@ export function CaseBoard() {
           </p>
         </div>
         <div className="overflow-hidden rounded-lg border border-border bg-background">
-          <table className="w-full text-sm">
+          <table className="w-full table-fixed text-sm">
+            <colgroup>
+              <col className="w-[190px]" />
+              <col />
+              <col className="w-[120px]" />
+              <col className="w-[130px]" />
+              <col className="w-[110px]" />
+              <col className="w-[124px]" />
+            </colgroup>
             <thead className="border-b border-border bg-muted text-left text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Status</th>
@@ -86,10 +94,10 @@ export function CaseBoard() {
                   onClick={() => setSelectedId(c.id)}
                   className={cn("cursor-pointer hover:bg-muted", selectedId === c.id && "bg-blue-50/60")}
                 >
-                  <td className="max-w-56 px-3 py-2.5">
-                    <LightSummary checks={c.checks} />
+                  <td className="px-3 py-2.5">
+                    <LightSummary checks={c.checks} compact />
                   </td>
-                  <td className="px-3 py-2.5 font-medium text-foreground">
+                  <td className="truncate px-3 py-2.5 font-medium text-foreground">
                     <Link
                       href={`/admin/case/${c.id}`}
                       onClick={(e) => e.stopPropagation()}
@@ -98,10 +106,10 @@ export function CaseBoard() {
                       {docTitle(c.doc_type)}
                     </Link>
                   </td>
-                  <td className="px-3 py-2.5 font-mono text-muted-foreground">{c.reference}</td>
-                  <td className="px-3 py-2.5 text-muted-foreground">{userName(c.created_by)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 font-mono text-muted-foreground">{c.reference}</td>
+                  <td className="truncate px-3 py-2.5 text-muted-foreground">{userName(c.created_by)}</td>
                   <td className="px-3 py-2.5 text-muted-foreground">{CASE_STATUS_DE[c.status]}</td>
-                  <td className="px-3 py-2.5 font-mono text-muted-foreground">{fmtDateTime(c.created_at)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 font-mono text-muted-foreground">{fmtShort(c.created_at)}</td>
                 </tr>
               ))}
             </tbody>

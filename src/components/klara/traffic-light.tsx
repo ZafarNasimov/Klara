@@ -31,12 +31,30 @@ export function overallLight(checks: CheckResult[]): Light {
   return "green";
 }
 
-export function LightSummary({ checks, className }: { checks: CheckResult[]; className?: string }) {
+export function LightSummary({
+  checks,
+  className,
+  compact = false,
+}: {
+  checks: CheckResult[];
+  className?: string;
+  /** Dense rows: dot + reason only, full text on hover. */
+  compact?: boolean;
+}) {
   if (!checks.length) {
     return <span className={cn("text-sm text-muted-foreground", className)}>Noch nicht geprüft</span>;
   }
   const light = overallLight(checks);
   const worst = checks.find((c) => c.light === light);
+  const reason = light === "green" ? "Alle Prüfungen bestanden" : worst?.reason_de ?? "";
+  if (compact) {
+    return (
+      <span className={cn("flex min-w-0 items-center gap-2 text-sm", className)} title={`${WORD[light]}: ${reason}`}>
+        <LightDot light={light} />
+        <span className="truncate text-foreground">{light === "green" ? WORD.green : reason}</span>
+      </span>
+    );
+  }
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-2 text-sm", className)}>
       <LightDot light={light} />

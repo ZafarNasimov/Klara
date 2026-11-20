@@ -121,7 +121,8 @@ export function mockExtract(text: string, ctx: ExtractContext): Extraction {
   const t = text.trim();
   const today = berlinDay(new Date(ctx.nowIso));
   const lang = ctx.language ?? guessLanguage(t);
-  const base = { reply_language: lang, text_de: lang === "de" ? t : `[${lang}] ${t}` };
+  // The mock cannot translate; the DE subtitle stays empty for other languages.
+  const base = { reply_language: lang, text_de: lang === "de" ? t : undefined };
 
   if (RX.endCall.test(t) && t.split(/\s+/).length <= 6) return { ...base, intent: "end_call", events: [] };
 
