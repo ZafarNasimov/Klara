@@ -26,6 +26,7 @@ export const EVENT_DE: Record<string, string> = {
   document_generated: "Dokument erstellt",
   case_validated: "Validiert",
   returned_for_completion: "Zurück zur Ergänzung",
+  correction_requested: "Korrektur durch den Polier angefordert",
   email_drafted: "E-Mail vorbereitet",
   email_sent: "E-Mail versendet",
   email_delivered: "Zustellung bestätigt",

@@ -21,7 +21,8 @@ export type LineKey =
   | "progressNoted"
   | "deviationNote"
   | "unconfirmedSaved"
-  | "returnedFor";
+  | "returnedFor"
+  | "correctAsk";
 
 type Table = Record<LineKey, string>;
 
@@ -48,6 +49,7 @@ export const LINES: Record<string, Table> = {
     deviationNote: "At this rate we'll be about {days} working days late. I'm preparing a notice for {successor}.",
     unconfirmedSaved: "Okay. I've saved what we have; the site manager will follow up.",
     returnedFor: "The site manager needs more information for {doc} {ref}.",
+    correctAsk: "{doc} {ref}: what should I correct?",
   },
   de: {
     clarify: "Entschuldigung, das habe ich nicht genau verstanden. Was ist auf der Baustelle passiert, und wo genau?",
@@ -71,6 +73,7 @@ export const LINES: Record<string, Table> = {
     deviationNote: "Bei diesem Tempo rechnen wir mit etwa {days} Arbeitstagen Verzug. Ich bereite eine Information an {successor} vor.",
     unconfirmedSaved: "In Ordnung. Ich habe das Bisherige gespeichert, die Bauleitung meldet sich.",
     returnedFor: "Die Bauleitung braucht noch eine Angabe zu {doc} {ref}.",
+    correctAsk: "{doc} {ref}: Was soll ich korrigieren?",
   },
   ru: {
     clarify: "Извините, я не совсем поняла. Что произошло на объекте и где именно?",
@@ -94,6 +97,7 @@ export const LINES: Record<string, Table> = {
     deviationNote: "При таком темпе отставание около {days} рабочих дней. Готовлю уведомление для {successor}.",
     unconfirmedSaved: "Хорошо. Я сохранила то, что есть, руководитель свяжется с вами.",
     returnedFor: "Руководителю нужно уточнение по документу «{doc}» {ref}.",
+    correctAsk: "{doc} {ref}: что мне исправить?",
   },
   pl: {
     clarify: "Przepraszam, nie do końca zrozumiałam. Co się stało na budowie i gdzie dokładnie?",
@@ -117,6 +121,7 @@ export const LINES: Record<string, Table> = {
     deviationNote: "W tym tempie opóźnienie wyniesie około {days} dni roboczych. Przygotowuję informację dla {successor}.",
     unconfirmedSaved: "Dobrze. Zapisałam to, co mamy, kierownik się odezwie.",
     returnedFor: "Kierownik budowy potrzebuje jeszcze informacji do dokumentu „{doc}” {ref}.",
+    correctAsk: "{doc} {ref}: co mam poprawić?",
   },
   tr: {
     clarify: "Kusura bakmayın, tam anlayamadım. Şantiyede ne oldu ve tam olarak nerede?",
@@ -140,6 +145,7 @@ export const LINES: Record<string, Table> = {
     deviationNote: "Bu hızla yaklaşık {days} iş günü gecikme olacak. {successor} için bir bilgilendirme hazırlıyorum.",
     unconfirmedSaved: "Tamam. Elimizdekini kaydettim, şantiye şefi sizinle iletişime geçecek.",
     returnedFor: "Şantiye şefinin {doc} {ref} için bir bilgiye daha ihtiyacı var.",
+    correctAsk: "{doc} {ref}: neyi düzelteyim?",
   },
   ro: {
     clarify: "Scuze, nu am înțeles bine. Ce s-a întâmplat pe șantier și unde exact?",
@@ -163,6 +169,7 @@ export const LINES: Record<string, Table> = {
     deviationNote: "În acest ritm vom avea o întârziere de circa {days} zile lucrătoare. Pregătesc o informare pentru {successor}.",
     unconfirmedSaved: "Bine. Am salvat ce avem, șeful de șantier revine.",
     returnedFor: "Șeful de șantier mai are nevoie de o informație pentru {doc} {ref}.",
+    correctAsk: "{doc} {ref}: ce să corectez?",
   },
 };
 

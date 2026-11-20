@@ -116,6 +116,8 @@ export type ConversationState = {
   tentative?: { doc_type: string; trade_name_guess: string | null; cause_kind: string; facts: Record<string, unknown> } | null;
   /** Answers to "Who hired the <trade>?", keyed by lower-case canonical trade name. */
   hired_by?: Record<string, "client" | "us" | "unknown">;
+  /** "correct": Klara's last line asked what to correct (shown above the current values instead of a readback intro). */
+  confirm_intro?: "correct" | null;
 };
 
 export type Conversation = {
@@ -350,6 +352,8 @@ export type CaseDetail = {
 export type ConfirmView = {
   /** Language of the labels and the user-facing values. */
   language: string;
+  /** "correct": the card follows "what should I correct?", so Klara's own line leads it. */
+  intro: "readback" | "correct";
   docs: {
     case_id: string;
     doc_type: string;

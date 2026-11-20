@@ -118,11 +118,12 @@ function readbackTemplate(cases: Case[], lang: string, now: Date): string {
 }
 
 /** The readback as rows for the confirm card: label and value in the user's language, German value alongside. */
-export function readbackView(cases: Case[], lang: string, now: Date): ConfirmView {
+export function readbackView(cases: Case[], lang: string, now: Date, intro: ConfirmView["intro"] = "readback"): ConfirmView {
   const labels = READBACK_LABELS[lang] ?? READBACK_LABELS.en;
   const titles = DOC_SPOKEN[lang] ?? DOC_SPOKEN.en;
   return {
     language: lang,
+    intro,
     docs: cases.map((c) => {
       const def = getDocType(c.doc_type)!;
       const title = lang === "de" ? null : (titles[c.doc_type] ?? null);

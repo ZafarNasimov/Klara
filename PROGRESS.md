@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-20 22:50 UTC · branch `claude/project-thread-jrqak8`
+Last update: 2026-11-20 22:44 UTC · branch `claude/project-thread-jrqak8`
 
 ## Milestones (SPEC §11)
 
@@ -28,19 +28,21 @@ Last update: 2026-11-20 22:50 UTC · branch `claude/project-thread-jrqak8`
 - **Documents** (`src/lib/documents/`): German templates for behinderungsanzeige, behinderung_ende, mehrkostenanzeige, anordnung_bestaetigung, stellungnahme_zurueckweisung, verzug_nu, info_folgegewerk. DIN 5008 PDF (page 1 letter, page 2 internal audit page with transcript, weather, checks) and DOCX. Markdown → sha256; versions are immutable once sent. Routes: `/api/documents/[id]/pdf` (`?variant=letter`, `?download`), `/api/documents/[id]/docx`, `POST /api/cases/[id]/document`.
 - **Weather evidence** (`src/lib/weather.ts`): Open-Meteo at the site and event hour, added on confirm of a Behinderungsanzeige; weather cases get "ungewöhnliche Witterung?" check. No data is invented when the lookup fails.
 - **Office actions** (`src/lib/cases/actions.ts`, tested): `POST /api/cases/[id]/validate` (Bauleiter only, blocked by missing fields / red checks) and `POST /api/cases/[id]/return` ("Zurück zur Ergänzung": Klara asks the Polier in the chat in their language; the answer and a new confirm make version 2).
-- **Tests:** 98 Vitest tests, incl. SPEC §10 scenarios (`src/lib/agent/turn.test.ts`).
+- **Correct by voice** (`reopenForCorrection` in `src/lib/cases/actions.ts`, `POST /api/cases/[id]/correct`): the Polier reopens a confirmed case; Klara asks "what should I correct?" in the team chat above the current facts (`state.confirm_intro = "correct"`). A change makes the next version and lifts the office approval; a plain "yes" keeps version and approval. Flag `correcting` until then.
+- **Mobile case page** `/app/case/[id]` (`case-view.tsx`): next-step sentence, office question when returned, scaled page-1 letter thumbnail (opens the PDF), checks, facts, sticky "PDF öffnen" + state-dependent primary action. Case cards say when the office needs something.
+- **Tests:** 101 Vitest tests, incl. SPEC §10 scenarios (`src/lib/agent/turn.test.ts`) and office/Polier actions (`src/lib/cases/actions.test.ts`).
 
 ### In progress (M2)
 
+- ✅ `/app/case/[id]` mobile case page with "Per Sprache korrigieren" (critique notes in `.impeccable/critique/`).
 - ✅ `/admin/case/[id]` office case page (`src/app/admin/case/[id]/case-detail.tsx`): header with status, deadline, **Validieren** (shows why it is blocked), **Zurück zur Ergänzung** dialog, **E-Mail vorbereiten** once validated (M4 composer still a shell); tabs Dokument (HTML letter preview from the same DocBody, version switch, SHA-256, PDF/Word download), Nachweise (transcript, weather), Verlauf, Hinweise; right rail with checks and facts. Critiqued (29/40) and the findings fixed.
 
 ### Next steps, in order
 
-1. Mobile case page `/app/case/[id]` (SPEC §8: type, status, traffic light, "PDF öffnen", "Per Sprache korrigieren"). Case card text for returned cases ("Die Bauleitung braucht noch eine Angabe von Ihnen").
-2. Bautagesbericht: template + PDF from `daily_report` + progress entries + weather (SPEC §5.2 `bautagesbericht`).
-3. Seed historical cases KL-2026-0039..0041 so the demo case is 0042 on a busy board.
-4. Verify Supabase end to end (see Setup) and commit any fixes.
-5. M3 voice, then M4–M6 per SPEC §11.
+1. Bautagesbericht: template + PDF from `daily_report` + progress entries + weather (SPEC §5.2 `bautagesbericht`).
+2. Seed historical cases KL-2026-0039..0041 so the demo case is 0042 on a busy board.
+3. Verify Supabase end to end (see Setup) and commit any fixes.
+4. M3 voice, then M4–M6 per SPEC §11.
 
 ## Run it locally
 

@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
-import { MobileHeader } from "@/components/mobile/mobile-header";
+import { MobileCaseView } from "./case-view";
 
-/** Mobile case card (SPEC §8, built in M2). */
+export const metadata: Metadata = { title: "Vorgang" };
+
+/** Mobile case page (SPEC §8 /app/case/[id]). */
 export default function MobileCasePage({ params }: PageProps<"/app/case/[id]">) {
   return (
     <Suspense>
@@ -11,11 +14,6 @@ export default function MobileCasePage({ params }: PageProps<"/app/case/[id]">) 
 }
 
 async function MobileCase({ params }: { params: PageProps<"/app/case/[id]">["params"] }) {
-  await params;
-  return (
-    <>
-      <MobileHeader title="Vorgang" backHref="/app" />
-      <main className="flex-1 p-4" />
-    </>
-  );
+  const { id } = await params;
+  return <MobileCaseView id={id} />;
 }

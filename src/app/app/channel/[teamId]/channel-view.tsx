@@ -8,6 +8,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { ArrowUp, Mic, Phone } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { KlaraAvatar } from "@/components/klara/klara-avatar";
+import { BTN_OUTLINE, BTN_PRIMARY } from "@/components/mobile/buttons";
 import { CaseCard } from "@/components/mobile/case-card";
 import { MobileHeader } from "@/components/mobile/mobile-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -156,6 +157,7 @@ export function ChannelView({ teamId }: { teamId: string }) {
                       {it.kind === "turn" && it.turn.id === confirmTurnId && confirm ? (
                         <ConfirmCard
                           view={confirm}
+                          turn={it.turn}
                           lines={lines}
                           busy={busy}
                           onYes={() => void send(lines.confirmYes)}
@@ -311,10 +313,6 @@ export function ChannelView({ teamId }: { teamId: string }) {
 
 const CARD_LINES_DE = cardLines("de");
 
-const BTN_BASE =
-  "flex min-h-12 items-center justify-center rounded-lg px-4 py-2 text-center text-[15px] leading-snug font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50";
-const BTN_PRIMARY = cn(BTN_BASE, "bg-primary text-primary-foreground hover:bg-primary/90");
-const BTN_OUTLINE = cn(BTN_BASE, "border border-border bg-background text-foreground hover:bg-muted");
 
 /** What went wrong, in words the Polier can act on. */
 function sendError(e: unknown): string {
@@ -501,12 +499,14 @@ function KlaraCard({
 /** Klara's readback as a fact sheet with one-tap answers (SPEC §6.2 step 5). */
 function ConfirmCard({
   view,
+  turn,
   lines,
   busy,
   onYes,
   onChange,
 }: {
   view: ConfirmView;
+  turn: Turn;
   lines: CardLines;
   busy: boolean;
   onYes: () => void;
@@ -520,8 +520,9 @@ function ConfirmCard({
       <section aria-label="Zusammenfassung prüfen" className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-border bg-background p-3.5">
         <p lang={view.language} className="text-[15px] leading-snug text-foreground">
           <span className="sr-only">Klara: </span>
-          {t.readbackIntro}
+          {view.intro === "correct" ? turn.text_original : t.readbackIntro}
         </p>
+        {view.intro === "correct" && !de && turn.text_de && turn.text_de !== turn.text_original ? <Subtitle text={turn.text_de} /> : null}
         {view.docs.map((d) => (
           <div key={d.case_id} className="mt-3 border-t border-border pt-3">
             <h3 className="text-[15px] leading-snug font-semibold text-foreground">{d.title_de}</h3>

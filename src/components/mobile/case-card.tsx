@@ -20,6 +20,13 @@ const NEXT_STEP_DE: Record<CaseStatus, string> = {
   abgeschlossen: "Abgeschlossen.",
 };
 
+/** What happens next, for the Polier. Office requests come first. */
+export function nextStepDe(c: Pick<CaseView, "status" | "flags">): string {
+  if (c.flags.includes("returned")) return "Die Bauleitung braucht noch eine Angabe von Ihnen. Klara fragt im Chat.";
+  if (c.flags.includes("correcting")) return "Klara wartet im Chat auf Ihre Korrektur.";
+  return NEXT_STEP_DE[c.status];
+}
+
 export function CaseCard({ c, className }: { c: CaseView; className?: string }) {
   return (
     <Link
@@ -39,7 +46,7 @@ export function CaseCard({ c, className }: { c: CaseView; className?: string }) 
         </div>
         <ChevronRight className="mt-2 size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
       </div>
-      <p className="mt-3 text-sm leading-snug text-foreground">{NEXT_STEP_DE[c.status]}</p>
+      <p className="mt-3 text-sm leading-snug text-foreground">{nextStepDe(c)}</p>
       <LightSummary checks={c.checks} className="mt-2" />
       {c.deadline ? <DeadlineBadge d={c.deadline} className="mt-3" /> : null}
     </Link>

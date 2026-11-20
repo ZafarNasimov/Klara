@@ -43,7 +43,7 @@ import {
   routeHindrance,
   type CauseKind,
 } from "@/lib/rules";
-import type { AppUser, Case, Conversation, ConversationState, ScheduleItem, Sphere, Team, Trade, Turn } from "@/lib/types";
+import type { AppUser, Case, Conversation, ConversationState, DocumentVersion, ScheduleItem, Sphere, Team, Trade, Turn } from "@/lib/types";
 import { generateDocument } from "@/lib/documents/generate";
 import { fetchWeather, type WeatherRecord } from "@/lib/weather";
 import { extract } from "./extract";
@@ -67,6 +67,9 @@ export type TurnInput = {
 
 /** Flags the rules engine recomputes on every evaluation. */
 const EVALUATED_FLAGS = new Set(["escalate", "internal_risk"]);
+/** Flags of a confirmed case that is open in a chat again until the next confirm. */
+const REOPEN_FLAGS = new Set(["returned", "correcting"]);
+const isReopened = (c: Case) => c.flags.some((f) => REOPEN_FLAGS.has(f));
 /** Documents that carry the site weather as evidence. */
 const WEATHER_DOC_TYPES = new Set(["behinderungsanzeige"]);
 
@@ -127,8 +130,8 @@ class TurnRun {
   async run(text: string, langHint: string | null): Promise<TurnResponse> {
     const hint = langHint && langHint !== "auto" ? langHint : null;
     const loaded = await Promise.all(this.state.pending_case_ids.map((id) => store().get("case", id)));
-    // Drafts, plus cases the office sent back for completion ("Zurück zur Ergänzung").
-    this.pending = loaded.filter((c): c is Case => !!c && (c.status === "entwurf" || c.flags.includes("returned")));
+    // Drafts, plus cases reopened in this chat (office "Zurück zur Ergänzung", Polier "Per Sprache korrigieren").
+    this.pending = loaded.filter((c): c is Case => !!c && (c.status === "entwurf" || isReopened(c)));
     this.state.pending_case_ids = this.pending.map((c) => c.id);
     for (const c of this.pending) this.cases.set(c.id, c);
 
@@ -145,6 +148,7 @@ class TurnRun {
       this.now,
     );
 
+    this.state.confirm_intro = null;
     await this.handle(ex);
 
     if (!this.parts.length) this.parts.push({ kind: "line", key: "smalltalk" });
@@ -188,7 +192,7 @@ class TurnRun {
 
   private async documentedCases(): Promise<Case[]> {
     const all = await listCases(this.ctx.project.id);
-    return all.filter((c) => c.conversation_id === this.conv.id && c.status !== "entwurf" && !c.flags.includes("returned"));
+    return all.filter((c) => c.conversation_id === this.conv.id && c.status !== "entwurf" && !isReopened(c));
   }
 
   private todaysItems(): ScheduleItem[] {
@@ -380,14 +384,16 @@ class TurnRun {
       // The card follows Klara's confirming line (user turn at now, Klara at now + 1 ms).
       const saved = await this.save(c, {
         status,
-        flags: c.flags.filter((f) => f !== "returned"),
+        flags: c.flags.filter((f) => !REOPEN_FLAGS.has(f)),
         facts: {
           _confirmed_at: new Date(this.now.getTime() + 2).toISOString(),
           ...(w ? { _weather: { summary_de: w.summary_de, unusual: w.unusual } } : {}),
         },
       });
       if (w) await addEvidence({ case_id: c.id, kind: "weather", ref: w.source, data: { ...w } }, this.now);
-      await this.makeDocument(saved);
+      const doc = await this.makeDocument(saved);
+      // A correction that changed nothing keeps the office's approval of the same letter.
+      if (doc?.validated_at && status === "bereit") await this.save(saved, { status: "validiert" });
       await addEvidence(
         { case_id: c.id, kind: "transcript", ref: this.conv.id, data: { conversation_id: this.conv.id, kind: this.conv.kind, turns: transcript } },
         this.now,
@@ -425,11 +431,12 @@ class TurnRun {
   }
 
   /** SPEC §6.2 step 6: version 1 of the letter (PDF + DOCX are rendered from it). A failure never breaks the call. */
-  private async makeDocument(c: Case): Promise<void> {
+  private async makeDocument(c: Case): Promise<DocumentVersion | null> {
     try {
-      await generateDocument(c.id, this.now);
+      return await generateDocument(c.id, this.now);
     } catch (err) {
       console.error("[klara] document generation failed", c.reference, err);
+      return null;
     }
   }
 

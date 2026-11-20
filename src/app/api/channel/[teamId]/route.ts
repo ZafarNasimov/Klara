@@ -51,6 +51,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/channel/[teamId
           awaiting.map((id) => cases.find((c) => c.id === id)).filter((c) => !!c),
           language,
           now,
+          chat?.state.confirm_intro === "correct" ? "correct" : "readback",
         )
       : null;
     const entries = Array.isArray(report?.data.entries) ? (report.data.entries as { kind?: string }[]) : [];

@@ -5,7 +5,7 @@ import { store } from "@/lib/db";
 import { createConversation, listCases, listDocumentVersions, listEvents, listTurns } from "@/lib/db/repo";
 import { buildSeed, IDS } from "@/lib/db/seed";
 import { berlinTime } from "@/lib/deadlines";
-import { returnForCompletion, validateCase, validationBlocker } from "./actions";
+import { reopenForCorrection, returnForCompletion, validateCase, validationBlocker } from "./actions";
 
 const DAY = "2026-11-20";
 let clock = berlinTime(DAY, 9, 30);
@@ -70,5 +70,50 @@ describe("return for completion", () => {
   it("needs a field or a note", async () => {
     const { c } = await goldenPath();
     await expect(returnForCompletion(c.id, {}, tick())).rejects.toThrow("Bitte eine Angabe");
+  });
+});
+
+describe("correct by voice", () => {
+  it("lets the Polier correct a confirmed case in the chat and makes a new version", async () => {
+    const { c, conv, say } = await goldenPath();
+    await validateCase(c.id, IDS.userBauleiter, tick());
+
+    const r = await reopenForCorrection(c.id, IDS.userPolierEstrich, tick());
+    expect(r.conversation_id).toBe(conv.id);
+    expect(r.case).toMatchObject({ status: "bereit", flags: expect.arrayContaining(["correcting"]) });
+    expect(validationBlocker(r.case)).toBe("Der Polier korrigiert die Meldung gerade.");
+    const ask = (await listTurns(conv.id)).at(-1)!;
+    expect(ask.text_original).toBe("Hindrance notice KL-2026-0042: what should I correct?");
+    expect(ask.text_de).toBe("Behinderungsanzeige KL-2026-0042: Was soll ich korrigieren?");
+
+    const r1 = await say("No, five people.");
+    expect(r1.awaiting_confirm).toBe(true);
+    expect(r1.confirm?.docs[0].rows.find((row) => row.key === "idle_staff")?.value).toBe("5 people");
+    await say("Yes.");
+    const [after] = (await listCases(IDS.project)).filter((x) => x.id === c.id);
+    expect(after.facts.idle_staff).toBe(5);
+    expect(after.flags).not.toContain("correcting");
+    expect(after.status).toBe("bereit");
+    expect((await listDocumentVersions(c.id)).map((v) => v.version)).toEqual([2, 1]);
+    expect((await listEvents({ caseId: c.id })).map((e) => e.kind)).toContain("correction_requested");
+  });
+
+  it("keeps the office approval when the Polier confirms without a change", async () => {
+    const { c, conv, say } = await goldenPath();
+    await validateCase(c.id, IDS.userBauleiter, tick());
+    await reopenForCorrection(c.id, IDS.userPolierEstrich, tick());
+    expect((await store().get("conversation", conv.id))?.state.confirm_intro).toBe("correct");
+    await say("Yes.");
+    const [after] = (await listCases(IDS.project)).filter((x) => x.id === c.id);
+    expect(after.status).toBe("validiert");
+    expect(after.flags).not.toContain("correcting");
+    expect((await listDocumentVersions(c.id)).map((v) => v.version)).toEqual([1]);
+    expect((await store().get("conversation", conv.id))?.state.confirm_intro).toBeNull();
+  });
+
+  it("refuses a letter that has been sent", async () => {
+    const { c } = await goldenPath();
+    await store().update("case", c.id, { status: "versendet" });
+    await expect(reopenForCorrection(c.id, IDS.userPolierEstrich, tick())).rejects.toThrow("bereits versendet");
   });
 });
