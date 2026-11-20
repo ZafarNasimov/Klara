@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-20 23:10 UTC · branch `claude/project-thread-jrqak8`
+Last update: 2026-11-20 23:25 UTC · branch `claude/project-thread-jrqak8`
 
 ## Milestones (SPEC §11)
 
@@ -32,7 +32,7 @@ Last update: 2026-11-20 23:10 UTC · branch `claude/project-thread-jrqak8`
 - **Mobile case page** `/app/case/[id]` (`case-view.tsx`): next-step sentence, office question when returned, scaled page-1 letter thumbnail (opens the PDF), checks, facts, sticky "PDF öffnen" + state-dependent primary action. Case cards say when the office needs something.
 - **Bautagesbericht** (`src/lib/reports/daily.ts`, template `templates/bautagesbericht.ts`): one case per team and day (reference `BTB-YYYYMMDD-<KOLONNE>`, outside KL numbering), compiled from the evening quantities (plan vs. actual table), the team's cases of the day (Besondere Vorkommnisse, Anordnungen), diary notes, site weather and names. Rebuilt after every evening quantity; missing Personal is asked in the chat (flag `collecting`), the yes writes the next version. DocBody has `form: "report"` plus `heading` / `table` / `signatures` blocks (PDF, DOCX, HTML preview). `POST /api/teams/[teamId]/daily-report {date?}` compiles on demand.
 - **Voice, step 1 push-to-talk** (`src/lib/voice/`, `src/app/app/call/[callId]/call-view.tsx`): call screen with phases ready/ringing → listening → recording → processing → speaking, Klara greets by first name, hold-to-talk or tap-to-start/tap-to-send, live waveform from the mic, transcript with German subtitles, case cards, hang-up → "Gespräch beendet" with the cases and the protocol. `POST /api/voice` (multipart audio → OpenAI `gpt-4o-transcribe` → noise filter `segment.ts` → same agent turn), `GET /api/tts` (OpenAI `gpt-4o-mini-tts` MP3 stream; the browser voice when there is no key or it fails), `POST /api/conversations/[id]/end`. Typing works any time and is the only input without `OPENAI_API_KEY`. iOS: audio is unlocked inside the start tap. Verified with Playwright (typed call, and push-to-talk with a stubbed `/api/voice`); real OpenAI audio is untested.
-- **Voice, step 2 hands-free (in progress):** `@ricky0123/vad-web` installed; `npm install` copies its model/worklet/wasm to `public/vad/` (`scripts/copy-vad-assets.mjs`, gitignored output). VAD settings (silence, min speech, threshold) are saved per project from `/admin/demo` (`POST /api/demo/vad`) and served by `GET /api/voice`. Not yet wired into the call screen.
+- **Voice, step 2 hands-free** (`src/lib/voice/vad.ts`): default mode once the mic is open. Silero VAD (`@ricky0123/vad-web`, model v5) runs on the call's own mic stream and AudioContext (created in the start tap for iOS); each utterance goes as a 16 kHz WAV to the same `/api/voice`. Paused while Klara thinks and speaks, resumed 300 ms after she stops (no barge-in). Toggle "Freihändig" ⇄ "Push-to-Talk" keeps the conversation; in hands-free the centre button mutes. If the detector cannot load, the screen falls back to push-to-talk with a notice. Settings (silence before end of turn, minimum speech, threshold) come from `/admin/demo` (`POST /api/demo/vad`) via `GET /api/voice`. `npm install` copies the model, worklet and ONNX runtime to `public/vad/` (`scripts/copy-vad-assets.mjs`, gitignored output). Verified with Playwright and a fake mic playing synthetic speech (`--use-file-for-fake-audio-capture`): three spoken turns to a confirmed Behinderungsanzeige; `/api/voice` was stubbed because this session has no OpenAI key. Noise filter keeps one-word answers ("Ja", "2") on purpose, otherwise confirm by voice would break (SPEC says "under 2 words").
 - **Tests:** 108 Vitest tests, incl. SPEC §10 scenarios (`src/lib/agent/turn.test.ts`) and office/Polier actions (`src/lib/cases/actions.test.ts`).
 
 ### M2 screens
@@ -43,9 +43,9 @@ Last update: 2026-11-20 23:10 UTC · branch `claude/project-thread-jrqak8`
 
 ### Next steps, in order
 
-1. M3 step 2: hands-free on the call screen (MicVAD with `getStream` = the open mic, pause while Klara thinks/speaks, "Freihändig" ⇄ "Push-to-Talk" toggle without losing the conversation), then critique/polish the call screen and the "Klara ruft an" incoming state.
-2. Test real voice and Claude in a fresh cloud session once the keys are in the environment: `OPENAI_API_KEY`, `KLARA_ANTHROPIC_*` (see Environment). The network policy must allow `api.openai.com` and `api.anthropic.com`; Node needs `NODE_USE_ENV_PROXY=1` there.
-3. M4–M6 per SPEC §11.
+1. Test real voice and Claude in a fresh cloud session (keys are in the environment now: `OPENAI_API_KEY`, `KLARA_ANTHROPIC_*`; `api.openai.com` is allowlisted). Measure latency per turn (SPEC: < 4 s), tune VAD defaults on a real phone. Then mark M3 done.
+2. Photo button (SPEC §8: channel and call screen), photos as evidence on the case and the audit page. Not built yet.
+3. M4–M6 per SPEC §11. In cloud sessions Node needs `NODE_USE_ENV_PROXY=1` to reach Supabase and the APIs.
 
 Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-0039..0041 so the board is not empty before the demo case.
 
@@ -94,7 +94,7 @@ Status (2026-11-20, checked from a separate session): all 18 tables exist and th
 - Live Claude path is untested until `KLARA_ANTHROPIC_API_KEY` (or `ANTHROPIC_API_KEY`) is set. Newer models reject forced `tool_choice`; `src/lib/agent/llm.ts` falls back to auto + instruction.
 - Open-Meteo's free tier rate-limits shared cloud IPs ("Daily API request limit exceeded"); then no weather is attached.
 - All letter texts are prototype drafts: **TODO legal review** (SPEC D8). Weather "unusual" thresholds are a heuristic.
-- The mic button opens the call screen stub (M3). "E-Mail vorbereiten" lands in M4.
+- "E-Mail vorbereiten" lands in M4. Photo upload is not built yet.
 - Next.js 16 here differs from older versions: read `node_modules/next/dist/docs/` first (AGENTS.md). With `cacheComponents`, async page work goes inside `<Suspense>`, GET handlers call `await connection()`, and run `npx next typegen` after adding routes (for `RouteContext` / `PageProps`).
 - react-pdf: fixed absolute `View`s don't render (use fixed `Text`s); no `lineHeight` on `Page`; a unitless `lineHeight` needs `fontSize` in the same style. tsx cannot load react-pdf; test PDFs via Vitest.
 - JS `\b` is ASCII-only; the keyword reader uses Unicode lookarounds.

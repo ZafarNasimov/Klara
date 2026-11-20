@@ -1,14 +1,17 @@
 "use client";
 // Call screen (SPEC §8 /app/call/[callId], §11 M3): an in-app call with Klara.
-// Push-to-talk: hold the big button, speak, let go (or tap to start and tap to
-// send). Audio goes to /api/voice (speech-to-text + the agent turn in one
-// round trip); Klara's reply plays through /api/tts or the browser's voice.
-// Typing works at any time and is the mode when speech-to-text is not set up.
+// Hands-free (default): the browser's voice detector hears where an utterance
+// starts and ends and sends it; it is paused while Klara thinks and speaks.
+// Push-to-talk (toggle, and the fallback when the detector can't load): hold
+// the big button, speak, let go (or tap to start and tap to send). Both send
+// the audio to /api/voice (speech-to-text + the agent turn in one round trip);
+// Klara's reply plays through /api/tts or the browser's voice. Typing works at
+// any time and is the only input when speech-to-text is not set up.
 // Turn states: listening → recording → processing → speaking → listening.
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ArrowUp, Keyboard, Mic, Phone, PhoneOff } from "lucide-react";
+import { ArrowUp, Keyboard, Mic, MicOff, Phone, PhoneOff } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { KlaraAvatar, type KlaraMood } from "@/components/klara/klara-avatar";
 import { BTN_OUTLINE, BTN_PRIMARY } from "@/components/mobile/buttons";
@@ -20,10 +23,12 @@ import type { TurnResponse } from "@/lib/agent/types";
 import type { CaseView, Conversation, ConversationDetail, Turn } from "@/lib/types";
 import { ApiError, postJson } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
-import { createLevelMeter, createSpeaker, MIC_CONSTRAINTS, startRecording, type Speaker } from "@/lib/voice/client";
+import { createAudioContext, createLevelMeter, createSpeaker, MIC_CONSTRAINTS, startRecording, type Speaker } from "@/lib/voice/client";
 import { DEFAULT_VAD, type VoiceConfig, type VoiceResult } from "@/lib/voice/types";
+import { loadHandsFree, type HandsFree } from "@/lib/voice/vad";
 
 type Phase = "ready" | "ringing" | "connecting" | "listening" | "recording" | "processing" | "speaking" | "ended";
+type Mode = "handsfree" | "ptt";
 
 const BARS = 21;
 /** Shorter presses are a tap: recording keeps running until the next tap. */
@@ -48,6 +53,9 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
   const [toggleRec, setToggleRec] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [micReady, setMicReady] = useState(false);
+  const [mode, setMode] = useState<Mode>("handsfree");
+  const [vadState, setVadState] = useState<"off" | "loading" | "ready" | "failed">("off");
+  const [muted, setMuted] = useState(false);
 
   const convRef = useRef<Conversation | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -59,11 +67,16 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
   const rafRef = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const ctxRef = useRef<AudioContext | null>(null);
+  const vadRef = useRef<HandsFree | null>(null);
+  const liveRef = useRef<{ phase: Phase; mode: Mode }>({ phase, mode });
+  const vadHandlers = useRef<{ start: () => void; end: (wav: Blob) => void; misfire: () => void }>({ start() {}, end() {}, misfire() {} });
 
   const isNew = callId === "new";
   const team = detail?.team ?? null;
   const channelHref = team ? `/app/channel/${team.id}` : teamId ? `/app/channel/${teamId}` : "/app";
   const voice = cfg?.stt === "openai" && micReady;
+  const handsFree = voice && mode === "handsfree";
 
   // ── Load: voice config, and the conversation when it already exists ──
   useEffect(() => {
@@ -99,8 +112,10 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
   useEffect(
     () => () => {
       cancelAnimationFrame(rafRef.current);
+      void vadRef.current?.destroy();
       meterRef.current?.close();
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      void ctxRef.current?.close().catch(() => {});
       speakerRef.current?.stop();
     },
     [],
@@ -139,11 +154,16 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
 
   const finish = useCallback(() => {
     stopMeter();
+    void vadRef.current?.destroy();
+    vadRef.current = null;
     meterRef.current?.close();
     meterRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    void ctxRef.current?.close().catch(() => {});
+    ctxRef.current = null;
     setMicReady(false);
+    setVadState("off");
     setPhase("ended");
   }, [stopMeter]);
 
@@ -176,6 +196,30 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
     setPhase("listening");
   }, []);
 
+  // ── Hands-free: the detector loads while Klara greets ──
+  const prepareHandsFree = (stream: MediaStream, ctx: AudioContext) => {
+    setVadState("loading");
+    loadHandsFree({
+      stream,
+      ctx,
+      settings: cfg?.vad ?? DEFAULT_VAD,
+      onSpeechStart: () => vadHandlers.current.start(),
+      onSpeechEnd: (wav) => vadHandlers.current.end(wav),
+      onMisfire: () => vadHandlers.current.misfire(),
+    })
+      .then((vad) => {
+        if (streamRef.current !== stream) return void vad.destroy(); // the call ended meanwhile
+        vadRef.current = vad;
+        setVadState("ready");
+      })
+      .catch(() => {
+        if (streamRef.current !== stream) return;
+        setVadState("failed");
+        setMode("ptt");
+        setNotice("Freihändig startet auf diesem Gerät nicht. Halten Sie die Taste, solange Sie sprechen.");
+      });
+  };
+
   // ── Start (the tap unlocks audio and the mic, SPEC M3 iOS note) ──
   const start = async () => {
     const speaker = createSpeaker(cfg?.tts ?? "browser");
@@ -184,11 +228,16 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
     setPhase("connecting");
     setNotice(null);
     if (cfg?.stt === "openai") {
+      // Created inside the tap: iOS only lets a gesture start audio input.
+      const ctx = createAudioContext();
+      ctxRef.current = ctx;
       try {
         const stream = await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
         streamRef.current = stream;
-        meterRef.current = createLevelMeter(stream);
+        if (ctx) meterRef.current = createLevelMeter(stream, ctx);
         setMicReady(true);
+        if (ctx) prepareHandsFree(stream, ctx);
+        else setMode("ptt");
       } catch {
         setNotice("Das Mikrofon ist nicht freigegeben. Sie können Ihre Antwort schreiben.");
         setTyping(true);
@@ -221,7 +270,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
 
   // ── Push-to-talk ──
   const beginRecording = () => {
-    if (!streamRef.current || phase !== "listening") return;
+    if (!streamRef.current || phase !== "listening" || mode !== "ptt") return;
     setNotice(null);
     speakerRef.current?.stop();
     recRef.current = startRecording(streamRef.current);
@@ -242,18 +291,25 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
       setPhase("listening");
       return;
     }
+    await sendSegment(blob, `segment.${ext}`, false);
+  };
+
+  /** One spoken segment, from either mode: speech-to-text and Klara's turn in one request. */
+  const sendSegment = async (blob: Blob, filename: string, quietOnNoise: boolean) => {
+    if (!convRef.current) return;
     setPhase("processing");
     try {
       const form = new FormData();
-      form.append("audio", blob, `segment.${ext}`);
-      form.append("conversation_id", convRef.current!.id);
-      if (convRef.current?.language) form.append("language", lang);
+      form.append("audio", blob, filename);
+      form.append("conversation_id", convRef.current.id);
+      if (convRef.current.language) form.append("language", lang);
       const r = await fetch("/api/voice", { method: "POST", body: form });
       const out = await r.json().catch(() => null);
       if (!r.ok) throw new ApiError(out?.error ?? `Fehler ${r.status}`, r.status);
       const res = out as VoiceResult;
       if (res.ignored || !res.turn) {
-        setNotice("Das habe ich nicht verstanden. Bitte noch einmal sprechen.");
+        // Hands-free hears coughs and machines too: drop those without a word.
+        if (!quietOnNoise) setNotice("Das habe ich nicht verstanden. Bitte noch einmal sprechen.");
         setPhase("listening");
         return;
       }
@@ -261,6 +317,62 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
     } catch (e) {
       failed(e);
     }
+  };
+
+  // The detector's callbacks are created once; they read the current turn state here.
+  useEffect(() => {
+    liveRef.current = { phase, mode };
+    vadHandlers.current = {
+      start() {
+        if (liveRef.current.mode !== "handsfree" || liveRef.current.phase !== "listening") return;
+        setNotice(null);
+        setPhase("recording");
+        requestAnimationFrame(startMeter);
+      },
+      end(wav) {
+        if (liveRef.current.mode !== "handsfree" || liveRef.current.phase !== "recording" || recRef.current) return;
+        stopMeter();
+        void sendSegment(wav, "segment.wav", true);
+      },
+      misfire() {
+        if (liveRef.current.phase !== "recording" || recRef.current) return;
+        stopMeter();
+        setPhase("listening");
+      },
+    };
+  });
+
+  // Listen only while it is the user's turn; resume ~300 ms after Klara stops talking (SPEC M3).
+  useEffect(() => {
+    const vad = vadRef.current;
+    if (!vad || vadState !== "ready") return;
+    const listen = mode === "handsfree" && !muted && (phase === "listening" || phase === "recording");
+    if (!listen) {
+      void vad.pause();
+      return;
+    }
+    if (phase !== "listening") return;
+    const t = window.setTimeout(() => void vad.start(), 300);
+    return () => window.clearTimeout(t);
+  }, [vadState, mode, muted, phase]);
+
+  /** Drop a half-heard segment (mode switch, mute) and go back to listening. */
+  const dropSegment = () => {
+    if (phase !== "recording") return;
+    stopMeter();
+    const rec = recRef.current;
+    recRef.current = null;
+    setToggleRec(false);
+    void rec?.stop();
+    setPhase("listening");
+  };
+
+  const switchMode = (m: Mode) => {
+    if (m === mode) return;
+    dropSegment();
+    setNotice(null);
+    setMuted(false);
+    setMode(m);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -402,20 +514,38 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
 
   const mood: KlaraMood = phase === "processing" || phase === "connecting" ? "thinking" : phase === "speaking" ? "speaking" : "listening";
   const lines = cardLines(lang);
+  const listeningNow = phase === "listening" && handsFree && !muted && vadState === "ready";
   const status =
     phase === "connecting"
       ? "Verbinde …"
       : phase === "recording"
-        ? toggleRec
-          ? "Ich höre zu. Tippen Sie zum Senden."
-          : "Ich höre zu. Loslassen zum Senden."
+        ? "Klara hört zu"
         : phase === "processing"
           ? "Klara denkt nach"
           : phase === "speaking"
             ? "Klara spricht"
-            : voice
-              ? "Halten Sie die Taste und sprechen Sie."
-              : "Schreiben Sie Ihre Antwort.";
+            : !voice
+              ? "Schreiben Sie Ihre Antwort."
+              : !handsFree
+                ? "Halten Sie die Taste und sprechen Sie."
+                : muted
+                  ? "Stummgeschaltet. Klara hört nicht zu."
+                  : vadState === "ready"
+                    ? "Sprechen Sie einfach, Klara hört zu."
+                    : "Freihändig startet …";
+  /** The second line: how to talk in the current mode. */
+  const hint =
+    !voice || phase === "processing" || phase === "speaking" || phase === "connecting"
+      ? null
+      : handsFree
+        ? muted
+          ? "Tippen Sie auf das Mikrofon, um weiterzusprechen."
+          : "Klara antwortet, wenn Sie eine Pause machen."
+        : phase === "recording"
+          ? toggleRec
+            ? "Tippen Sie zum Senden."
+            : "Loslassen zum Senden."
+          : "Kurz tippen startet, erneut tippen sendet.";
 
   return (
     <div className="flex h-dvh flex-col">
@@ -430,7 +560,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
       {/* Stage: Klara and what she is doing */}
       <section aria-label="Klara" className="flex shrink-0 flex-col items-center border-b border-border px-4 pt-5 pb-4">
         <div className="relative flex size-[120px] items-center justify-center">
-          {phase === "listening" && voice ? (
+          {listeningNow ? (
             <span aria-hidden className="absolute inset-0 animate-[klara-ring_1.6s_var(--ease-out)_infinite] rounded-full border-2 border-primary/40" />
           ) : null}
           <span aria-hidden className={cn("absolute inset-2 rounded-full border-2 transition-colors duration-200", phase === "recording" ? "border-primary" : "border-transparent")} />
@@ -453,7 +583,8 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
             </span>
           )}
         </div>
-        {phase === "recording" ? <p className="text-sm text-muted-foreground">{status}</p> : null}
+        {/* Fixed height, so the transcript does not jump each time the user starts speaking. */}
+        <p className="min-h-5 text-center text-sm text-pretty text-muted-foreground">{hint}</p>
         <p className="mt-1 text-xs text-muted-foreground">Dieses Gespräch wird aufgezeichnet.</p>
       </section>
 
@@ -533,59 +664,108 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
           </form>
         ) : null}
         {voice ? (
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center">
-          <button
-            type="button"
-            onClick={() => {
-              setTyping((v) => !v);
-              if (!typing) requestAnimationFrame(() => inputRef.current?.focus());
-            }}
-            aria-pressed={typing}
-            aria-label="Tippen statt sprechen"
-            className={cn(
-              "flex size-14 items-center justify-center justify-self-start rounded-full border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              typing ? "bg-muted text-foreground" : "bg-background text-foreground hover:bg-muted",
-            )}
-          >
-            <Keyboard className="size-6" aria-hidden />
-          </button>
-          <button
-            type="button"
-            disabled={!voice || (phase !== "listening" && phase !== "recording")}
-            onPointerDown={onPointerDown}
-            onPointerUp={onPointerUp}
-            onPointerCancel={onPointerUp}
-            onKeyDown={onKeyDown}
-            onContextMenu={(e) => e.preventDefault()}
-            aria-label={phase === "recording" ? "Senden" : "Halten und sprechen"}
-            aria-pressed={phase === "recording"}
-            className={cn(
-              "flex size-20 touch-none items-center justify-center rounded-full outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-40 [-webkit-touch-callout:none]",
-              "transition-transform duration-150 ease-[var(--ease-out)] active:scale-[0.96]",
-              phase === "recording" ? "bg-primary text-primary-foreground ring-4 ring-primary/25" : "bg-primary text-primary-foreground hover:bg-primary/90",
-            )}
-          >
-            <Mic className="size-8" aria-hidden />
-          </button>
-          <button
-            type="button"
-            onClick={hangUp}
-            aria-label="Auflegen"
-            className="flex size-14 items-center justify-center justify-self-end rounded-full bg-zinc-900 text-white outline-none hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            <PhoneOff className="size-6" aria-hidden />
-          </button>
-        </div>
+          <>
+            {vadState !== "failed" ? (
+              <div role="group" aria-label="Sprechmodus" className="mb-3 grid grid-cols-2 rounded-full border border-border bg-muted p-0.5">
+                {(
+                  [
+                    ["handsfree", "Freihändig"],
+                    ["ptt", "Push-to-Talk"],
+                  ] as const
+                ).map(([m, label]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => switchMode(m)}
+                    aria-pressed={mode === m}
+                    className={cn(
+                      "h-12 rounded-full text-[15px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      "transition-[background-color,color,box-shadow] duration-150 ease-[var(--ease-out)]",
+                      mode === m ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setTyping((v) => !v);
+                  if (!typing) requestAnimationFrame(() => inputRef.current?.focus());
+                }}
+                aria-pressed={typing}
+                aria-label="Tippen statt sprechen"
+                className={cn(
+                  "flex size-14 items-center justify-center justify-self-start rounded-full border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  typing ? "bg-muted text-foreground" : "bg-background text-foreground hover:bg-muted",
+                )}
+              >
+                <Keyboard className="size-6" aria-hidden />
+              </button>
+              {handsFree ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    dropSegment();
+                    setMuted((m) => !m);
+                  }}
+                  aria-label="Stummschalten"
+                  aria-pressed={muted}
+                  className={cn(
+                    "flex size-20 items-center justify-center rounded-full outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    "transition-transform duration-150 ease-[var(--ease-out)] active:scale-[0.96]",
+                    muted
+                      ? "border-2 border-zinc-900 bg-background text-foreground"
+                      : phase === "recording"
+                        ? "bg-primary text-primary-foreground ring-4 ring-primary/25"
+                        : "bg-primary text-primary-foreground hover:bg-primary/90",
+                  )}
+                >
+                  {muted ? <MicOff className="size-8" aria-hidden /> : <Mic className="size-8" aria-hidden />}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={phase !== "listening" && phase !== "recording"}
+                  onPointerDown={onPointerDown}
+                  onPointerUp={onPointerUp}
+                  onPointerCancel={onPointerUp}
+                  onKeyDown={onKeyDown}
+                  onContextMenu={(e) => e.preventDefault()}
+                  aria-label={phase === "recording" ? "Senden" : "Halten und sprechen"}
+                  aria-pressed={phase === "recording"}
+                  className={cn(
+                    "flex size-20 touch-none items-center justify-center rounded-full outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-40 [-webkit-touch-callout:none]",
+                    "transition-transform duration-150 ease-[var(--ease-out)] active:scale-[0.96]",
+                    phase === "recording" ? "bg-primary text-primary-foreground ring-4 ring-primary/25" : "bg-primary text-primary-foreground hover:bg-primary/90",
+                  )}
+                >
+                  <Mic className="size-8" aria-hidden />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={hangUp}
+                aria-label="Auflegen"
+                className="flex size-14 items-center justify-center justify-self-end rounded-full bg-zinc-900 text-white outline-none hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <PhoneOff className="size-6" aria-hidden />
+              </button>
+            </div>
+          </>
         ) : (
           <div className="flex justify-center">
-          <button
-            type="button"
-            onClick={hangUp}
-            aria-label="Auflegen"
-            className="flex size-14 items-center justify-center rounded-full bg-zinc-900 text-white outline-none hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            <PhoneOff className="size-6" aria-hidden />
-          </button>
+            <button
+              type="button"
+              onClick={hangUp}
+              aria-label="Auflegen"
+              className="flex size-14 items-center justify-center rounded-full bg-zinc-900 text-white outline-none hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <PhoneOff className="size-6" aria-hidden />
+            </button>
           </div>
         )}
       </div>

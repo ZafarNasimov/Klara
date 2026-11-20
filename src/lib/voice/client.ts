@@ -166,10 +166,18 @@ export function createSpeaker(mode: "openai" | "browser"): Speaker {
   };
 }
 
-/** Live input level 0…1 for the waveform, read from an AnalyserNode. */
-export function createLevelMeter(stream: MediaStream): { read: (bins: Float32Array) => void; close: () => void } {
-  const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+/** One AudioContext per call, created inside the start tap (iOS needs the gesture). */
+export function createAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!Ctx) return null;
   const ctx = new Ctx();
+  void ctx.resume().catch(() => {});
+  return ctx;
+}
+
+/** Live input level 0…1 for the waveform, read from an AnalyserNode on the call's AudioContext. */
+export function createLevelMeter(stream: MediaStream, ctx: AudioContext): { read: (bins: Float32Array) => void; close: () => void } {
   const src = ctx.createMediaStreamSource(stream);
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 256;
@@ -188,7 +196,6 @@ export function createLevelMeter(stream: MediaStream): { read: (bins: Float32Arr
     },
     close() {
       src.disconnect();
-      void ctx.close();
     },
   };
 }
