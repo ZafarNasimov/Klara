@@ -59,11 +59,15 @@ Findings:
 
 ### Next steps, in order
 
-1. **Verify M3 with the real keys** (locally: put the keys in `.env.local`).
-   - Start a call from `/app/channel/<teamId>` → "Klara anrufen". Speak the SPEC §10 scenario 2 in Russian or English: the transcript must be right, the turn must be live Claude (no "Testmodus" note), and Klara must speak with the OpenAI voice.
-   - Measure the time per turn, from the end of speech to the first audio (SPEC: < 4 s). If it is slower, stream the TTS earlier or switch `KLARA_ANTHROPIC_MODEL` for extraction.
-   - Test on a real phone over HTTPS (iOS needs the start tap; that path is built but untested). Tune the VAD defaults in `/admin/demo` for a loud site.
-   - Then mark M3 ✅.
+1. **Fix call latency, then finish M3** (live test above: 9–11 s per turn, target < 4 s; STT ~1.1 s and TTS first byte ~1.75 s are fine, the Claude turn takes ~8–10 s).
+   - First add per-step timing logs to `/api/voice` and `runTurn` (STT, extraction, phrasing, save) to see where the time goes.
+   - A live turn makes one extraction call (`src/lib/agent/extract.ts`, main model) plus fast-model phrasing calls for questions and readback in the user's language (`src/lib/agent/phrase.ts` → `phraseWithLlm`).
+   - Levers, cheapest first:
+     - **(a)** Use the pre-written per-field phrasings in `lines.ts` / the doc type `question_hint`s for questions in the 6 languages, and call the model only for languages without a pre-written line. This removes one round trip on most turns.
+     - **(b)** Use `fastModel()` with `effort: "low"` for `record_turn` on call turns, and keep the main model for chat or as a retry when validation fails.
+     - **(c)** Set `max_tokens` to ~1200 for `record_turn`; it is 4000 now in `callTool`.
+     - **(d)** Start TTS on the first sentence while the rest is still being built.
+   - Re-measure with the same HTTP test, then on a real phone over HTTPS (iOS start tap, VAD defaults in `/admin/demo` for a loud site). Then mark M3 ✅.
 2. **M4 e-mail loop** (SPEC §6.4, §8 `/admin/mail/[draftId]`, §11 M4). Pieces that already exist:
    - tables and types `email_out` (status default `entwurf`) and `email_in`;
    - doc type and template `stellungnahme_zurueckweisung`;
@@ -137,7 +141,7 @@ Status (2026-11-20, checked from a separate session): all 18 tables exist and th
 
 ## Known issues and open decisions
 
-- Keys were checked on 2026-11-20 from a separate cloud session (Supabase with 2 teams, Anthropic, OpenAI TTS). A full live turn through the app (Claude extraction + OpenAI STT/TTS in the call screen) is still to be verified (Next steps 1). Newer models reject forced `tool_choice`; `src/lib/agent/llm.ts` falls back to auto + instruction.
+- Keys were checked on 2026-11-20 from a separate cloud session (Supabase with 2 teams, Anthropic, OpenAI). The live voice path works over HTTP (see "Live voice test"), but a turn takes 9–11 s against the 4 s target (Next steps 1). The browser call screen has not run with real keys yet. Newer models reject forced `tool_choice`; `src/lib/agent/llm.ts` falls back to auto + instruction.
 - Hands-free was verified only with a simulated mic (Playwright `--use-file-for-fake-audio-capture` with synthetic speech) and a stubbed `/api/voice`.
 - Open-Meteo's free tier rate-limits shared cloud IPs ("Daily API request limit exceeded"); then no weather is attached.
 - All letter texts are prototype drafts: **TODO legal review** (SPEC D8). Weather "unusual" thresholds are a heuristic.
