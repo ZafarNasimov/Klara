@@ -133,6 +133,7 @@ export function evaluateCase(input: EvaluateInput, ctx: RulesCtx): Evaluation {
       case "sphere":
         checks.push(sphereCheck(sphere, typeof facts._trade === "string" ? facts._trade : null));
         if (sphere === "own_sub" || sphere === "own_team") flags.push("internal_risk");
+        if (sphere === "weather") checks.push(weatherCheck(facts._weather));
         break;
 
       case "channel":
@@ -162,6 +163,25 @@ export function evaluateCase(input: EvaluateInput, ctx: RulesCtx): Evaluation {
   });
 
   return { missing_fields: missing, checks, recipient, deadline, deadline_rule: serializeRule(def.deadline), flags };
+}
+
+/** § 6 Abs. 2 Nr. 2 VOB/B: weather counts only when it was unusual. `_weather` is set from Open-Meteo on confirm. */
+export function weatherCheck(w: unknown): CheckResult {
+  const id = "weather_evidence";
+  const label_de = "Wetterdaten";
+  const rec = w && typeof w === "object" ? (w as { summary_de?: unknown; unusual?: unknown }) : null;
+  if (!rec || typeof rec.summary_de !== "string") {
+    return { id, label_de, light: "yellow", reason_de: "Wetterdaten fehlen – bitte Wetterbericht des Tages beifügen" };
+  }
+  const unusual = Array.isArray(rec.unusual) ? rec.unusual.filter((x): x is string => typeof x === "string") : [];
+  return unusual.length
+    ? { id, label_de, light: "green", reason_de: `Ungewöhnliche Witterung belegt: ${unusual.join(", ")}` }
+    : {
+        id,
+        label_de,
+        light: "yellow",
+        reason_de: "Hinweis: Witterung laut Wetterdaten nicht ungewöhnlich – mit der bei Angebotsabgabe zu rechnenden Witterung ist keine Behinderung; bitte prüfen",
+      };
 }
 
 export function sphereCheck(sphere: Sphere | null, trade: string | null = null): CheckResult {

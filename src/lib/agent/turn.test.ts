@@ -1,7 +1,7 @@
 // SPEC §10 test scenarios through the whole text pipeline (keyword reader, memory store).
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { store } from "@/lib/db";
-import { createConversation, getDailyReport, listCases, listEvents } from "@/lib/db/repo";
+import { createConversation, getDailyReport, listCases, listEvents, listEvidence } from "@/lib/db/repo";
 import { buildSeed, IDS } from "@/lib/db/seed";
 import { berlinTime } from "@/lib/deadlines";
 import type { Case } from "@/lib/types";
@@ -149,6 +149,37 @@ describe("scenario 5: storm", () => {
     expect(c.facts._cost_reservation).toBe(false);
     expect(c.flags).toContain("no_cost_reservation");
     expect(check(c, "sphere")?.reason_de).toMatch(/kein Kostenvorbehalt.*Hinweis/);
+    expect(check(c, "weather_evidence")).toMatchObject({ light: "yellow", reason_de: expect.stringMatching(/^Wetterdaten fehlen/) });
+  });
+
+  describe("with weather data", () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    });
+
+    it("attaches the site weather on confirm and shows the storm as unusual", async () => {
+      vi.stubEnv("WEATHER_DISABLED", "0");
+      const hours = Array.from({ length: 24 }, (_, h) => `${DAY}T${String(h).padStart(2, "0")}:00`);
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () =>
+          Response.json({
+            hourly: { time: hours, temperature_2m: hours.map(() => 7), precipitation: hours.map(() => 0.4), weather_code: hours.map(() => 63), wind_gusts_10m: hours.map(() => 90) },
+            daily: { time: [DAY], temperature_2m_max: [9], temperature_2m_min: [4], precipitation_sum: [9.6], wind_gusts_10m_max: [102], weather_code: [63] },
+          }),
+        ),
+      );
+      const say = await chat();
+      let r = await say("Sturm, der Kran stand den ganzen Tag.");
+      for (let i = 0; i < 4 && !r.awaiting_confirm; i++) r = await say("Weiß ich nicht.");
+      expect(r.awaiting_confirm).toBe(true);
+      await say("Ja.");
+      const [c] = await live();
+      expect(check(c, "weather_evidence")).toMatchObject({ light: "green", reason_de: "Ungewöhnliche Witterung belegt: Sturmböen bis 102 km/h" });
+      const weather = (await listEvidence(c.id)).find((e) => e.kind === "weather");
+      expect(weather?.data.summary_de).toMatch(/^20\.11\.2026: Regen, .*Böen bis 102\u00a0km\/h/);
+    });
   });
 });
 

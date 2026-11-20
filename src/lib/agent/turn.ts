@@ -36,6 +36,7 @@ import {
   CONFIDENCE_THRESHOLD,
   dependents,
   evaluateCase,
+  eventTime,
   nextQuestionField,
   planVsActual,
   resolveTrade,
@@ -44,6 +45,7 @@ import {
 } from "@/lib/rules";
 import type { AppUser, Case, Conversation, ConversationState, ScheduleItem, Sphere, Team, Trade, Turn } from "@/lib/types";
 import { generateDocument } from "@/lib/documents/generate";
+import { fetchWeather, type WeatherRecord } from "@/lib/weather";
 import { extract } from "./extract";
 import type { LineKey } from "./lines";
 import { line, question, readback, readbackView } from "./phrase";
@@ -65,6 +67,8 @@ export type TurnInput = {
 
 /** Flags the rules engine recomputes on every evaluation. */
 const EVALUATED_FLAGS = new Set(["escalate", "internal_risk"]);
+/** Documents that carry the site weather as evidence. */
+const WEATHER_DOC_TYPES = new Set(["behinderungsanzeige"]);
 
 const nowBerlinFmt = new Intl.DateTimeFormat("en-GB", {
   timeZone: TZ,
@@ -337,6 +341,25 @@ class TurnRun {
     this.parts.push({ kind: "line", key: "clarify" });
   }
 
+  /** Site weather at each hindrance's event time (SPEC §5.2 computed `weather`); lookups shared per instant. */
+  private async weatherFor(cases: Case[]): Promise<Map<string, WeatherRecord>> {
+    const out = new Map<string, WeatherRecord>();
+    const { lat, lng } = this.ctx.project;
+    const byInstant = new Map<string, Promise<WeatherRecord | null>>();
+    await Promise.all(
+      cases
+        .filter((c) => WEATHER_DOC_TYPES.has(c.doc_type))
+        .map(async (c) => {
+          const at = eventTime(requireDocType(c.doc_type), c.facts, this.now);
+          const key = at.toISOString().slice(0, 13);
+          if (!byInstant.has(key)) byInstant.set(key, fetchWeather(lat, lng, at));
+          const w = await byInstant.get(key)!;
+          if (w) out.set(c.id, w);
+        }),
+    );
+    return out;
+  }
+
   private async confirm(): Promise<void> {
     const ids = new Set(this.state.awaiting_confirm ?? []);
     const confirmed = this.pending.filter((c) => ids.has(c.id));
@@ -347,12 +370,21 @@ class TurnRun {
       language: t.language,
       at: t.created_at,
     }));
+    const weather = await this.weatherFor(confirmed);
     let incomplete = 0;
     for (const c of confirmed) {
       const status = c.missing_fields.length ? "unvollstaendig" : "bereit";
       if (status === "unvollstaendig") incomplete++;
+      const w = weather.get(c.id) ?? null;
       // The card follows Klara's confirming line (user turn at now, Klara at now + 1 ms).
-      const saved = await this.save(c, { status, facts: { _confirmed_at: new Date(this.now.getTime() + 2).toISOString() } });
+      const saved = await this.save(c, {
+        status,
+        facts: {
+          _confirmed_at: new Date(this.now.getTime() + 2).toISOString(),
+          ...(w ? { _weather: { summary_de: w.summary_de, unusual: w.unusual } } : {}),
+        },
+      });
+      if (w) await addEvidence({ case_id: c.id, kind: "weather", ref: w.source, data: { ...w } }, this.now);
       await this.makeDocument(saved);
       await addEvidence(
         { case_id: c.id, kind: "transcript", ref: this.conv.id, data: { conversation_id: this.conv.id, kind: this.conv.kind, turns: transcript } },
