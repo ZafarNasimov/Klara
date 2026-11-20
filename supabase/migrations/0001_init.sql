@@ -119,7 +119,8 @@ create table "case" (
   parent_case_id uuid references "case"(id),
   reference text not null unique,
   created_by uuid references app_user(id),
-  questions_asked int not null default 0,
+  asked_fields text[] not null default '{}',
+  declined_fields text[] not null default '{}',
   flags text[] not null default '{}',
   created_at timestamptz not null default now()
 );

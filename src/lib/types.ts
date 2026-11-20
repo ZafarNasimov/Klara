@@ -166,8 +166,10 @@ export type Case = {
   parent_case_id: string | null;
   reference: string;
   created_by: string | null;
-  /** Number of questions Klara asked for this case (max 3). */
-  questions_asked: number;
+  /** Fields Klara already asked the user about (max 3 per case). */
+  asked_fields: string[];
+  /** Fields the user said they don't know. */
+  declined_fields: string[];
   /** Internal flags, e.g. escalate, internal_risk. */
   flags: string[];
   created_at: string;

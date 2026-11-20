@@ -1,0 +1,55 @@
+import type { DocTypeDef } from "./types";
+
+export const behinderungEnde: DocTypeDef = {
+  id: "behinderung_ende",
+  title_de: "Anzeige Wegfall der Behinderung / Wiederaufnahme",
+  legal_basis: "§ 6 Abs. 3 VOB/B",
+  tier: "A",
+  build_priority: "must",
+  recipient: "client_with_authority",
+  deadline: { kind: "unverzueglich" },
+  event_time_field: "end_at",
+  checks: ["required_fields", "recipient", "timing_unverzueglich", "confidence"],
+  max_questions: 3,
+  fields: [
+    {
+      key: "end_at",
+      label_de: "Ende der Behinderung",
+      type: "datetime",
+      required: true,
+      source: "user",
+      question_hint: "Since when exactly can you work again? Date and time.",
+      ask: {
+        en: "Since when exactly can you work again? Date and time, please.",
+        de: "Seit wann genau können Sie wieder arbeiten? Bitte Datum und Uhrzeit.",
+        ru: "С какого момента точно можно снова работать? Дата и время, пожалуйста.",
+      },
+      extract_hint: "ISO 8601 datetime with offset.",
+    },
+    {
+      key: "resumed_at",
+      label_de: "Wiederaufnahme der Arbeiten",
+      type: "datetime",
+      required: false,
+      source: "user",
+      ask_if_missing: true,
+      question_hint: "When did or will your crew resume work?",
+      ask: {
+        en: "When did your crew start working again, or when will they?",
+        de: "Wann hat Ihre Kolonne wieder angefangen, oder wann fängt sie an?",
+        ru: "Когда ваша бригада снова начала работу или когда начнёт?",
+      },
+      extract_hint: "ISO 8601 datetime with offset.",
+    },
+    {
+      key: "still_affected",
+      label_de: "Noch beeinträchtigt",
+      type: "text",
+      required: false,
+      source: "user",
+      question_hint: "Is anything still affected?",
+      extract_hint: "German, only if stated.",
+    },
+  ],
+  readback_fields: ["end_at", "resumed_at", "still_affected"],
+};
