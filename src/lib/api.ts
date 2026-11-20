@@ -9,6 +9,17 @@ export class BadRequestError extends Error {
   }
 }
 
+/** An error with its own HTTP status and a message meant for the user (e.g. a missing voice key → 503). */
+export class HttpError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "HttpError";
+  }
+}
+
 export function jsonError(message: string, status: number) {
   return Response.json({ error: message }, { status });
 }
@@ -21,6 +32,10 @@ export async function handle(fn: () => Promise<unknown>): Promise<Response> {
   } catch (err) {
     if (err instanceof NotFoundError) return jsonError(err.message, 404);
     if (err instanceof BadRequestError) return jsonError(err.message, 400);
+    if (err instanceof HttpError) {
+      if (err.status >= 500) console.error("[klara] request failed", err.message);
+      return jsonError(err.message, err.status);
+    }
     console.error("[klara] request failed", err);
     return jsonError(err instanceof Error ? err.message : "Unbekannter Fehler", 500);
   }

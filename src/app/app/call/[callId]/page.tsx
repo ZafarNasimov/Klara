@@ -1,25 +1,28 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
-import { KlaraAvatar } from "@/components/klara/klara-avatar";
-import { MobileHeader } from "@/components/mobile/mobile-header";
+import { store } from "@/lib/db";
+import { CallView } from "./call-view";
 
-/** Call screen "Klara ruft an" (SPEC §8, built in M3). */
-export default function CallPage({ params }: PageProps<"/app/call/[callId]">) {
+export const metadata: Metadata = { title: "Gespräch mit Klara" };
+
+/** Call screen (SPEC §8 /app/call/[callId]); `new?team=…` starts a call, `?incoming=1` rings first. */
+export default function CallPage({ params, searchParams }: PageProps<"/app/call/[callId]">) {
   return (
     <Suspense>
-      <Call params={params} />
+      <Call params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function Call({ params }: { params: PageProps<"/app/call/[callId]">["params"] }) {
-  await params;
-  return (
-    <>
-      <MobileHeader title="Gespräch mit Klara" backHref="/app" />
-      <main className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
-        <KlaraAvatar size={112} />
-        <p className="text-sm text-muted-foreground">Dieses Gespräch wird aufgezeichnet.</p>
-      </main>
-    </>
-  );
+async function Call({
+  params,
+  searchParams,
+}: {
+  params: PageProps<"/app/call/[callId]">["params"];
+  searchParams: PageProps<"/app/call/[callId]">["searchParams"];
+}) {
+  const [{ callId }, sp] = await Promise.all([params, searchParams]);
+  const team = typeof sp.team === "string" ? sp.team : null;
+  const teamName = team ? ((await store().get("team", team))?.name ?? null) : null;
+  return <CallView callId={callId} teamId={team} teamName={teamName} incoming={sp.incoming === "1"} />;
 }

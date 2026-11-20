@@ -364,6 +364,16 @@ export type ConfirmView = {
   }[];
 };
 
+/** One conversation for the call screen (GET /api/conversations/[id]). */
+export type ConversationDetail = {
+  conversation: Conversation;
+  team: Team;
+  lead_name: string | null;
+  turns: Turn[];
+  /** Cases this conversation produced (drafts excluded). */
+  cases: CaseView[];
+};
+
 /** Team channel feed for the mobile app (GET /api/channel/[teamId]). */
 export type ChannelFeed = {
   team: Team;

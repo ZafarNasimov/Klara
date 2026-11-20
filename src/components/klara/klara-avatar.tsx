@@ -9,9 +9,12 @@ export function KlaraAvatar({
   mood = "idle",
   className,
   title,
+  talking = false,
 }: {
   size?: number;
   mood?: KlaraMood;
+  /** Speaking mouth moves (call screen while Klara's voice plays). */
+  talking?: boolean;
   className?: string;
   /** Accessible name; omit when the avatar is decorative next to Klara's name. */
   title?: string;
@@ -53,7 +56,15 @@ export function KlaraAvatar({
       )}
       {/* mouth */}
       {mood === "speaking" ? (
-        <ellipse cx="32" cy="40" rx="4" ry="2.4" fill="#18181b" />
+        <ellipse
+          cx="32"
+          cy="40"
+          rx="4"
+          ry="2.4"
+          fill="#18181b"
+          style={{ transformBox: "fill-box", transformOrigin: "center" }}
+          className={talking ? "animate-[klara-talk_320ms_ease-in-out_infinite]" : undefined}
+        />
       ) : (
         <path d="M27.5 39.2q4.5 3.6 9 0" fill="none" stroke="#18181b" strokeWidth="2.2" strokeLinecap="round" />
       )}

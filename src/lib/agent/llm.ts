@@ -4,7 +4,7 @@
 // explicit instruction, and re-ask once if no tool call came back.
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { llmMode } from "@/lib/runtime";
+import { anthropicEnv, llmMode } from "@/lib/runtime";
 
 export { llmMode };
 
@@ -18,20 +18,21 @@ export class LlmError extends Error {
 let client: Anthropic | null = null;
 function anthropic(): Anthropic {
   if (!client) {
-    if (!process.env.ANTHROPIC_API_KEY) throw new LlmError("ANTHROPIC_API_KEY fehlt");
-    client = new Anthropic({ timeout: 25_000, maxRetries: 1 });
+    const apiKey = anthropicEnv("API_KEY");
+    if (!apiKey) throw new LlmError("KLARA_ANTHROPIC_API_KEY (oder ANTHROPIC_API_KEY) fehlt");
+    client = new Anthropic({ apiKey, timeout: 25_000, maxRetries: 1 });
   }
   return client;
 }
 
 export function mainModel(): string {
-  const m = process.env.ANTHROPIC_MODEL;
-  if (!m) throw new LlmError("ANTHROPIC_MODEL fehlt");
+  const m = anthropicEnv("MODEL");
+  if (!m) throw new LlmError("KLARA_ANTHROPIC_MODEL (oder ANTHROPIC_MODEL) fehlt");
   return m;
 }
 
 export function fastModel(): string {
-  return process.env.ANTHROPIC_MODEL_FAST || mainModel();
+  return anthropicEnv("MODEL_FAST") || mainModel();
 }
 
 // Models documented to return 400 on tool_choice "tool"/"any".
@@ -45,7 +46,7 @@ function supportsForcedTool(model: string): boolean {
 type Effort = "low" | "medium" | "high";
 
 function effortSetting(): Effort | null {
-  const e = process.env.ANTHROPIC_EFFORT;
+  const e = anthropicEnv("EFFORT");
   return e === "low" || e === "medium" || e === "high" ? e : null;
 }
 

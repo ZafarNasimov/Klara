@@ -1,6 +1,7 @@
 import { BadRequestError, handle, readJson, requireString } from "@/lib/api";
 import { store } from "@/lib/db";
-import { createConversation, listConversations, projectNow } from "@/lib/db/repo";
+import { LINES, fill } from "@/lib/agent/lines";
+import { addTurn, createConversation, listConversations, projectNow } from "@/lib/db/repo";
 import { NotFoundError } from "@/lib/db/store";
 import type { ConversationKind } from "@/lib/types";
 
@@ -24,6 +25,19 @@ export async function POST(req: Request) {
       if (open) return open;
     }
     const lang = body.language && body.language !== "auto" ? body.language : null;
-    return createConversation({ team_id: teamId, user_id: team.lead_user_id, kind, language: lang }, await projectNow(team.project_id));
+    const now = await projectNow(team.project_id);
+    const conv = await createConversation({ team_id: teamId, user_id: team.lead_user_id, kind, language: lang }, now);
+    if (kind === "call") {
+      // Klara opens the call in the Polier's language; their first sentence decides the language after that.
+      const lead = await store().get("app_user", team.lead_user_id);
+      const say = lang ?? lead?.language ?? "de";
+      const name = lead?.name.split(" ")[0] ?? "";
+      const greet = (l: string) => fill((LINES[l] ?? LINES.de).callGreeting, { name }).replace(/,\s*,/, ",");
+      await addTurn(
+        { conversation_id: conv.id, role: "klara", text_original: greet(say), text_de: greet("de"), language: say, audio_url: null },
+        now,
+      );
+    }
+    return conv;
   });
 }

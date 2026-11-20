@@ -22,7 +22,8 @@ export type LineKey =
   | "deviationNote"
   | "unconfirmedSaved"
   | "returnedFor"
-  | "correctAsk";
+  | "correctAsk"
+  | "callGreeting";
 
 type Table = Record<LineKey, string>;
 
@@ -50,6 +51,7 @@ export const LINES: Record<string, Table> = {
     unconfirmedSaved: "Okay. I've saved what we have; the site manager will follow up.",
     returnedFor: "The site manager needs more information for {doc} {ref}.",
     correctAsk: "{doc} {ref}: what should I correct?",
+    callGreeting: "Hello {name}, this is Klara. What has happened on site?",
   },
   de: {
     clarify: "Entschuldigung, das habe ich nicht genau verstanden. Was ist auf der Baustelle passiert, und wo genau?",
@@ -74,6 +76,7 @@ export const LINES: Record<string, Table> = {
     unconfirmedSaved: "In Ordnung. Ich habe das Bisherige gespeichert, die Bauleitung meldet sich.",
     returnedFor: "Die Bauleitung braucht noch eine Angabe zu {doc} {ref}.",
     correctAsk: "{doc} {ref}: Was soll ich korrigieren?",
+    callGreeting: "Hallo {name}, hier ist Klara. Was gibt es auf der Baustelle?",
   },
   ru: {
     clarify: "Извините, я не совсем поняла. Что произошло на объекте и где именно?",
@@ -98,6 +101,7 @@ export const LINES: Record<string, Table> = {
     unconfirmedSaved: "Хорошо. Я сохранила то, что есть, руководитель свяжется с вами.",
     returnedFor: "Руководителю нужно уточнение по документу «{doc}» {ref}.",
     correctAsk: "{doc} {ref}: что мне исправить?",
+    callGreeting: "Здравствуйте, {name}, это Клара. Что случилось на стройке?",
   },
   pl: {
     clarify: "Przepraszam, nie do końca zrozumiałam. Co się stało na budowie i gdzie dokładnie?",
@@ -122,6 +126,7 @@ export const LINES: Record<string, Table> = {
     unconfirmedSaved: "Dobrze. Zapisałam to, co mamy, kierownik się odezwie.",
     returnedFor: "Kierownik budowy potrzebuje jeszcze informacji do dokumentu „{doc}” {ref}.",
     correctAsk: "{doc} {ref}: co mam poprawić?",
+    callGreeting: "Dzień dobry, {name}, tu Klara. Co się dzieje na budowie?",
   },
   tr: {
     clarify: "Kusura bakmayın, tam anlayamadım. Şantiyede ne oldu ve tam olarak nerede?",
@@ -146,6 +151,7 @@ export const LINES: Record<string, Table> = {
     unconfirmedSaved: "Tamam. Elimizdekini kaydettim, şantiye şefi sizinle iletişime geçecek.",
     returnedFor: "Şantiye şefinin {doc} {ref} için bir bilgiye daha ihtiyacı var.",
     correctAsk: "{doc} {ref}: neyi düzelteyim?",
+    callGreeting: "Merhaba {name}, ben Klara. Şantiyede ne oldu?",
   },
   ro: {
     clarify: "Scuze, nu am înțeles bine. Ce s-a întâmplat pe șantier și unde exact?",
@@ -170,6 +176,7 @@ export const LINES: Record<string, Table> = {
     unconfirmedSaved: "Bine. Am salvat ce avem, șeful de șantier revine.",
     returnedFor: "Șeful de șantier mai are nevoie de o informație pentru {doc} {ref}.",
     correctAsk: "{doc} {ref}: ce să corectez?",
+    callGreeting: "Bună ziua, {name}, sunt Klara. Ce s-a întâmplat pe șantier?",
   },
 };
 

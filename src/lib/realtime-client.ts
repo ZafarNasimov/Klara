@@ -62,7 +62,8 @@ function ensureConnected() {
   if (teardown) return;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  teardown = url && key ? connectSupabase(url, key) : connectSse();
+  // Tolerate the REST endpoint pasted as the project URL.
+  teardown = url && key ? connectSupabase(url.trim().replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, ""), key) : connectSse();
 }
 
 export function subscribeLive(l: Listener): () => void {

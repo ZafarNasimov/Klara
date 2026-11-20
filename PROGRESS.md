@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-20 22:53 UTC · branch `claude/project-thread-jrqak8`
+Last update: 2026-11-20 23:10 UTC · branch `claude/project-thread-jrqak8`
 
 ## Milestones (SPEC §11)
 
@@ -31,7 +31,9 @@ Last update: 2026-11-20 22:53 UTC · branch `claude/project-thread-jrqak8`
 - **Correct by voice** (`reopenForCorrection` in `src/lib/cases/actions.ts`, `POST /api/cases/[id]/correct`): the Polier reopens a confirmed case; Klara asks "what should I correct?" in the team chat above the current facts (`state.confirm_intro = "correct"`). A change makes the next version and lifts the office approval; a plain "yes" keeps version and approval. Flag `correcting` until then.
 - **Mobile case page** `/app/case/[id]` (`case-view.tsx`): next-step sentence, office question when returned, scaled page-1 letter thumbnail (opens the PDF), checks, facts, sticky "PDF öffnen" + state-dependent primary action. Case cards say when the office needs something.
 - **Bautagesbericht** (`src/lib/reports/daily.ts`, template `templates/bautagesbericht.ts`): one case per team and day (reference `BTB-YYYYMMDD-<KOLONNE>`, outside KL numbering), compiled from the evening quantities (plan vs. actual table), the team's cases of the day (Besondere Vorkommnisse, Anordnungen), diary notes, site weather and names. Rebuilt after every evening quantity; missing Personal is asked in the chat (flag `collecting`), the yes writes the next version. DocBody has `form: "report"` plus `heading` / `table` / `signatures` blocks (PDF, DOCX, HTML preview). `POST /api/teams/[teamId]/daily-report {date?}` compiles on demand.
-- **Tests:** 106 Vitest tests, incl. SPEC §10 scenarios (`src/lib/agent/turn.test.ts`) and office/Polier actions (`src/lib/cases/actions.test.ts`).
+- **Voice, step 1 push-to-talk** (`src/lib/voice/`, `src/app/app/call/[callId]/call-view.tsx`): call screen with phases ready/ringing → listening → recording → processing → speaking, Klara greets by first name, hold-to-talk or tap-to-start/tap-to-send, live waveform from the mic, transcript with German subtitles, case cards, hang-up → "Gespräch beendet" with the cases and the protocol. `POST /api/voice` (multipart audio → OpenAI `gpt-4o-transcribe` → noise filter `segment.ts` → same agent turn), `GET /api/tts` (OpenAI `gpt-4o-mini-tts` MP3 stream; the browser voice when there is no key or it fails), `POST /api/conversations/[id]/end`. Typing works any time and is the only input without `OPENAI_API_KEY`. iOS: audio is unlocked inside the start tap. Verified with Playwright (typed call, and push-to-talk with a stubbed `/api/voice`); real OpenAI audio is untested.
+- **Voice, step 2 hands-free (in progress):** `@ricky0123/vad-web` installed; `npm install` copies its model/worklet/wasm to `public/vad/` (`scripts/copy-vad-assets.mjs`, gitignored output). VAD settings (silence, min speech, threshold) are saved per project from `/admin/demo` (`POST /api/demo/vad`) and served by `GET /api/voice`. Not yet wired into the call screen.
+- **Tests:** 108 Vitest tests, incl. SPEC §10 scenarios (`src/lib/agent/turn.test.ts`) and office/Polier actions (`src/lib/cases/actions.test.ts`).
 
 ### M2 screens
 
@@ -41,8 +43,8 @@ Last update: 2026-11-20 22:53 UTC · branch `claude/project-thread-jrqak8`
 
 ### Next steps, in order
 
-1. M3 voice (SPEC §11 "Voice mode details"): step 1 push-to-talk end to end (`/api/voice` STT → `/api/agent/turn` → `/api/tts`), step 2 hands-free with `@ricky0123/vad-web` on the same pipeline, VAD settings in `/admin/demo`.
-2. Verify Supabase end to end (see Setup) and commit any fixes (a separate thread is on it).
+1. M3 step 2: hands-free on the call screen (MicVAD with `getStream` = the open mic, pause while Klara thinks/speaks, "Freihändig" ⇄ "Push-to-Talk" toggle without losing the conversation), then critique/polish the call screen and the "Klara ruft an" incoming state.
+2. Test real voice and Claude in a fresh cloud session once the keys are in the environment: `OPENAI_API_KEY`, `KLARA_ANTHROPIC_*` (see Environment). The network policy must allow `api.openai.com` and `api.anthropic.com`; Node needs `NODE_USE_ENV_PROXY=1` there.
 3. M4–M6 per SPEC §11.
 
 Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-0039..0041 so the board is not empty before the demo case.
@@ -71,8 +73,8 @@ See `.env.example` for all names. Never commit `.env*` files.
 |---|---|---|
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Supabase backend | `DATA_BACKEND` defaults to `supabase` when both are set |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser realtime | optional |
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `ANTHROPIC_MODEL_FAST` | Live extraction + phrasing | `LLM_MODE` defaults to `live` when the key is set |
-| `OPENAI_API_KEY` | M3 voice | not used yet |
+| `KLARA_ANTHROPIC_API_KEY`, `KLARA_ANTHROPIC_MODEL`, `KLARA_ANTHROPIC_MODEL_FAST` (optional `KLARA_ANTHROPIC_EFFORT`) | Live extraction + phrasing | Each falls back to the plain `ANTHROPIC_*` name. Claude Code cloud environments reserve `ANTHROPIC_*` (the key is not passed to the app, and `ANTHROPIC_MODEL` would change Claude Code's own model), so use the `KLARA_` names there; locally and on Vercel either works. `LLM_MODE` defaults to `live` when a key is set. The model names have no default (SPEC D10): set both. |
+| `OPENAI_API_KEY` | M3 voice (speech-to-text, Klara's voice) | without it the call screen takes typed text and the browser speaks. Optional: `STT_MODEL`, `TTS_MODEL`, `TTS_VOICE`, `TTS_PROVIDER=browser` |
 | `POSTMARK_*`, `DEMO_CLIENT_MAILBOX` | M4 e-mail | not used yet |
 | `WEATHER_DISABLED=1` | skip Open-Meteo | tests set it |
 | `DEMO_NOW` | fixed demo start instant | optional |
@@ -83,11 +85,13 @@ See `.env.example` for all names. Never commit `.env*` files.
 2. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` (and the `NEXT_PUBLIC_*` pair for realtime).
 3. `npm run seed` loads the demo data (destroys existing rows).
 
-Status: Zafar ran the migration and added the variables to the cloud environment on 2026-11-20; the connection has not been verified from code yet.
+Status (2026-11-20, checked from a separate session): all 18 tables exist and the seed is loaded.
+- In the Claude Code cloud environment, Node `fetch` reaches Supabase only with `NODE_USE_ENV_PROXY=1` (the egress proxy). Locally you do not need it.
+- `SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_URL` must be the project URL (`https://<ref>.supabase.co`), not the REST endpoint. The code now strips a trailing `/rest/v1/` anyway.
 
 ## Known issues and open decisions
 
-- Live Claude path is untested until `ANTHROPIC_API_KEY` is set. Newer models reject forced `tool_choice`; `src/lib/agent/llm.ts` falls back to auto + instruction.
+- Live Claude path is untested until `KLARA_ANTHROPIC_API_KEY` (or `ANTHROPIC_API_KEY`) is set. Newer models reject forced `tool_choice`; `src/lib/agent/llm.ts` falls back to auto + instruction.
 - Open-Meteo's free tier rate-limits shared cloud IPs ("Daily API request limit exceeded"); then no weather is attached.
 - All letter texts are prototype drafts: **TODO legal review** (SPEC D8). Weather "unusual" thresholds are a heuristic.
 - The mic button opens the call screen stub (M3). "E-Mail vorbereiten" lands in M4.

@@ -43,7 +43,7 @@ import {
   routeHindrance,
   type CauseKind,
 } from "@/lib/rules";
-import type { AppUser, Case, Conversation, ConversationState, DocumentVersion, ScheduleItem, Sphere, Team, Trade, Turn } from "@/lib/types";
+import type { AppUser, Case, CaseView, Conversation, ConversationState, DocumentVersion, ScheduleItem, Sphere, Team, Trade, Turn } from "@/lib/types";
 import { generateDocument } from "@/lib/documents/generate";
 import { compileDailyReport } from "@/lib/reports/daily";
 import { fetchWeather, type WeatherRecord } from "@/lib/weather";
@@ -101,6 +101,18 @@ export async function runTurn(input: TurnInput): Promise<TurnResponse> {
   return new TurnRun(ctx, conv, team, now).run(text, input.language ?? null);
 }
 
+/** End a call without a spoken goodbye (the "Auflegen" button). Chats stay open. */
+export async function hangUp(conversationId: string, now?: Date): Promise<{ conversation: Conversation; cases: CaseView[] }> {
+  const conv = await getConversation(conversationId);
+  if (!conv) throw new NotFoundError("conversation", conversationId);
+  if (conv.kind !== "call") throw new BadRequestError("Nur Anrufe können aufgelegt werden");
+  if (conv.status === "closed") return { conversation: conv, cases: [] };
+  const team = await store().get("team", conv.team_id);
+  if (!team) throw new NotFoundError("team", conv.team_id);
+  const ctx = await getProjectContext(team.project_id);
+  return new TurnRun(ctx, conv, team, now ?? withOffset(clockBase(), ctx.project.settings.demo_clock_offset_ms)).hangUp();
+}
+
 class TurnRun {
   private readonly today: string;
   private readonly region: string;
@@ -129,13 +141,26 @@ class TurnRun {
     this.state = { ...s, pending_case_ids: [...(s.pending_case_ids ?? [])] };
   }
 
-  async run(text: string, langHint: string | null): Promise<TurnResponse> {
-    const hint = langHint && langHint !== "auto" ? langHint : null;
+  private async loadPending(): Promise<void> {
     const loaded = await Promise.all(this.state.pending_case_ids.map((id) => store().get("case", id)));
     // Drafts, plus cases reopened in this chat (office "Zurück zur Ergänzung", Polier "Per Sprache korrigieren").
     this.pending = loaded.filter((c): c is Case => !!c && (c.status === "entwurf" || isReopened(c)));
     this.state.pending_case_ids = this.pending.map((c) => c.id);
     for (const c of this.pending) this.cases.set(c.id, c);
+  }
+
+  /** "Auflegen": unconfirmed drafts are kept for the office, the call is closed. */
+  async hangUp(): Promise<{ conversation: Conversation; cases: CaseView[] }> {
+    await this.loadPending();
+    await this.endCall();
+    const conversation = await updateConversation(this.conv.id, { state: this.state, status: "closed", ended_at: this.now.toISOString() });
+    const touched = [...this.touched].map((id) => this.cases.get(id)).filter((c): c is Case => !!c);
+    return { conversation, cases: await toCaseViews(touched, this.ctx) };
+  }
+
+  async run(text: string, langHint: string | null): Promise<TurnResponse> {
+    const hint = langHint && langHint !== "auto" ? langHint : null;
+    await this.loadPending();
 
     const [history, convCases] = await Promise.all([listTurns(this.conv.id, 10), this.documentedCases()]);
     const { extraction: ex, source } = await extract(text, this.extractContext(history, convCases, hint));

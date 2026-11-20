@@ -6,12 +6,15 @@ import { NotFoundError, type Row, type Store } from "./store";
 
 let client: SupabaseClient | null = null;
 
+/** The project URL, also when the REST endpoint was pasted ("https://x.supabase.co/rest/v1/"). */
+export const projectUrl = (url: string) => url.trim().replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
+
 function db(): SupabaseClient {
   if (!client) {
     const url = process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) throw new Error("SUPABASE_URL und SUPABASE_SERVICE_ROLE_KEY fehlen");
-    client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    client = createClient(projectUrl(url), key, { auth: { persistSession: false, autoRefreshToken: false } });
   }
   return client;
 }
