@@ -47,3 +47,18 @@ const short = new Intl.DateTimeFormat("de-DE", {
 });
 /** "20.11., 07:00" for dense tables. */
 export const fmtShort = (iso: string | Date) => short.format(new Date(iso));
+
+export const EVENT_DE: Record<string, string> = {
+  case_created: "Vorgang angelegt",
+  case_confirmed: "Angaben vom Polier bestätigt",
+  document_generated: "Dokument erzeugt",
+  case_validated: "Validiert",
+  returned_for_completion: "Zur Ergänzung zurückgegeben",
+  email_sent: "E-Mail versendet",
+  email_received: "Antwort eingegangen",
+  reply_classified: "Antwort ausgewertet",
+  diary_entry: "Bautagesbericht ergänzt",
+  risk_flag: "Interner Hinweis",
+  call_ended: "Gespräch beendet",
+  unsupported_event: "Meldung zur Prüfung",
+};
