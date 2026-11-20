@@ -110,7 +110,7 @@ describe("evaluateCase", () => {
     cause: "Die Elektroinstallation im 2.OG ist nicht fertiggestellt; der Bereich wurde nicht freigegeben.",
     affected_works: "Estricharbeiten 2.OG",
     idle_staff: 4,
-    trade: "Elektro",
+    _trade: "Elektro",
   };
 
   it("golden path: all green except the amber recipient, deadline 'unverzüglich – heute'", () => {

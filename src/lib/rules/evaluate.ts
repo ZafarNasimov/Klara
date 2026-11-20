@@ -131,7 +131,7 @@ export function evaluateCase(input: EvaluateInput, ctx: RulesCtx): Evaluation {
         break;
 
       case "sphere":
-        checks.push(sphereCheck(sphere, typeof facts.trade === "string" ? facts.trade : null));
+        checks.push(sphereCheck(sphere, typeof facts._trade === "string" ? facts._trade : null));
         if (sphere === "own_sub" || sphere === "own_team") flags.push("internal_risk");
         break;
 

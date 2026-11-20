@@ -112,6 +112,10 @@ export type ConversationState = {
   asked_sphere?: { case_id: string; trade: string | null } | null;
   /** Clarifying questions asked in a row (to avoid loops). */
   clarify_count?: number;
+  /** Low-confidence report kept for the next turn instead of opening a case (SPEC §6.2 step 3). */
+  tentative?: { doc_type: string; trade_name_guess: string | null; cause_kind: string; facts: Record<string, unknown> } | null;
+  /** Answers to "Who hired the <trade>?", keyed by lower-case canonical trade name. */
+  hired_by?: Record<string, "client" | "us" | "unknown">;
 };
 
 export type Conversation = {
