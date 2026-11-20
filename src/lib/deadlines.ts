@@ -203,7 +203,7 @@ export function computeDeadline(rule: DeadlineRule, input: DeadlineInput): Deadl
       return {
         due_at: endOfBerlinDay(dueDay).toISOString(),
         status: byDay(dueDay, today),
-        label_de: `${rule.days} Werktage – bis ${fmtDayDe(dueDay)}`,
+        label_de: `${daysDe(rule.days, "Werktag")} – bis ${fmtDayDe(dueDay)}`,
       };
     }
 
@@ -212,7 +212,7 @@ export function computeDeadline(rule: DeadlineRule, input: DeadlineInput): Deadl
       return {
         due_at: endOfBerlinDay(dueDay).toISOString(),
         status: byDay(dueDay, today),
-        label_de: `${rule.days} Tage – bis ${fmtDayDe(dueDay)}`,
+        label_de: `${daysDe(rule.days, "Tag")} – bis ${fmtDayDe(dueDay)}`,
       };
     }
 
@@ -220,6 +220,9 @@ export function computeDeadline(rule: DeadlineRule, input: DeadlineInput): Deadl
       return { due_at: null, status: "ok", label_de: "keine Frist" };
   }
 }
+
+/** "1 Tag", "3 Tage", "1 Werktag", "5 Werktage". */
+const daysDe = (n: number, unit: "Tag" | "Werktag") => `${n} ${unit}${n === 1 ? "" : "e"}`;
 
 // The case row stores the rule as a short string next to deadline_at, so the
 // status can be recomputed at read time against the (demo) clock.
@@ -293,8 +296,8 @@ export function deadlineView(
         holidayRegion: region,
       });
     case "working_days_after":
-      return { due_at: c.deadline_at, status: byDay(dueDay, today), label_de: `${rule.days} Werktage – bis ${fmtDayDe(dueDay)}` };
+      return { due_at: c.deadline_at, status: byDay(dueDay, today), label_de: `${daysDe(rule.days, "Werktag")} – bis ${fmtDayDe(dueDay)}` };
     case "calendar_days_after":
-      return { due_at: c.deadline_at, status: byDay(dueDay, today), label_de: `${rule.days} Tage – bis ${fmtDayDe(dueDay)}` };
+      return { due_at: c.deadline_at, status: byDay(dueDay, today), label_de: `${daysDe(rule.days, "Tag")} – bis ${fmtDayDe(dueDay)}` };
   }
 }

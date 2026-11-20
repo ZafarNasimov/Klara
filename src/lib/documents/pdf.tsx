@@ -132,7 +132,35 @@ const s = StyleSheet.create({
     fontSize: 9,
   },
   turn: { marginBottom: 2 * MM },
+  // Report form (Bautagesbericht)
+  section: {
+    fontFamily: "Helvetica-Bold",
+    fontSize: 10.5,
+    marginTop: 4 * MM,
+    marginBottom: 2 * MM,
+    paddingBottom: 1 * MM,
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.rule,
+  },
+  table: { marginBottom: 3 * MM },
+  tr: { flexDirection: "row", borderBottomWidth: 0.5, borderBottomColor: C.rule, paddingVertical: 1.2 * MM },
+  th: { fontSize: 8.5, color: C.muted },
+  td: { fontSize: 10, lineHeight: 1.35 },
+  sigRow: { flexDirection: "row", gap: 10 * MM, marginTop: 10 * MM },
+  sigBox: { flex: 1 },
+  sigLine: { borderBottomWidth: 0.75, borderBottomColor: C.text, height: 14 * MM, marginBottom: 1.5 * MM },
+  reportHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", marginTop: 8 * MM, marginBottom: 3 * MM },
+  reportTitle: { fontFamily: "Helvetica-Bold", fontSize: 15 },
+  grid: { flexDirection: "row", flexWrap: "wrap", borderTopWidth: 0.5, borderTopColor: C.rule, marginBottom: 2 * MM },
+  cell: { width: "50%", paddingVertical: 1.5 * MM, paddingRight: 3 * MM, borderBottomWidth: 0.5, borderBottomColor: C.rule },
 });
+
+/** Column widths for a report table: the first column takes the rest. */
+function colWidths(n: number): string[] {
+  if (n === 2) return ["75%", "25%"];
+  if (n === 4) return ["49%", "17%", "17%", "17%"];
+  return Array.from({ length: n }, () => `${100 / n}%`);
+}
 
 /** Text with "[fehlt: …]" placeholders highlighted, so a gap is visible on paper. */
 function Rich({ text }: { text: string }) {
@@ -190,7 +218,85 @@ function Block({ b }: { b: DocBlock }) {
           ))}
         </View>
       );
+    case "heading":
+      return (
+        <Text style={s.section} minPresenceAhead={12 * MM}>
+          {b.text}
+        </Text>
+      );
+    case "table": {
+      if (!b.rows.length) return <Text style={s.p}>{b.empty ?? "–"}</Text>;
+      const w = colWidths(b.columns.length);
+      return (
+        <View style={s.table}>
+          <View style={s.tr} wrap={false}>
+            {b.columns.map((c, i) => (
+              <Text key={c.label} style={[s.th, { width: w[i], textAlign: c.numeric ? "right" : "left" }]}>
+                {c.label}
+              </Text>
+            ))}
+          </View>
+          {b.rows.map((r, ri) => (
+            <View key={ri} style={s.tr} wrap={false}>
+              {r.map((v, i) => (
+                <Text key={i} style={[s.td, { width: w[i], textAlign: b.columns[i]?.numeric ? "right" : "left" }]}>
+                  <Rich text={v} />
+                </Text>
+              ))}
+            </View>
+          ))}
+        </View>
+      );
+    }
+    case "signatures":
+      return (
+        <View style={s.sigRow} wrap={false}>
+          {b.parties.map((p) => (
+            <View key={p.role} style={s.sigBox}>
+              <View style={s.sigLine} />
+              <Text style={s.small}>
+                {p.role}
+                {p.name ? `: ${p.name}` : ""}, Datum, Unterschrift
+              </Text>
+            </View>
+          ))}
+        </View>
+      );
   }
+}
+
+function Report({ body }: { body: DocBody }) {
+  return (
+    <Page size="A4" style={s.page}>
+      <View style={s.content}>
+        <View style={s.head}>
+          <Text style={s.company}>{body.sender.name}</Text>
+          <Text style={s.headRight}>
+            {body.sender.address}
+            {"\n"}Bauleitung
+          </Text>
+        </View>
+        <View style={s.reportHead}>
+          <Text style={s.reportTitle}>{body.subject}</Text>
+          <Text style={s.small}>{body.reference}</Text>
+        </View>
+        <View style={s.grid}>
+          {body.refs.map((r) => (
+            <View key={r.label} style={s.cell} wrap={false}>
+              <Text style={s.th}>{r.label}</Text>
+              <Text style={s.td}>
+                <Rich text={r.value} />
+              </Text>
+            </View>
+          ))}
+        </View>
+        {body.blocks.map((b, i) => (
+          <Block key={i} b={b} />
+        ))}
+      </View>
+      <Footer body={body} />
+    </Page>
+  );
 }
 
 function Footer({ body, internal }: { body: DocBody; internal?: boolean }) {
@@ -210,7 +316,7 @@ function Footer({ body, internal }: { body: DocBody; internal?: boolean }) {
         }}
         fixed
         render={({ pageNumber, totalPages }) =>
-          `${internal ? "Intern – " : ""}Zeichen ${body.reference}, Seite ${pageNumber} von ${totalPages}`
+          `${internal ? "Intern – " : ""}${body.form === "report" ? "Bericht" : "Zeichen"} ${body.reference}, Seite ${pageNumber} von ${totalPages}`
         }
       />
     </>
@@ -430,7 +536,7 @@ export async function renderPdf(
       author={body.sender.name}
       language="de"
     >
-      <Letter body={body} />
+      {body.form === "report" ? <Report body={body} /> : <Letter body={body} />}
       {audit ? <AuditPage body={body} audit={audit} /> : null}
     </Document>,
   );

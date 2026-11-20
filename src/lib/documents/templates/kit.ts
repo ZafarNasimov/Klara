@@ -21,7 +21,13 @@ export type TemplateCtx = {
   missing: string[];
 };
 
-export type TemplateOut = { subject: string; refs?: { label: string; value: string }[]; blocks: DocBlock[] };
+export type TemplateOut = {
+  subject: string;
+  refs?: { label: string; value: string }[];
+  blocks: DocBlock[];
+  /** "report": no addressee, salutation or closing (Bautagesbericht). */
+  form?: "letter" | "report";
+};
 export type Template = (t: TemplateCtx) => TemplateOut;
 
 export const dateDe = (day: string) => fmtDate(/^\d{4}-\d{2}-\d{2}$/.test(day) ? `${day}T12:00:00Z` : day);

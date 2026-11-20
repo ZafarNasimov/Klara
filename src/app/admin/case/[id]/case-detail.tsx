@@ -33,6 +33,7 @@ const FLAG_DE: Record<string, string> = {
   no_cost_reservation: "Witterung: nur Bauzeitverlängerung, kein Kostenvorbehalt",
   returned: "Zur Ergänzung beim Polier",
   correcting: "Der Polier korrigiert die Meldung gerade",
+  collecting: "Klara fragt den Polier im Chat noch nach",
 };
 
 export function CaseDetailView({ id }: { id: string }) {
@@ -68,6 +69,7 @@ export function CaseDetailView({ id }: { id: string }) {
   const name = (uid: string | null) => ctx?.users.find((u) => u.id === uid)?.name ?? null;
   const returned = c.flags.includes("returned");
   const correcting = c.flags.includes("correcting");
+  const collecting = c.flags.includes("collecting");
   const isBauleiter = user.role === "bauleiter";
   const canValidate = c.status !== "validiert" && !data.validation_blocker && isBauleiter && !!latest;
   const validateHint =
@@ -112,7 +114,7 @@ export function CaseDetailView({ id }: { id: string }) {
                   {c.author_name ? `, gemeldet von ${c.author_name}` : null}
                 </span>
                 <span className="inline-flex h-7 items-center rounded-md border border-border px-2 text-foreground">
-                  {returned ? "Zur Ergänzung beim Polier" : correcting ? "Korrektur beim Polier" : CASE_STATUS_DE[c.status]}
+                  {returned ? "Zur Ergänzung beim Polier" : correcting ? "Korrektur beim Polier" : collecting ? "Klara fragt nach" : CASE_STATUS_DE[c.status]}
                 </span>
                 <DeadlineBadge d={c.deadline} />
               </div>

@@ -6,12 +6,20 @@ export type DocBlock =
   /** Label/value rows ("Beginn der Behinderung: 20.11.2026, 07:00 Uhr"). */
   | { kind: "facts"; rows: { label: string; value: string }[] }
   | { kind: "quote"; text: string }
-  | { kind: "bullets"; items: string[] };
+  | { kind: "bullets"; items: string[] }
+  /** Section title inside a report ("Personal", "Ausgeführte Leistungen"). */
+  | { kind: "heading"; text: string }
+  /** Grid with a header row; `numeric` columns are right-aligned. An empty table prints `empty`. */
+  | { kind: "table"; columns: { label: string; numeric?: boolean }[]; rows: string[][]; empty?: string }
+  /** Signature boxes (role, printed name, "Datum, Unterschrift" line). */
+  | { kind: "signatures"; parties: { role: string; name: string | null }[] };
 
 export type DocParty = { name: string; organisation: string | null; address: string | null };
 
 export type DocBody = {
   doc_type: string;
+  /** "report" (Bautagesbericht): a form without address window, salutation and closing. Default "letter". */
+  form?: "letter" | "report";
   /** Betreff, first line bold. */
   subject: string;
   reference: string;

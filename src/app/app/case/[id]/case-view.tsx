@@ -57,7 +57,7 @@ export function MobileCaseView({ id }: { id: string }) {
   const latest = data.versions[0] ?? null;
   const channel = c.team_id ? `/app/channel/${c.team_id}` : "/app";
   const sent = SENT.has(c.status);
-  const returned = c.flags.includes("returned");
+  const returned = c.flags.includes("returned") || c.flags.includes("collecting");
   const correcting = c.flags.includes("correcting");
   const question = returned
     ? (data.events.filter((e) => e.kind === "returned_for_completion").sort((a, b) => b.created_at.localeCompare(a.created_at))[0]?.payload
@@ -131,7 +131,7 @@ export function MobileCaseView({ id }: { id: string }) {
 
         <section aria-labelledby="letter-h" className="mt-7">
           <h2 id="letter-h" className="text-[15px] font-semibold text-foreground">
-            Schreiben
+            {c.doc_type === "bautagesbericht" ? "Bericht" : "Schreiben"}
           </h2>
           {latest && pdfHref ? (
             <>

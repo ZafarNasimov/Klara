@@ -246,6 +246,9 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
     end_at: "ended",
     resumed_at: "resumed",
     still_affected: "still affected",
+    staff: "crew",
+    work_performed: "work done",
+    incidents: "special events",
   },
   de: {
     start_at: "seit",
@@ -268,6 +271,9 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
     end_at: "entfallen",
     resumed_at: "wieder aufgenommen",
     still_affected: "fortwirkend",
+    staff: "Personal",
+    work_performed: "Leistungen",
+    incidents: "Besondere Vorkommnisse",
   },
   ru: {
     start_at: "с",
@@ -290,6 +296,9 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
     end_at: "закончилось",
     resumed_at: "возобновлено",
     still_affected: "последствия",
+    staff: "бригада",
+    work_performed: "выполнено",
+    incidents: "особые происшествия",
   },
   pl: {
     start_at: "od",
@@ -312,6 +321,9 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
     end_at: "ustało",
     resumed_at: "wznowiono",
     still_affected: "skutki",
+    staff: "ekipa",
+    work_performed: "wykonane prace",
+    incidents: "zdarzenia szczególne",
   },
   tr: {
     start_at: "başlangıç",
@@ -334,6 +346,9 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
     end_at: "bitti",
     resumed_at: "yeniden başladı",
     still_affected: "etkisi sürüyor",
+    staff: "ekip",
+    work_performed: "yapılan iş",
+    incidents: "özel olaylar",
   },
   ro: {
     start_at: "de la",
@@ -356,6 +371,9 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
     end_at: "încetat",
     resumed_at: "reluat",
     still_affected: "efecte",
+    staff: "echipa",
+    work_performed: "lucrări executate",
+    incidents: "evenimente deosebite",
   },
 };
 

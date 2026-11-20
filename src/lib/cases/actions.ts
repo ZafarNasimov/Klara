@@ -26,6 +26,7 @@ export function validationBlocker(c: Case): string | null {
   if (SENT.has(c.status)) return "Das Schreiben ist bereits versendet.";
   if (c.flags.includes("returned")) return "Liegt zur Ergänzung beim Polier.";
   if (c.flags.includes("correcting")) return "Der Polier korrigiert die Meldung gerade.";
+  if (c.flags.includes("collecting")) return "Klara fragt den Polier im Chat noch nach.";
   if (c.missing_fields.length) return `Es fehlen noch Angaben: ${c.missing_fields.map((k) => fieldLabel(c.doc_type, k)).join(", ")}.`;
   const red = c.checks.find((x) => x.light === "red");
   if (red) return `${red.label_de}: ${red.reason_de}`;

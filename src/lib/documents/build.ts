@@ -53,24 +53,26 @@ export function buildBody(input: BuildInput, ctx: BuildCtx): DocBody {
   });
   const signer = ctx.users.find((u) => u.role === "bauleiter");
 
+  const report = out.form === "report";
   return {
     doc_type: def.id,
+    ...(report ? { form: "report" as const } : {}),
     subject: out.subject,
     reference: c.reference,
     date: letterDate,
     place: cityOf(ctx.company.address),
     sender: { name: ctx.company.name, address: ctx.company.address },
-    addressee: recipient.to ? party(recipient.to) : null,
-    cc: recipient.cc.map(party),
+    addressee: !report && recipient.to ? party(recipient.to) : null,
+    cc: report ? [] : recipient.cc.map(party),
     refs: [
       { label: "Bauvorhaben", value: `${ctx.project.name}, ${ctx.project.address}` },
       { label: "Vertrag", value: `Nr. ${ctx.project.contract_no} vom ${dateDe(ctx.project.contract_date)}` },
-      { label: "Unser Zeichen", value: c.reference },
+      ...(report ? [] : [{ label: "Unser Zeichen", value: c.reference }]),
       ...(out.refs ?? []),
     ],
-    salutation: "Sehr geehrte Damen und Herren,",
+    salutation: report ? "" : "Sehr geehrte Damen und Herren,",
     blocks: out.blocks,
-    closing: "Mit freundlichen Grüßen",
+    closing: report ? "" : "Mit freundlichen Grüßen",
     signatory: { name: signer?.name ?? "Bauleitung", role: "Bauleitung", company: ctx.company.name },
     missing: [...new Set(tctx.missing)],
   };
@@ -86,11 +88,29 @@ function blockMd(b: DocBlock): string {
       return b.items.map((i) => `- ${i}`).join("\n");
     case "facts":
       return b.rows.map((r) => `**${r.label}:** ${r.value}`).join("  \n");
+    case "heading":
+      return `### ${b.text}`;
+    case "table": {
+      if (!b.rows.length) return b.empty ?? "–";
+      const cell = (v: string) => v.replace(/\|/g, "\\|");
+      return [
+        `| ${b.columns.map((c) => cell(c.label)).join(" | ")} |`,
+        `| ${b.columns.map((c) => (c.numeric ? "---:" : "---")).join(" | ")} |`,
+        ...b.rows.map((r) => `| ${r.map(cell).join(" | ")} |`),
+      ].join("\n");
+    }
+    case "signatures":
+      return b.parties.map((p) => `${p.role}: ${p.name ?? "________________"}, Datum, Unterschrift: ________________`).join("  \n");
   }
 }
 
 /** Canonical Markdown of a letter. The sha256 of this text identifies the version. */
 export function toMarkdown(b: DocBody): string {
+  if (b.form === "report") {
+    const lines = [`${b.sender.name}, ${b.sender.address}`, "", `## ${b.subject}`, "", b.refs.map((r) => `${r.label}: ${r.value}`).join("  \n"), ""];
+    for (const block of b.blocks) lines.push(blockMd(block), "");
+    return lines.join("\n").trim() + "\n";
+  }
   const lines: string[] = [];
   lines.push(`${b.sender.name}, ${b.sender.address}`, "");
   if (b.addressee) {

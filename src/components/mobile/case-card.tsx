@@ -24,6 +24,7 @@ const NEXT_STEP_DE: Record<CaseStatus, string> = {
 export function nextStepDe(c: Pick<CaseView, "status" | "flags">): string {
   if (c.flags.includes("returned")) return "Die Bauleitung braucht noch eine Angabe von Ihnen. Klara fragt im Chat.";
   if (c.flags.includes("correcting")) return "Klara wartet im Chat auf Ihre Korrektur.";
+  if (c.flags.includes("collecting")) return "Klara braucht im Chat noch eine Angabe von Ihnen.";
   return NEXT_STEP_DE[c.status];
 }
 

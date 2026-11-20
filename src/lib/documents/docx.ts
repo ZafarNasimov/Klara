@@ -53,12 +53,55 @@ function block(b: DocBlock): (Paragraph | Table)[] {
       return b.items.map((i) => para(`– ${i}`, { indent: 4 * MM, after: 60 }));
     case "facts":
       return [factTable(b.rows), para("", { after: 60 })];
+    case "heading":
+      return [para(b.text, { bold: true, after: 80 })];
+    case "table": {
+      if (!b.rows.length) return [para(b.empty ?? "–")];
+      const LINE = { style: BorderStyle.SINGLE, size: 4, color: "E4E4E7" };
+      const cell = (text: string, numeric: boolean | undefined, head: boolean) =>
+        new TableCell({
+          children: [
+            new Paragraph({
+              alignment: numeric ? AlignmentType.RIGHT : AlignmentType.LEFT,
+              children: runs(text, head ? { size: 17, color: "52525B" } : { size: 20 }),
+              spacing: { before: 40, after: 40 },
+            }),
+          ],
+        });
+      return [
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          borders: { top: NONE, left: NONE, right: NONE, insideVertical: NONE, bottom: LINE, insideHorizontal: LINE },
+          rows: [
+            new TableRow({ tableHeader: true, children: b.columns.map((c) => cell(c.label, c.numeric, true)) }),
+            ...b.rows.map((r) => new TableRow({ children: r.map((v, i) => cell(v, b.columns[i]?.numeric, false)) })),
+          ],
+        }),
+        para("", { after: 60 }),
+      ];
+    }
+    case "signatures":
+      return [
+        para("", { after: 480 }),
+        ...b.parties.map((p) => para(`______________________________   ${p.role}${p.name ? `: ${p.name}` : ""}, Datum, Unterschrift`, { size: 18, after: 360 })),
+      ];
   }
+}
+
+function reportChildren(body: DocBody): (Paragraph | Table)[] {
+  return [
+    new Paragraph({ children: [new TextRun({ text: body.sender.name, bold: true, font: FONT, size: 30 })], spacing: { after: 40 } }),
+    para(`${body.sender.address}, Bauleitung`, { size: 16, color: "52525B", after: 360 }),
+    para(body.subject, { bold: true, size: 30, after: 120 }),
+    factTable(body.refs),
+    para("", { after: 120 }),
+    ...body.blocks.flatMap(block),
+  ];
 }
 
 export async function renderDocx(body: DocBody): Promise<Buffer> {
   const a = body.addressee;
-  const children: (Paragraph | Table)[] = [
+  const children: (Paragraph | Table)[] = body.form === "report" ? reportChildren(body) : [
     new Paragraph({ children: [new TextRun({ text: body.sender.name, bold: true, font: FONT, size: 30 })], spacing: { after: 40 } }),
     para(`${body.sender.address}, Bauleitung`, { size: 16, color: "52525B", after: 480 }),
     para(`${body.sender.name}, ${body.sender.address}`, { size: 14, color: "52525B", after: 80 }),

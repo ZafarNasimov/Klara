@@ -45,6 +45,7 @@ import {
 } from "@/lib/rules";
 import type { AppUser, Case, Conversation, ConversationState, DocumentVersion, ScheduleItem, Sphere, Team, Trade, Turn } from "@/lib/types";
 import { generateDocument } from "@/lib/documents/generate";
+import { compileDailyReport } from "@/lib/reports/daily";
 import { fetchWeather, type WeatherRecord } from "@/lib/weather";
 import { extract } from "./extract";
 import type { LineKey } from "./lines";
@@ -68,7 +69,8 @@ export type TurnInput = {
 /** Flags the rules engine recomputes on every evaluation. */
 const EVALUATED_FLAGS = new Set(["escalate", "internal_risk"]);
 /** Flags of a confirmed case that is open in a chat again until the next confirm. */
-const REOPEN_FLAGS = new Set(["returned", "correcting"]);
+/** Confirmed cases Klara works on again in the chat: office question, Polier correction, report gaps. */
+const REOPEN_FLAGS = new Set(["returned", "correcting", "collecting"]);
 const isReopened = (c: Case) => c.flags.some((f) => REOPEN_FLAGS.has(f));
 /** Documents that carry the site weather as evidence. */
 const WEATHER_DOC_TYPES = new Set(["behinderungsanzeige"]);
@@ -633,7 +635,25 @@ class TurnRun {
         });
       }
     }
+    if (any) await this.refreshDailyReport();
     return any;
+  }
+
+  /** The evening quantities go straight into today's Bautagesbericht (SPEC §5.2). */
+  private async refreshDailyReport(): Promise<void> {
+    try {
+      const report = await compileDailyReport(this.team.id, this.today, this.now);
+      this.cases.set(report.id, report);
+      this.touched.add(report.id);
+      // Gaps (Personal) are asked right here, like any other missing fact; the yes writes the next version.
+      if (report.missing_fields.length && report.status === "unvollstaendig" && !this.pending.some((p) => p.id === report.id)) {
+        const open = await this.save(report, { flags: unique([...report.flags, "collecting"]) });
+        this.pending.push(open);
+        this.state.pending_case_ids = unique([...this.state.pending_case_ids, open.id]);
+      }
+    } catch (err) {
+      console.error("[klara] daily report failed", this.team.name, this.today, err);
+    }
   }
 
   // ── Events → cases ──────────────────────────────────────────────────
