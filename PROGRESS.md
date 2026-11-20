@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-20 23:25 UTC · branch `claude/project-thread-jrqak8`
+Last update: 2026-11-20 23:35 UTC (cloud work paused here; continue locally) · branch `claude/project-thread-jrqak8`
 
 ## Milestones (SPEC §11)
 
@@ -12,7 +12,7 @@ Last update: 2026-11-20 23:25 UTC · branch `claude/project-thread-jrqak8`
 | M0 | Skeleton: Next.js, store, schema, seed, role switcher, screen shells | ✅ done |
 | M1 | Text pipeline: rules engine, `/api/agent/turn`, readback/confirm, text chat | ✅ done |
 | M2 | Documents: templates, PDF + DOCX, sha256, versions, admin case view | ✅ done |
-| M3 | Voice: call screen, STT/TTS (needs `OPENAI_API_KEY`) | 🟡 in progress |
+| M3 | Voice: call screen, hands-free + push-to-talk, STT/TTS (needs `OPENAI_API_KEY`) | 🟡 built; live-key verification pending |
 | M4 | E-mail: composer, Postmark send, inbound reply analysis | ⬜ |
 | M5 | Realtime, polish, fallbacks ("Antwort simulieren") | ⬜ |
 | M6 | Eval set (`eval/utterances.json`, ≥30) and `eval/run.ts` | ⬜ |
@@ -43,9 +43,33 @@ Last update: 2026-11-20 23:25 UTC · branch `claude/project-thread-jrqak8`
 
 ### Next steps, in order
 
-1. Test real voice and Claude in a fresh cloud session (keys are in the environment now: `OPENAI_API_KEY`, `KLARA_ANTHROPIC_*`; `api.openai.com` is allowlisted). Measure latency per turn (SPEC: < 4 s), tune VAD defaults on a real phone. Then mark M3 done.
-2. Photo button (SPEC §8: channel and call screen), photos as evidence on the case and the audit page. Not built yet.
-3. M4–M6 per SPEC §11. In cloud sessions Node needs `NODE_USE_ENV_PROXY=1` to reach Supabase and the APIs.
+1. **Verify M3 with the real keys** (locally: put the keys in `.env.local`).
+   - Start a call from `/app/channel/<teamId>` → "Klara anrufen". Speak the SPEC §10 scenario 2 in Russian or English: the transcript must be right, the turn must be live Claude (no "Testmodus" note), and Klara must speak with the OpenAI voice.
+   - Measure the time per turn, from the end of speech to the first audio (SPEC: < 4 s). If it is slower, stream the TTS earlier or switch `KLARA_ANTHROPIC_MODEL` for extraction.
+   - Test on a real phone over HTTPS (iOS needs the start tap; that path is built but untested). Tune the VAD defaults in `/admin/demo` for a loud site.
+   - Then mark M3 ✅.
+2. **M4 e-mail loop** (SPEC §6.4, §8 `/admin/mail/[draftId]`, §11 M4). Pieces that already exist:
+   - tables and types `email_out` (status default `entwurf`) and `email_in`;
+   - doc type and template `stellungnahme_zurueckweisung`;
+   - the stub page `src/app/admin/mail/[draftId]/page.tsx`. "E-Mail vorbereiten" on `/admin/case/[id]` links to `/admin/mail/new?case=<id>` once the case is `validiert`;
+   - `callTool()` in `src/lib/agent/llm.ts` for forced tool calls.
+
+   Suggested build:
+   - `src/lib/mail/`:
+     - subject `{title_de} gem. {legal_basis} – BV {project.name} – Zeichen {reference}` (add "gem. …" only for the plain `§ … VOB/B` bases);
+     - To/CC from `resolveRecipient()` (the contact emails);
+     - body from a `suggest_email_body` tool call on the fast model, with a fixed German template as the fallback. Use the letter's salutation, no legal claims, under 90 words.
+   - Routes:
+     - `POST /api/mail/draft {case_id}` creates the draft or reuses the unsent one for the latest version. The draft is an `email_out` row with status `entwurf`; draftId is its id.
+     - `PATCH` saves edits.
+     - `POST /api/mail/send` refuses unless the case is `validiert` and the version is validated. It then sends through Postmark (`POST https://api.postmarkapp.com/email`, header `X-Postmark-Server-Token`, attachment = PDF page 1 only via `?variant=letter`, DOCX optional), stores `message_id`, sets the version `immutable`, `sent_at` and `delivery_status`, sets the case to `versendet` and logs an event. Without `POSTMARK_SERVER_TOKEN`, "send" is simulated with a local message id.
+   - Composer UI as in SPEC §8. "Senden" is disabled until `validiert`.
+   - `POST /api/email/inbound?token=…` (Postmark inbound JSON). It checks `POSTMARK_INBOUND_TOKEN`, stores `email_in`, and matches the case: `In-Reply-To` contains our `message_id`, else `KL-\d{4}-\d{4}` in the subject or body, else unassigned. Then it classifies with the forced tool `classify_reply`, with a keyword fallback ("zurückweisen" → rejection, and so on), and maps the result per SPEC §6.4. A rejection of a `behinderungsanzeige` creates a `stellungnahme_zurueckweisung` case (`parent_case_id`) with the facts `reply_date`, `reply_quote`, `orig_reference`, `orig_date` and `evidence_bullets` (from evidence: transcript times, weather, diary, plan vs. actual), generates v1, and logs the event "Antwort des Bauherrn: Zurückweisung" plus the Hinweis.
+   - `/admin/demo` "Antwort simulieren" (SPEC D5: scripted rejection) goes through the same inbound handler. It is also the 15 s fallback on the case page.
+   - Tests: the SPEC §10 scenario 7 path, send blocked without `validiert`, sent version immutable.
+   - Done criterion (SPEC §12): scenario 2 → validated → sent → reply → follow-up draft in ≤ 2:30 without reload.
+3. **Photo button** (SPEC §8: channel and call screen). Not built. `evidence.case_id` is NOT NULL, so a photo needs a case: the conversation's pending case, else the team's latest open case of the day, else that day's Bautagesbericht. Store files in Supabase Storage (`SUPABASE_STORAGE_BUCKET`) or `.data/files/` in memory mode. Show thumbnails on the audit page (PDF page 2) and in the Bautagesbericht.
+4. M5 (realtime admin updates, timeline, fallbacks), M6 (eval set ≥ 30 utterances, `eval/run.ts`), per SPEC §11.
 
 Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-0039..0041 so the board is not empty before the demo case.
 
@@ -65,6 +89,10 @@ Screens: `/` entry, `/app` (Polier, mobile), `/app/channel/<teamId>`, `/admin` (
 
 Without any keys Klara runs fully: memory store + keyword reader (only simple sentences, the SPEC §10 ones). A "Testmodus" note shows in the chat.
 
+- `npm install` also copies the voice-detector files to `public/vad/` (postinstall). If hands-free says it cannot start, run `node scripts/copy-vad-assets.mjs`.
+- The microphone needs a secure page: `http://localhost` works; for a phone on your network use `next dev --experimental-https` or a tunnel.
+- Memory mode keeps data in `.data/db.json` (`MEMORY_PERSIST=1`). `/admin/demo` → "Demo zurücksetzen" reloads the seed.
+
 ## Environment
 
 See `.env.example` for all names. Never commit `.env*` files.
@@ -75,7 +103,9 @@ See `.env.example` for all names. Never commit `.env*` files.
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser realtime | optional |
 | `KLARA_ANTHROPIC_API_KEY`, `KLARA_ANTHROPIC_MODEL`, `KLARA_ANTHROPIC_MODEL_FAST` (optional `KLARA_ANTHROPIC_EFFORT`) | Live extraction + phrasing | Each falls back to the plain `ANTHROPIC_*` name. Claude Code cloud environments reserve `ANTHROPIC_*` (the key is not passed to the app, and `ANTHROPIC_MODEL` would change Claude Code's own model), so use the `KLARA_` names there; locally and on Vercel either works. `LLM_MODE` defaults to `live` when a key is set. The model names have no default (SPEC D10): set both. |
 | `OPENAI_API_KEY` | M3 voice (speech-to-text, Klara's voice) | without it the call screen takes typed text and the browser speaks. Optional: `STT_MODEL`, `TTS_MODEL`, `TTS_VOICE`, `TTS_PROVIDER=browser` |
-| `POSTMARK_*`, `DEMO_CLIENT_MAILBOX` | M4 e-mail | not used yet |
+| `POSTMARK_SERVER_TOKEN`, `POSTMARK_FROM`, `POSTMARK_INBOUND_TOKEN`, `DEMO_CLIENT_MAILBOX` | M4 e-mail | not used yet. The seed gives the Bauherr contact the `DEMO_CLIENT_MAILBOX` address, so the teammate's mailbox receives the demo letter. Postmark domain/DNS must be verified before the event (SPEC D4) |
+| `DATA_BACKEND` (`memory` / `supabase`), `MEMORY_PERSIST` | data store | default: Supabase when its URL and key are set, else memory |
+| `NODE_USE_ENV_PROXY=1` | **Claude Code cloud only** | Node `fetch` there must go through the egress proxy (Supabase, OpenAI, Anthropic). Not needed locally or on Vercel |
 | `WEATHER_DISABLED=1` | skip Open-Meteo | tests set it |
 | `DEMO_NOW` | fixed demo start instant | optional |
 
@@ -91,7 +121,8 @@ Status (2026-11-20, checked from a separate session): all 18 tables exist and th
 
 ## Known issues and open decisions
 
-- Live Claude path is untested until `KLARA_ANTHROPIC_API_KEY` (or `ANTHROPIC_API_KEY`) is set. Newer models reject forced `tool_choice`; `src/lib/agent/llm.ts` falls back to auto + instruction.
+- Keys were checked on 2026-11-20 from a separate cloud session (Supabase with 2 teams, Anthropic, OpenAI TTS). A full live turn through the app (Claude extraction + OpenAI STT/TTS in the call screen) is still to be verified (Next steps 1). Newer models reject forced `tool_choice`; `src/lib/agent/llm.ts` falls back to auto + instruction.
+- Hands-free was verified only with a simulated mic (Playwright `--use-file-for-fake-audio-capture` with synthetic speech) and a stubbed `/api/voice`.
 - Open-Meteo's free tier rate-limits shared cloud IPs ("Daily API request limit exceeded"); then no weather is attached.
 - All letter texts are prototype drafts: **TODO legal review** (SPEC D8). Weather "unusual" thresholds are a heuristic.
 - "E-Mail vorbereiten" lands in M4. Photo upload is not built yet.
