@@ -95,6 +95,15 @@ Earlier cloud test (2026-11-20, 23:20 UTC, HTTP only): STT exact and 1.15 s, TTS
 
 Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-0039..0041 so the board is not empty before the demo case.
 
+## Deployment (Vercel)
+
+- Live: **https://klara-liard.vercel.app** (also klara-zafars-projects-3fafacbe.vercel.app), project `klara` in team "Zafar's projects", functions in `fra1` (`vercel.json`, next to Supabase). Deployed 2026-11-21 with `vercel deploy --prod`; `.vercelignore` keeps `.env*` and local data out of the upload.
+- Env vars set on Vercel (production): DATA_BACKEND=supabase, the Supabase four + bucket, KLARA_ANTHROPIC_* (key, models, effort low), OPENAI_API_KEY, STT/TTS settings. Smoke test: pages, `/api/project` (supabase, live), `/api/voice`, `/vad/*` all 200.
+- The project got connected to the GitHub repo while linking: pushes create preview deployments (protected by Vercel login); production = `vercel deploy --prod` or the production branch.
+- **The app has no login.** Anyone with the URL can use it (Claude/OpenAI costs, and once Postmark is set up, e-mails). Before Postmark: add a password gate (ask Claude for a small Basic-Auth proxy with a `SITE_PASSWORD` env var that leaves `/api/email/inbound` open) or keep the URL private.
+- Postmark with this deployment: set `POSTMARK_SERVER_TOKEN`, `POSTMARK_FROM`, `POSTMARK_REPLY_TO`, `POSTMARK_INBOUND_TOKEN`, `DEMO_CLIENT_MAILBOX` in Vercel (Settings → Environment Variables), redeploy, set the inbound webhook to `https://klara-liard.vercel.app/api/email/inbound?token=<POSTMARK_INBOUND_TOKEN>`, then "Demo zurücksetzen" on `/admin/demo` so the Bauherr contact gets the mailbox. Until Postmark approves the account, the client mailbox must be on the sender's domain.
+- Phone test (M3) can use the same URL (HTTPS, no tunnel needed).
+
 ## Run it locally
 
 Node 22, npm.
