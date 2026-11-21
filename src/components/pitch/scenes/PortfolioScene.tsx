@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { DashboardBody } from "@/components/dashboard/dashboard";
+import { Overview } from "@/components/dashboard/dashboard";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { DashboardView } from "@/lib/dashboard/compute";
 import { useApi } from "@/lib/use-api";
@@ -33,7 +33,7 @@ export function PortfolioScene({ phase, step, revealMode }: SceneProps) {
       <FitBox left={160} top={196} width={1600} height={752}>
         <TooltipProvider>
           <div inert aria-hidden className="pointer-events-none">
-            {v ? <DashboardBody v={v} linkable={false} /> : null}
+            {v ? <Overview v={v} linkable={false} /> : null}
           </div>
         </TooltipProvider>
       </FitBox>

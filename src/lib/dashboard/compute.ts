@@ -714,7 +714,6 @@ export function durationDays(v: unknown): number {
 }
 
 const rank = (c: HeatCell) => (c.status === "red" ? 1000 : c.status === "amber" ? 100 : 0) + c.delay * 10 + (c.hindrance ? 5 : 0);
-const normArea = (a: string) => a.replace(/\s+/g, "").toUpperCase();
 /** "2.OG", "2. OG, Achsen A–C", "im 2. Obergeschoss" → the same floor; no floor named → matches. */
 const floorOf = (a: string | null) => {
   const m = a ? /(\d+)\s*\.?\s*(OG|Obergeschoss)|\b(EG|Erdgeschoss|UG)\b/i.exec(a) : null;
