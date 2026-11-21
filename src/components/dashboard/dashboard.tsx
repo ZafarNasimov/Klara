@@ -89,10 +89,10 @@ export function Overview({ v, linkable, onPick = null }: { v: DashboardView; lin
         </Card>
       </div>
       <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
-        <Card title="Gewerke je Baustelle">
+        <Card title="Gewerke">
           <Heatmap v={v} linkable={linkable} />
         </Card>
-        <Card title="Plan und Ist">
+        <Card title="Plan/Ist">
           <TradeBullets v={v} />
         </Card>
       </div>
@@ -153,7 +153,7 @@ function FilterBar({
         <div className="flex flex-wrap items-center gap-2">
           {fixedProject ? null : (
             <Select label="Baustelle" value={filters.project ?? ""} onChange={(x) => onChange({ project: x || null })}>
-              <option value="">Alle Baustellen</option>
+              <option value="">Baustellen</option>
               {v?.sites.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.code} · {s.name}
@@ -162,7 +162,7 @@ function FilterBar({
             </Select>
           )}
           <Select label="Team" value={filters.team ?? ""} onChange={(x) => onChange({ team: x || null })}>
-            <option value="">Alle Teams</option>
+            <option value="">Teams</option>
             {v?.teams
               .filter((t) => !filters.project || t.project_id === filters.project)
               .map((t) => (
@@ -172,7 +172,7 @@ function FilterBar({
               ))}
           </Select>
           <Select label="Gewerk" value={filters.trade ?? ""} onChange={(x) => onChange({ trade: x || null })}>
-            <option value="">Alle Gewerke</option>
+            <option value="">Gewerke</option>
             {v?.trade_names.map((t) => (
               <option key={t} value={t}>
                 {t}

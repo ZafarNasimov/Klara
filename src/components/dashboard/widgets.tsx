@@ -329,9 +329,8 @@ export function Heatmap({ v, linkable }: { v: DashboardView; linkable: boolean }
           const fade = { initial: reduce ? false : { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.35, delay: 0.1 + ri * 0.03 } } as const;
           return (
             <div key={r.project_id} role="row" className="contents">
-              <motion.span role="rowheader" className="flex items-center gap-2 text-sm whitespace-nowrap" {...fade}>
-                <span className="font-mono text-xs text-muted-foreground">{r.code}</span>
-                <span className="text-foreground">{short(r.project_id)}</span>
+              <motion.span role="rowheader" aria-label={`Baustelle ${r.code} · ${r.name}`} className="flex items-center text-sm whitespace-nowrap text-foreground" {...fade}>
+                {short(r.project_id)}
               </motion.span>
               {r.cells.map((c) => {
                 if (c.status === "none") return <span key={c.trade} role="cell" aria-label={`${r.code} ${c.trade}: keine laufenden Arbeiten`} />;
@@ -389,7 +388,8 @@ export function Heatmap({ v, linkable }: { v: DashboardView; linkable: boolean }
 
 export function TradeBullets({ v }: { v: DashboardView }) {
   const reduce = useReducedMotion();
-  const bars = v.trade_bars.bars.slice(0, 6);
+  // The trades the site reports quantities for, worst first in the list order; at most four on the Überblick.
+  const bars = v.trade_bars.bars.slice(0, 4);
   if (!bars.length) return <Empty>Für diesen Filter sind keine Mengen geplant.</Empty>;
   return (
     <ul className="flex flex-col gap-3">
