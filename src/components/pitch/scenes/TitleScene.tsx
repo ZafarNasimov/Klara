@@ -1,11 +1,12 @@
 "use client";
 
 import { motion } from "motion/react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { KlaraRobot } from "../KlaraRobot";
+import { KlaraRobot, type KlaraRobotHandle } from "../KlaraRobot";
 import { StaticSpotlight } from "../StaticSpotlight";
 import { DARK_BG, EASE_OUT, u } from "../stage";
-import { ExitBlur, FadeUp, RevealWords, SILVER_TEXT, Stage, type SceneProps } from "./scene-parts";
+import { ExitBlur, FadeUp, RevealWords, scheduleGlances, SILVER_TEXT, Stage, type SceneProps } from "./scene-parts";
 
 export const TITLE_POINTS = [
   "Formal notices are missing or sent too late",
@@ -30,9 +31,21 @@ const SPOT = { x: 77, y: 30 };
 export function TitleScene({ phase, step, revealMode, headRef, robotPaused }: SceneProps) {
   const show = phase !== "standby";
   const auto = revealMode === "auto";
+  const rootRef = useRef<HTMLElement>(null);
+  const robotRef = useRef<KlaraRobotHandle>(null);
+
+  // Klara reads along: the headline first, then each pain point as it lands.
+  useEffect(() => {
+    if (phase !== "enter") return;
+    const cues: [string, number][] = auto
+      ? [["headline", 400], ["point-2", 1400], ["audience", 3200]]
+      : [[step === 0 ? "headline" : `point-${step - 1}`, step === 0 ? 400 : 150]];
+    return scheduleGlances(rootRef.current, robotRef.current, cues);
+  }, [phase, step, auto]);
 
   return (
     <section
+      ref={rootRef}
       aria-label="Ask Klara – title"
       className="absolute inset-0 cursor-none overflow-hidden"
       style={{ background: DARK_BG }}
@@ -47,7 +60,7 @@ export function TitleScene({ phase, step, revealMode, headRef, robotPaused }: Sc
           animate={show ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.97 }}
           transition={{ duration: 0.9, ease: EASE_OUT }}
         >
-          <KlaraRobot className="size-full" headRef={headRef} paused={robotPaused} />
+          <KlaraRobot ref={robotRef} className="size-full" headRef={headRef} paused={robotPaused} />
         </motion.div>
 
         <ExitBlur
@@ -56,7 +69,7 @@ export function TitleScene({ phase, step, revealMode, headRef, robotPaused }: Sc
           style={{ left: u(160), width: u(780), paddingBottom: u(40) }}
         >
           <motion.p
-            className="font-medium uppercase tracking-[0.1em] text-zinc-500"
+            className="font-medium uppercase tracking-[0.1em] text-zinc-400"
             style={{ fontSize: u(14) }}
             initial={{ opacity: 0 }}
             animate={{ opacity: show ? 1 : 0 }}
@@ -66,6 +79,7 @@ export function TitleScene({ phase, step, revealMode, headRef, robotPaused }: Sc
           </motion.p>
 
           <h1
+            data-gaze="headline"
             className="font-bold leading-[0.95] tracking-[-0.04em]"
             style={{ fontSize: u(132), marginTop: u(28) }}
           >
@@ -87,10 +101,11 @@ export function TitleScene({ phase, step, revealMode, headRef, robotPaused }: Sc
               <FadeUp
                 key={point}
                 as="li"
+                gaze={`point-${i}`}
                 show={show && (auto || step > i)}
                 delay={auto ? 0.6 + i * 0.12 : 0}
                 duration={0.5}
-                className={cn("flex items-center leading-[1.4] text-neutral-400")}
+                className={cn("flex items-center leading-[1.4] text-neutral-300")}
                 style={{ fontSize: u(22), gap: u(20) }}
               >
                 <span aria-hidden className="h-px shrink-0 bg-neutral-700" style={{ width: u(32) }} />

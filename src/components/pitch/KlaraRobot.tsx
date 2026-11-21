@@ -1,23 +1,25 @@
 "use client";
 
 import type { Application } from "@splinetool/runtime";
-import { motion } from "motion/react";
+import { animate, motion, type AnimationPlaybackControls } from "motion/react";
 import dynamic from "next/dynamic";
 import Image from "next/image";
 import {
   Component,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
   useSyncExternalStore,
   type CSSProperties,
   type ReactNode,
   type Ref,
+  type RefCallback,
 } from "react";
 import { cn } from "@/lib/utils";
 import { hasWebGL, loadKlaraScene, SPLINE_WASM_PATH } from "./klara-robot-loader";
-import { EASE_OUT, u } from "./stage";
+import { EASE_IN_OUT, EASE_OUT, u } from "./stage";
 
 const Spline = dynamic(() => import("@splinetool/react-spline"), { ssr: false });
 
@@ -46,12 +48,38 @@ const DEFAULT_LOAD_TIMEOUT_MS = 2000;
 
 type Mode = "loading" | "live" | "fallback";
 
+/** What Klara looks at: an element on the page, or straight at the audience. */
+export type GazeTarget = Element | "audience";
+
+export type KlaraRobotHandle = {
+  /**
+   * Turns Klara's head toward a target by gliding a virtual pointer there
+   * (the scene's head-follow reacts to pointer moves). The real mouse still
+   * takes over as soon as it moves. Called before the robot is live, the
+   * glance waits and runs once it is.
+   */
+  glanceAt: (target: GazeTarget) => void;
+};
+
+const GLANCE_MS = 700;
+
+const centerOf = (el: Element) => {
+  const r = el.getBoundingClientRect();
+  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+};
+
+function movePointer(x: number, y: number) {
+  document.documentElement.dispatchEvent(
+    new PointerEvent("pointermove", { clientX: x, clientY: y, bubbles: true, pointerType: "mouse", isPrimary: true }),
+  );
+}
+
 export type KlaraRobotProps = {
   className?: string;
   /** Fires once the live robot is on screen (not for the PNG fallback). */
   onLoad?: (app: Application) => void;
   /** 1×1 px element over the robot's visor: origin for the scene transitions. */
-  headRef?: Ref<HTMLDivElement>;
+  headRef?: RefCallback<HTMLDivElement>;
   /**
    * Stops Spline rendering while the robot is covered (a transition, or a scene
    * waiting underneath). Takes effect once the camera intro has settled, so a
@@ -60,6 +88,8 @@ export type KlaraRobotProps = {
   paused?: boolean;
   loadTimeoutMs?: number;
   namePlate?: boolean;
+  /** Imperative handle: `glanceAt(target)`. */
+  ref?: Ref<KlaraRobotHandle>;
 };
 
 const noopSubscribe = () => () => {};
@@ -71,6 +101,7 @@ export function KlaraRobot({
   paused = false,
   loadTimeoutMs = DEFAULT_LOAD_TIMEOUT_MS,
   namePlate = true,
+  ref,
 }: KlaraRobotProps) {
   // Server snapshot assumes WebGL so the first client render matches the HTML.
   const webgl = useSyncExternalStore(noopSubscribe, hasWebGL, () => true);
@@ -78,6 +109,10 @@ export function KlaraRobot({
   const [sceneUrl, setSceneUrl] = useState<string | null>(null);
   const [settled, setSettled] = useState(false);
   const appRef = useRef<Application | null>(null);
+  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const pointerRef = useRef<{ x: number; y: number } | null>(null);
+  const glanceRef = useRef<AnimationPlaybackControls | null>(null);
+  const pendingGazeRef = useRef<GazeTarget | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
   const state: Mode = webgl ? mode : "fallback";
@@ -136,6 +171,71 @@ export function KlaraRobot({
     else if (!paused && app.isStopped) app.play();
   }, [paused, live, settled]);
 
+  // Remember where the real pointer is, so a scripted glance starts from it.
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!e.isTrusted) return;
+      glanceRef.current?.stop(); // the presenter's mouse wins
+      pointerRef.current = { x: e.clientX, y: e.clientY };
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      glanceRef.current?.stop();
+    };
+  }, []);
+
+  const runGlance = useCallback((target: GazeTarget) => {
+    const anchor = anchorRef.current;
+    const box = boxRef.current;
+    if (!anchor || !box) return;
+    const head = centerOf(anchor);
+    // Straight ahead = the point just below the visor (she faces the room).
+    const to =
+      target === "audience"
+        ? { x: head.x, y: head.y + box.getBoundingClientRect().height * 0.04 }
+        : centerOf(target);
+    const from = pointerRef.current ?? head;
+    glanceRef.current?.stop();
+    glanceRef.current = animate(0, 1, {
+      duration: GLANCE_MS / 1000,
+      ease: EASE_IN_OUT,
+      onUpdate: (t) => {
+        const x = from.x + (to.x - from.x) * t;
+        const y = from.y + (to.y - from.y) * t;
+        pointerRef.current = { x, y };
+        movePointer(x, y);
+      },
+    });
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      glanceAt: (target) => {
+        if (live) runGlance(target);
+        else pendingGazeRef.current = target;
+      },
+    }),
+    [live, runGlance],
+  );
+
+  // A glance asked for while loading runs once the robot is live.
+  useEffect(() => {
+    if (!live || !pendingGazeRef.current) return;
+    const target = pendingGazeRef.current;
+    pendingGazeRef.current = null;
+    runGlance(target);
+  }, [live, runGlance]);
+
+  const setAnchor = useCallback(
+    (el: HTMLDivElement | null) => {
+      anchorRef.current = el;
+      headRef?.(el);
+    },
+    [headRef],
+  );
+
   const head = live && settled ? HEAD_SETTLED : HEAD_INTRO;
 
   return (
@@ -189,7 +289,7 @@ export function KlaraRobot({
       </div>
 
       <div
-        ref={headRef}
+        ref={setAnchor}
         aria-hidden
         data-klara-head
         className="pointer-events-none absolute size-px"
@@ -198,7 +298,7 @@ export function KlaraRobot({
 
       {namePlate && (
         <span
-          className="absolute -translate-x-1/2 rounded-full border border-zinc-800 font-mono leading-none tracking-[0.2em] text-zinc-500"
+          className="absolute -translate-x-1/2 rounded-full border border-zinc-800 font-mono leading-none tracking-[0.2em] text-zinc-400"
           style={{
             left: `${HEAD_SETTLED.x}%`,
             bottom: u(56),

@@ -1,9 +1,10 @@
 "use client";
 
-import { KlaraRobot } from "../KlaraRobot";
+import { useEffect, useRef } from "react";
+import { KlaraRobot, type KlaraRobotHandle } from "../KlaraRobot";
 import { StaticSpotlight } from "../StaticSpotlight";
 import { DARK_BG, u } from "../stage";
-import { ExitBlur, FadeUp, RevealWords, SILVER_TEXT, Stage, type SceneProps } from "./scene-parts";
+import { ExitBlur, FadeUp, RevealWords, scheduleGlances, SILVER_TEXT, Stage, type SceneProps } from "./scene-parts";
 import { ROBOT_BOX } from "./TitleScene";
 
 const SPOT = { x: 77, y: 30 };
@@ -21,9 +22,21 @@ export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: 
   const auto = revealMode === "auto";
   const line2 = show && (auto || step >= 1);
   const line3 = show && (auto || step >= 2);
+  const rootRef = useRef<HTMLElement>(null);
+  const robotRef = useRef<KlaraRobotHandle>(null);
+
+  // She looks at the first line, then turns to the room for the punchline.
+  useEffect(() => {
+    if (phase !== "enter") return;
+    const cues: [string, number][] = auto
+      ? [["line-1", 300], ["audience", 1100]]
+      : [step === 0 ? ["line-1", 300] : ["audience", 150]];
+    return scheduleGlances(rootRef.current, robotRef.current, cues);
+  }, [phase, step, auto]);
 
   return (
     <section
+      ref={rootRef}
       aria-label="Ask Klara – close"
       className="absolute inset-0 cursor-none overflow-hidden"
       style={{ background: DARK_BG }}
@@ -35,7 +48,7 @@ export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: 
           className="absolute"
           style={{ left: u(ROBOT_BOX.left), top: u(ROBOT_BOX.top), width: u(ROBOT_BOX.width), height: u(ROBOT_BOX.height) }}
         >
-          <KlaraRobot className="size-full" headRef={headRef} paused={robotPaused} />
+          <KlaraRobot ref={robotRef} className="size-full" headRef={headRef} paused={robotPaused} />
         </div>
 
         <ExitBlur
@@ -45,6 +58,7 @@ export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: 
         >
           <FadeUp
             as="p"
+            gaze="line-1"
             show={show}
             className="leading-[1.15] tracking-[-0.02em] text-neutral-300"
             style={{ fontSize: u(56) }}
@@ -70,7 +84,7 @@ export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: 
             show={line3}
             delay={auto ? 2.2 : 0.1}
             duration={0.5}
-            className="text-zinc-500"
+            className="text-zinc-400"
             style={{ fontSize: u(20), marginTop: u(64) }}
           >
             Ask Klara · Team Build Different

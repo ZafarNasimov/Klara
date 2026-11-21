@@ -1,8 +1,9 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Fragment, type ComponentType, type CSSProperties, type ReactNode, type Ref } from "react";
+import { Fragment, type ComponentType, type CSSProperties, type ReactNode, type RefCallback } from "react";
 import { cn } from "@/lib/utils";
+import type { KlaraRobotHandle } from "../KlaraRobot";
 import { EASE_OUT, type ScenePhase, type SceneTheme, u } from "../stage";
 
 export type RevealMode = "click" | "auto";
@@ -13,7 +14,7 @@ export type SceneProps = {
   step: number;
   revealMode: RevealMode;
   /** Dark scenes attach this to KlaraRobot's head anchor. */
-  headRef?: Ref<HTMLDivElement>;
+  headRef?: RefCallback<HTMLDivElement>;
   /** True while a transition covers this scene's robot. */
   robotPaused?: boolean;
 };
@@ -99,6 +100,7 @@ export function FadeUp({
   delay = 0,
   duration = 0.6,
   as = "div",
+  gaze,
   className,
   style,
   children,
@@ -107,6 +109,8 @@ export function FadeUp({
   delay?: number;
   duration?: number;
   as?: "div" | "p" | "li";
+  /** Marks the element as a target for Klara's scripted glances. */
+  gaze?: string;
   className?: string;
   style?: CSSProperties;
   children: ReactNode;
@@ -114,6 +118,7 @@ export function FadeUp({
   const Tag = motion[as];
   return (
     <Tag
+      data-gaze={gaze}
       className={className}
       style={style}
       initial={{ opacity: 0, y: 12 }}
@@ -168,6 +173,24 @@ export function RevealWords({
       </span>
     </>
   );
+}
+
+/**
+ * Schedules Klara's glances for a scene: `[target, delayMs]` pairs, where the
+ * target is a `data-gaze` key inside `root` or "audience". Cancels on change.
+ */
+export function scheduleGlances(
+  root: HTMLElement | null,
+  robot: KlaraRobotHandle | null,
+  cues: [key: string, delayMs: number][],
+) {
+  const timers = cues.map(([key, delay]) =>
+    window.setTimeout(() => {
+      const target = key === "audience" ? "audience" : root?.querySelector(`[data-gaze="${key}"]`);
+      if (target) robot?.glanceAt(target);
+    }, delay),
+  );
+  return () => timers.forEach((t) => window.clearTimeout(t));
 }
 
 /** Silver text from the brief: neutral-50 → neutral-400, top to bottom. */
