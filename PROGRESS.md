@@ -101,7 +101,8 @@ Instead of Postmark, Klara can use a normal mailbox: `src/lib/mail/mailbox.ts` s
 
 - Mailbox: musterbau.bauleitung@gmail.com (Gmail app password in `MAIL_PASSWORD`, needs 2-Step Verification). The Bauherr contact gets `DEMO_CLIENT_MAILBOX` on "Demo zurücksetzen".
 - Site password: `SITE_PASSWORD` → `src/proxy.ts` sends visitors without the cookie to `/login` (API: 401); `/api/email/inbound` stays open (own token).
-- Not live-tested yet (waiting for the app password): sending through Gmail, reading the reply, Gmail keeping our Message-ID.
+- Live site (2026-11-21): `SITE_PASSWORD`, `DEMO_CLIENT_MAILBOX` and `MAIL_FROM_NAME` are set on Vercel and deployed; the login works, pages without it redirect, the API answers 401. Demo data reset there (Bauherr contact = the client mailbox, no cases).
+- Open: Gmail refused the first app password ("535-5.7.8 Username and Password not accepted" for SMTP and IMAP, the password has the right 16-letter shape). Most likely it was created under another signed-in Google account. Zafar recreates it (https://myaccount.google.com/apppasswords?authuser=musterbau.bauleitung@gmail.com); then set `MAIL_USER` + `MAIL_PASSWORD` on Vercel, redeploy, and run the live test. Until then the live site test-sends.
 
 ## Deployment (Vercel)
 
