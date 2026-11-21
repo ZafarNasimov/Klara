@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-21 01:20 UTC (local session: M4 e-mail loop) · branch `claude/project-thread-jrqak8`
+Last update: 2026-11-21 (local session: photo button, M5, other reply types, M6 eval; merged `pitchflow` with the pitch deck) · branch `claude/project-thread-jrqak8`
 
 ## Milestones (SPEC §11)
 
@@ -49,6 +49,28 @@ Last update: 2026-11-21 01:20 UTC (local session: M4 e-mail loop) · branch `cla
 - ✅ `/app/case/[id]` mobile case page with "Per Sprache korrigieren" (critique notes in `.impeccable/critique/`).
 - ✅ `/admin/case/[id]` office case page (`src/app/admin/case/[id]/case-detail.tsx`): header with status, deadline, **Validieren** (shows why it is blocked), **Zurück zur Ergänzung** dialog, **E-Mail vorbereiten** once validated (M4 composer still a shell); tabs Dokument (HTML letter preview from the same DocBody, version switch, SHA-256, PDF/Word download), Nachweise (transcript, weather), Verlauf, Hinweise; right rail with checks and facts. Critiqued (29/40) and the findings fixed.
 
+### Pitch `/pitch` (branch `pitchflow`)
+
+Full-screen pitch deck for the 3-minute presentation. Code in `src/components/pitch/**`, route `src/app/pitch/page.tsx`, assets in `public/pitch/**`.
+
+- **Scenes** (`src/components/pitch/pitch-scenes.ts`, content spec of 2026-11-21, one story in `pitch-story.ts`: Baustelle B Wohnanlage Riem, team Estrich, client's electricians, 07:00, crew of 4, missing = duration + photo):
+  | Key | Scene | Clicks inside |
+  |---|---|---|
+  | 1 | Title (dark): Ask Klara, 3 stat rows (7% · § 6 · 80%) + sources line | 3 |
+  | 2 | The call (REPLAY): chat EN, German Behinderungsanzeige fills live; then 5 capabilities | 4 exchanges + 1 |
+  | 3 | The office (app mock; cursor visible; only the ringed `data-next` control or the next key advances): open Estrich, transcript, close, Clarify, Site manager, Send (3.2 waiting, amber), reply (3.3, next key or `S`, all green at once), Validate (3.4). `R` resets the scene | 8 |
+  | 4 | More sources: meeting summary, email parsing, daily plan | 3 |
+  | 5 | Portfolio: KPIs, plan vs actual by trade, sites/teams table, Elektro problem | 1 |
+  | 6a | Ecosystem: strike-through, "An operating system…", inputs → Klara → outputs, people | 5 |
+  | 6b | Close (dark): No missing reports. / No missed notices. / No lost money. / operating system / sign-off | 4 |
+  Light scenes use shadcn (Badge, Button, Table, Chart) at presentation scale via `appScaleVars()` (re-bases `--spacing`, `--text-*`, `--radius` on the 1920×1080 grid; app mocks at 150 %).
+- **Control:** →, Space, Enter, PageDown or click = next; ←, PageUp = back one beat (then the previous scene); number keys 1–6 jump to a scene; `R` resets the current scene. Input is ignored while a transition runs. The scene is kept in the URL (`?scene=6b`), so a reload stays put. Rehearsal switches: `?reveal=auto` (timed reveals), `?transition=fade` (crossfade instead of the circle wipe; also used with reduced motion). Cursor hidden on all scenes.
+- **Klara robot** (`KlaraRobot.tsx`): 21st.dev Spline scene, served offline: `public/pitch/klara-robot.splinecode` + the runtime's `bevel.wasm` / `process.wasm` in `public/pitch/spline/` (the runtime fetches them from unpkg / cdn.spline.design otherwise). `@splinetool/runtime` is pinned to 2.0.211; **re-copy the two wasm files from `node_modules/@splinetool/runtime/build` when you bump it.** PNG fallback (`klara-robot.png`, transparent first frame) while loading, without WebGL, on errors or after 2 s. The scene opens on a head close-up and pulls back to the full robot in ~2.5 s (built into the scene). Head follows the pointer page-wide; **scripted gaze** via `glanceAt()`: she looks at the headline, each pain point as it appears, closing line 1, then the audience on the punchline (a real mouse move takes over).
+- **Transitions** (`PitchFlow.tsx`): dark→light = text blur-out, visor glow, clip-path circle from the robot's head to the farthest window corner (1100 ms); light→dark = the light collapses into the head of the closing scene, which is mounted (inert, paused after its intro) under Scene 5.
+- **Critique** 22/32 (dual-agent, snapshot `.impeccable/critique/…pitchflow-tsx.md`). Fixed: spotlight not rendering, off-screen wipe time and blank collapse start, white disc on the head, cursor on light scenes, hidden Scene 6 read out by screen readers, reload reset, plate < 11 px, label contrast (zinc-400 / neutral-300). Open: Back from Scene 2 replays the title robot's intro; the wipe origin ignores the head's turn.
+- **Verified** (headless Chrome, offline, dev server): live robot 1.1–1.4 s after navigation, no request leaves localhost, PNG fallback with WebGL disabled (no layout shift), 1920×1080 and 1512×982 @2x, back navigation, key mashing, no console errors. Both wipes without dropped frames.
+- **Before the pitch:** run it on the presentation laptop **plugged in** (on battery ≤ 20 % Chrome's Energy Saver caps animation at 30 fps), Chrome full-screen, from a production build (`npm run build && npm start`; in dev the first visit compiles the Spline chunk and can hit the 2 s PNG fallback). If the wipe stutters there, use `?transition=fade`.
+
 ### M4 screens
 
 - `/admin/mail/[draftId]` composer (`composer.tsx`; `new?case=<id>` prepares the draft): mail header rows (Von = Bauleiter, An/CC as tokens with contact names and an amber mark for a contact without Vollmacht, Betreff), the suggested body, autosave; right rail = page 1 of the letter as paper (shared `LetterThumb`), file name, "Word-Datei mitsenden", "Prüfseite wird nicht mitgesendet". "Senden" / "Validieren und senden" stays focusable when blocked and names the reason; Strg+Enter sends. Sent e-mails open read-only.
@@ -88,10 +110,11 @@ Earlier cloud test (2026-11-20, 23:20 UTC, HTTP only): STT exact and 1.15 s, TTS
 
 1. **Live checks of M3 and M4** (needs Zafar):
    - M3: real phone over HTTPS (`npm run build && npm start` plus a tunnel, e.g. `cloudflared tunnel --url http://localhost:3000`), compare the `[klara] timing` lines with "Call latency work", iOS start tap, VAD defaults for a loud site.
-   - M4: Postmark account with a verified sender domain (SPEC D4), set `POSTMARK_SERVER_TOKEN`, `POSTMARK_FROM`, `POSTMARK_REPLY_TO` (the inbound address) and `POSTMARK_INBOUND_TOKEN`; point Postmark's inbound webhook to `https://<host>/api/email/inbound?token=<POSTMARK_INBOUND_TOKEN>`; send the golden-path letter to `DEMO_CLIENT_MAILBOX` and reply from it. Check that the reply is matched (In-Reply-To or "Zeichen KL-…" in "AW:"). Not tested with real mail yet.
+   - M4: real round trip through the Gmail mailbox (see "Real e-mail through a mailbox"): send the golden-path letter from the live site to `DEMO_CLIENT_MAILBOX`, answer it from there (a rejection, a question "Teilen Sie uns bitte mit …" or a change "Abweichend … ist zusätzlich …"), and check that Klara matches and classifies the reply within ~10 s. Postmark stays possible (steps further below).
    - Latency options still open (see "Call latency work"): (a) after M6, (b) paid.
 2. **M5** (SPEC §11): realtime polish, demo page. (Done: "Verlauf" on the case page shows the whole chain of linked letters, e-mails included, via `caseChain` / `caseDetail` in `src/lib/cases/detail.ts`. Live channel chosen by the server (`/api/realtime/config`): Supabase Realtime only when the server writes to Supabase, else SSE; falls back to SSE if the Supabase channel cannot be joined; refetches after a reconnect and when the tab becomes visible again. SPEC §12 done criterion 1 checked with two browser screens (phone channel + office board, no reload): 27.9 s end to end on a local production build with live Claude and the 15 s "Antwort simulieren" wait; the board showed the confirmed case at once.) Other answers (SPEC §6.4 step 4) done: `request_info` → new doc type `ergaenzung` ("Ergänzende Angaben") with the client's questions, Klara asks the Polier in the team chat at once and the answer fills the letter (checked live: answer in Russian → German letter); `change_request` / `counter_instruction` → Ankündigung Mehrvergütung (prefilled from the e-mail, asks only start/planned start) + Bestätigung of the written instruction ("Bestätigung Ihrer Anordnung", "per E-Mail"); BGB contracts show the § 650b Abs. 2 30-day period with a countdown. Demo page plays in Zurückweisung, Rückfrage or Änderungswunsch. The doc type is now titled "Bestätigung einer Anordnung" (the letter subject still says "mündlichen" for verbal ones). Still open: unassigned replies are stored and logged but have no screen to assign them; a Postmark delivery webhook could turn "Übermittlung" green on delivery.
 3. **M6**: eval done. `eval/utterances.json` has 38 labelled first turns (RU 8, PL 8, DE 10, TR 6, EN 5, RO 1): hindrance by the client's trade, own subcontractor no-show (→ `verzug_nu`), weather, verbal instruction (→ Anordnung + Mehrkosten), two events, unknown trade (sphere `unclear`), Wegfall, Bedenken (recognised, not built), evening quantities (→ `info_folgegewerk`), own crew, "all to plan", vague. `npm run eval` (live model, ~40 turns, well under 1 USD) or `npm run eval -- --mock` (keyword reader, free; 83 %, it is only the fallback); `--only <prefix>`, `--verbose`. Always a fresh in-memory project per utterance, never Supabase; results in `.data/eval-<mode>.json`; exit code 1 below target. Live run 2026-11-21: doc type 38/38, sphere 18/18, missing fields 3/3, median 2.4 s per turn. The first run missed "The drywall guys didn't show up today." (Klara asked what happened); fixed with a general prompt rule: a trade that did not show up, left early or works too slowly is a hindrance caused by that trade, code routes it. Still open: 5 full rehearsals on the real phone + projector (Zafar).
+4. **Pitch:** critique + polish of Scenes 2–6a (running), then rehearse the whole deck on the presentation laptop (see "Pitch `/pitch`"). Then the app review (white, shadcn, anti-slop) for `/admin` and `/app`, on the memory store.
 
 Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-0039..0041 so the board is not empty before the demo case.
 
@@ -179,6 +202,8 @@ Status (2026-11-20, checked from a separate session): all 18 tables exist and th
 - Next.js 16 here differs from older versions: read `node_modules/next/dist/docs/` first (AGENTS.md). With `cacheComponents`, async page work goes inside `<Suspense>`, GET handlers call `await connection()`, and run `npx next typegen` after adding routes (for `RouteContext` / `PageProps`).
 - react-pdf: fixed absolute `View`s don't render (use fixed `Text`s); no `lineHeight` on `Page`; a unitless `lineHeight` needs `fontSize` in the same style. tsx cannot load react-pdf; test PDFs via Vitest.
 - JS `\b` is ASCII-only; the keyword reader uses Unicode lookarounds.
+- CSS modules do not work in this project: `next.config.ts` sends every `*.css` through the Tailwind loader as global CSS, so `styles.x` is undefined. Use Tailwind classes or inline styles.
+- Pitch: the Spline runtime logs `updating from 114 to 136` (warning) on every robot load because the 21st.dev scene file is an older format. Only a re-export from the Spline editor removes it. `npm i @splinetool/react-spline` without exact versions failed with a bogus ERESOLVE (`react@undefined`); installing with exact versions works.
 
 ## Working rules
 
