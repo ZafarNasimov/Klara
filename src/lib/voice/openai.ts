@@ -47,6 +47,38 @@ export async function transcribe(audio: Blob, filename: string, language: string
   return (json.text ?? "").trim();
 }
 
+/**
+ * Speech to text with timestamps (meeting recordings). Whisper returns
+ * segments with start times; if that fails, the plain transcript comes back
+ * as one segment so nothing is lost.
+ */
+export async function transcribeSegments(audio: Blob, filename: string, language: string | null): Promise<{ start: number; text: string }[]> {
+  const form = new FormData();
+  form.append("file", audio, filename);
+  form.append("model", "whisper-1");
+  form.append("response_format", "verbose_json");
+  form.append("timestamp_granularities[]", "segment");
+  if (language && LANGUAGE_NAMES[language]) form.append("language", language);
+  form.append("prompt", "Baubesprechung, Bauleitung, Bauherr, Architekt, Elektro, Estrich, Trockenbau, 2. OG, Mehrkosten, Anordnung, Behinderung.");
+  try {
+    const res = await fetch(`${BASE}/audio/transcriptions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key()}` },
+      body: form,
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!res.ok) throw new VoiceError(`Spracherkennung fehlgeschlagen (${res.status})`);
+    const json = (await res.json()) as { segments?: { start: number; text: string }[]; text?: string };
+    const segs = (json.segments ?? []).map((x) => ({ start: x.start, text: x.text.trim() })).filter((x) => x.text);
+    if (segs.length) return segs;
+    return json.text?.trim() ? [{ start: 0, text: json.text.trim() }] : [];
+  } catch (err) {
+    if (err instanceof VoiceError && err.status === 503) throw err;
+    const text = await transcribe(audio, filename, language);
+    return text ? [{ start: 0, text }] : [];
+  }
+}
+
 /** Text to speech as a streamed MP3 body. */
 export async function speech(text: string, language: string): Promise<ReadableStream<Uint8Array>> {
   const lang = LANGUAGE_NAMES[language] ?? "the language of the text";

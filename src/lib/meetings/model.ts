@@ -97,6 +97,9 @@ export type MeetingProtocol = {
   error: string | null;
   source: "recording" | "upload" | "sample" | "seed";
   mail: MailDraft | null;
+  /** Audio chunks uploaded so far (recording) and their type. */
+  chunks?: number;
+  audio_mime?: string;
 };
 
 /** One meeting as the UI sees it. */
