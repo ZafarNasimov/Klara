@@ -11,31 +11,53 @@ import { EASE_IN_OUT, EASE_OUT, u } from "../stage";
 import { CaseDocument } from "./CaseDocument";
 import { LightScene, useBeat, type SceneProps } from "./scene-parts";
 
-/** Klara answers this long after the foreman's line. */
-const ANSWER_DELAY_MS = 1000;
+/**
+ * Per exchange, after the foreman's line appears (the click):
+ * Klara "processes" → the fields from that sentence fill → Klara answers.
+ * Fields her own line mentions (the open flags) follow shortly after it.
+ */
+const FILL_DELAY_MS = 1400;
+const ANSWER_DELAY_MS = 2200;
+const KLARA_FILL_DELAY_MS = ANSWER_DELAY_MS + 400;
+
+/** Within the current exchange: 0 foreman spoke, 1 fields filled, 2 Klara answered, 3 her fields filled. */
+type Stage = 0 | 1 | 2 | 3;
 /** Document box (design px); after the call it slides to the left column. */
 const DOC = { left: 980, top: 150, width: 780 };
 const DOC_SHIFT = `${-((DOC.left - 160) / DOC.width) * 100}%`;
 
 /**
- * Scene 2 – the call (REPLAY). Steps 1–4: one exchange each (foreman, then
- * Klara ~1 s later) while the German Behinderungsanzeige fills in. Step 5:
- * the chat leaves, the document moves left, the capabilities arrive.
+ * Scene 2 – the call (REPLAY). Steps 1–4: one exchange each. The foreman's
+ * line appears on the click; after a processing pause the document fields
+ * from it fill, then Klara answers. Step 5: the chat leaves, the document
+ * moves left, the capabilities arrive.
  */
 export function CallScene({ phase, step, revealMode }: SceneProps) {
-  const beat = useBeat(phase, step, revealMode, [700, 6000, 10500, 15500, 21500]);
+  const beat = useBeat(phase, step, revealMode, [700, 6500, 11500, 17000, 23500]);
   const exchanges = Math.min(beat, CALL_EXCHANGES);
   const after = beat > CALL_EXCHANGES;
 
-  const [answered, setAnswered] = useState(0);
+  // Progress inside the newest exchange; earlier exchanges are complete.
+  const [progress, setProgress] = useState<{ exchange: number; stage: Stage }>({ exchange: 0, stage: 0 });
   useEffect(() => {
     if (phase !== "enter" || exchanges === 0) return;
-    const timer = window.setTimeout(() => setAnswered(exchanges), ANSWER_DELAY_MS);
-    return () => window.clearTimeout(timer);
+    const set = (stage: Stage) => () => setProgress({ exchange: exchanges, stage });
+    const timers = [
+      window.setTimeout(set(1), FILL_DELAY_MS),
+      window.setTimeout(set(2), ANSWER_DELAY_MS),
+      window.setTimeout(set(3), KLARA_FILL_DELAY_MS),
+    ];
+    return () => timers.forEach((t) => window.clearTimeout(t));
   }, [phase, exchanges]);
 
-  const shown = after ? CALL_SCRIPT.length : exchanges === 0 ? 0 : exchanges * 2 - (answered >= exchanges ? 0 : 1);
-  const done = shown >= CALL_SCRIPT.length;
+  const stage: Stage = after ? 3 : progress.exchange === exchanges ? progress.stage : 0;
+  const foremanLine = (exchanges - 1) * 2; // index of the newest foreman line
+  // Lines on screen, and the last line whose facts are in the document.
+  const shown = after ? CALL_SCRIPT.length : exchanges === 0 ? 0 : foremanLine + (stage >= 2 ? 2 : 1);
+  const heardUpTo = after ? CALL_SCRIPT.length - 1 : exchanges === 0 ? -1 : foremanLine - 1 + (stage >= 3 ? 2 : stage >= 1 ? 1 : 0);
+  const processing = !after && exchanges > 0 && stage === 0;
+  const thinking = !after && exchanges > 0 && stage === 1;
+  const done = heardUpTo >= CALL_SCRIPT.length - 1;
 
   return (
     <LightScene label="Scene 2 – the call" phase={phase}>
@@ -58,6 +80,7 @@ export function CallScene({ phase, step, revealMode }: SceneProps) {
         {CALL_SCRIPT.slice(0, shown).map((line, i) => (
           <Message key={i} line={line} />
         ))}
+        {thinking && <Thinking />}
       </motion.div>
 
       {/* German document (right, then left) */}
@@ -68,7 +91,7 @@ export function CallScene({ phase, step, revealMode }: SceneProps) {
         animate={{ x: after ? DOC_SHIFT : "0%" }}
         transition={{ duration: 0.7, ease: EASE_IN_OUT, delay: after ? 0.15 : 0 }}
       >
-        <CaseDocument heardUpTo={shown - 1} status={done ? "open" : "building"} />
+        <CaseDocument heardUpTo={heardUpTo} status={done ? "open" : processing ? "processing" : "building"} />
       </motion.div>
 
       {/* After the call: what just happened, one by one */}
@@ -96,6 +119,23 @@ export function CallScene({ phase, step, revealMode }: SceneProps) {
         </ul>
       )}
     </LightScene>
+  );
+}
+
+/** Klara is composing her answer (shown between the fields filling and her reply). */
+function Thinking() {
+  return (
+    <motion.div
+      className="flex shrink-0 items-end gap-3"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: EASE_OUT }}
+    >
+      <KlaraAvatar size={36} className="size-9 self-start" title="Klara" />
+      <p aria-label="Klara is answering" className="rounded-2xl rounded-tl-md border border-zinc-200 bg-white px-4 py-2.5 text-sm leading-snug text-zinc-400">
+        …
+      </p>
+    </motion.div>
   );
 }
 

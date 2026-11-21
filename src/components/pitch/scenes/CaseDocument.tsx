@@ -6,10 +6,12 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { DOC_COMPLETION, DOC_FIELDS, DOC_REFERENCE, DOC_TITLE, todayDE, type DocField } from "../pitch-story";
 
-export type DocStatus = "building" | "open" | "ready" | "validated";
+export type DocStatus = "building" | "processing" | "open" | "ready" | "validated";
 
 const STATUS: Record<DocStatus, { text: string; dot: string; tone: string }> = {
   building: { text: "Entwurf · wird erstellt", dot: "bg-zinc-300", tone: "text-zinc-600 border-zinc-200 bg-white" },
+  // Between the foreman's sentence and the fields it fills.
+  processing: { text: "Klara verarbeitet die Aussage …", dot: "bg-primary", tone: "text-primary border-blue-200 bg-blue-50" },
   open: { text: "Entwurf · 2 Angaben offen", dot: "bg-light-yellow", tone: "text-light-yellow-text border-amber-200 bg-amber-50" },
   ready: { text: "Vollständig · bereit zur Validierung", dot: "bg-light-green", tone: "text-light-green-text border-green-200 bg-green-50" },
   validated: { text: "Validiert", dot: "", tone: "text-light-green-text border-green-200 bg-green-50" },
