@@ -416,32 +416,40 @@ function Waiting({
           <h2 id="waiting-h" className="text-sm font-medium text-foreground">
             Wartet auf Antwort
           </h2>
+          {/* Text that changes sits in its own elements: a translated page (browser translation
+              replaces text nodes) must not lose the anchors React inserts next to. */}
           <p className="mt-0.5 text-sm text-muted-foreground">
             {mail.sent_at ? (
-              <>
+              <span>
                 Versendet am{" "}
                 <time dateTime={mail.sent_at} className="font-mono">
                   {fmtDateTime(mail.sent_at)}
                 </time>{" "}
-              </>
+              </span>
             ) : null}
-            an {mail.to.map((a) => contactName(a, contacts)).join(", ")}
-            {simulated ? " als Testversand, nicht zugestellt" : null}. Antworten auf diese E-Mail ordnet Klara diesem Vorgang zu.
+            <span>
+              {`an ${mail.to.map((a) => contactName(a, contacts)).join(", ")}${simulated ? " als Testversand, nicht zugestellt" : ""}. Antworten auf diese E-Mail ordnet Klara diesem Vorgang zu.`}
+            </span>
           </p>
           {polling ? (
             <p className="mt-1 text-sm text-muted-foreground" aria-live="polite">
               {lastCheck?.error ? (
-                <span className="text-light-red-text">{lastCheck.error}</span>
+                <span key="error" className="text-light-red-text">
+                  {lastCheck.error}
+                </span>
               ) : (
-                <>
-                  Klara prüft das Postfach alle 10 Sekunden
+                <span key="ok">
+                  <span>Klara prüft das Postfach alle 10 Sekunden</span>
                   {lastCheck ? (
-                    <>
-                      , zuletzt um <span className="font-mono">{fmtTime(lastCheck.at)}</span>
-                    </>
+                    <span>
+                      , zuletzt um{" "}
+                      <span key={lastCheck.at.toISOString()} className="font-mono">
+                        {fmtTime(lastCheck.at)}
+                      </span>
+                    </span>
                   ) : null}
-                  .
-                </>
+                  <span>.</span>
+                </span>
               )}{" "}
               <button
                 type="button"
@@ -463,7 +471,7 @@ function Waiting({
             onClick={() => void simulate()}
             className="rounded-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           >
-            {busy ? "Antwort wird eingespielt …" : "Antwort simulieren"}
+            <span key={busy ? "busy" : "idle"}>{busy ? "Antwort wird eingespielt …" : "Antwort simulieren"}</span>
           </button>{" "}
           (Zurückweisung des Bauherrn, für die Vorführung)
         </p>
