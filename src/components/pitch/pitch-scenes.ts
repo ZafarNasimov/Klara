@@ -16,7 +16,7 @@ export const PITCH_SCENES: PitchSceneDef[] = [
   { id: "title", key: "1", label: "Ask Klara", theme: "dark", steps: TITLE_STATS.length, Component: TitleScene },
   // Self-paced: takes the presses itself (one turn per press, queued, never skipping the latency).
   { id: "call", key: "2", label: "The call", theme: "light", steps: 0, Component: CallScene },
-  // open case, transcript, close, clarify, recipient, sent (3.2), replied (3.3, also "S"), validated (3.4)
+  // open case, clarify, recipient, sent (3.2), replied (3.3, also "S"), validated (3.4), letter (3.5), mailed (3.6)
   { id: "office", key: "3", label: "The office", theme: "light", steps: 8, pointer: true, keyBeats: { s: OFFICE_BEATS.sent }, Component: AdminScene },
   { id: "sources", key: "4", label: "More sources", theme: "light", steps: 3, Component: SourcesScene },
   { id: "portfolio", key: "5", label: "Every site at a glance", theme: "light", steps: 1, Component: PortfolioScene },

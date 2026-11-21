@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Building2, Check, CircleCheck, Clock, FileText, ImageIcon, Mic, Reply, X } from "lucide-react";
+import { AlertCircle, Building2, Check, CircleCheck, Clock, FileText, ImageIcon, Mic, Reply, Send, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { KlaraAvatar } from "@/components/klara/klara-avatar";
 import { cn } from "@/lib/utils";
 import {
   CALL_SCRIPT,
+  CASE,
   CLARIFY_MESSAGE_DE,
   CLARIFY_MESSAGE_EN,
   CLARIFY_RECIPIENTS,
@@ -15,9 +16,11 @@ import {
   DOC_COMPLETION,
   DOC_REFERENCE,
   SITES,
+  todayDE,
 } from "../pitch-story";
-import { EASE_OUT, u } from "../stage";
+import { EASE_IN_OUT, EASE_OUT, u } from "../stage";
 import { CaseDocument, PAPER_SHADOW, STATUS_COLORS, type DocStatus } from "./CaseDocument";
+import { CaseLetter } from "./CaseLetter";
 import { appScaleVars, LightScene, NEXT_ACTION, TypingDots, useBeat, type SceneProps } from "./scene-parts";
 import { CALL_TIMING } from "../call-timing";
 
@@ -27,7 +30,7 @@ import { CALL_TIMING } from "../call-timing";
  * the next key or "S"), 3.4 = validated. Everything derives from the beat,
  * so ← restores each earlier state exactly.
  */
-export const OFFICE_BEATS = { open: 1, transcript: 2, closeTranscript: 3, clarify: 4, recipient: 5, sent: 6, replied: 7, validated: 8 } as const;
+export const OFFICE_BEATS = { open: 1, clarify: 2, recipient: 3, sent: 4, replied: 5, validated: 6, letter: 7, mailed: 8 } as const;
 const B = OFFICE_BEATS;
 
 const TRANSCRIPT_TIMES = ["0:00", "0:07", "0:13", "0:16", "0:20", "0:22", "0:33", "0:35"];
@@ -45,7 +48,10 @@ const ease = { duration: 0.3, ease: EASE_OUT };
  * key) advances; other clicks in this scene do nothing.
  */
 export function AdminScene({ phase, step, revealMode }: SceneProps) {
-  const beat = useBeat(phase, step, revealMode, [1200, 3800, 6400, 8000, 11400, 14000, 17000, 20000]);
+  const beat = useBeat(phase, step, revealMode, [1200, 3200, 6400, 9200, 12200, 15200, 18600, 23000]);
+  // "View transcript" stays a working button but is not a beat (keeps Scene 3 short).
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
+  const [today] = useState(todayDE);
 
   // Voice input: "Transcribing…" for 1.5 s (same pace as the call), then the
   // whole transcript at once.
@@ -140,7 +146,7 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                     </p>
                   </div>
                   <div className="ml-auto flex items-center gap-2">
-                    <Button variant="outline" className={next(B.transcript)} {...nextAttr(B.transcript)}>
+                    <Button variant="outline" aria-pressed={transcriptOpen} onClick={() => setTranscriptOpen((v) => !v)}>
                       View transcript
                     </Button>
                     <Button variant="outline" className={next(B.clarify)} {...nextAttr(B.clarify)}>
@@ -150,11 +156,20 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                   </div>
                 </div>
                 <div className="relative min-h-0 flex-1 overflow-hidden p-5" style={appScaleVars(1.35)}>
-                  <CaseDocument heardUpTo={CALL_SCRIPT.length - 1} complete={complete} status={status} className="mx-auto max-w-3xl" />
+                  {/* 3.5: this card becomes the letter (shared layout); 3.6: the letter becomes the PDF in the e-mail row. */}
+                  {beat < B.letter ? (
+                    <motion.div layoutId="case-paper" transition={PAPER_MORPH} className="mx-auto max-w-3xl">
+                      <CaseDocument heardUpTo={CALL_SCRIPT.length - 1} complete={complete} status={status} />
+                    </motion.div>
+                  ) : (
+                    <div className={cn("mx-auto max-w-3xl", beat === B.letter && "invisible")}>
+                      <CaseDocument heardUpTo={CALL_SCRIPT.length - 1} complete={complete} status={status} />
+                    </div>
+                  )}
                 </div>
 
                 <AnimatePresence>
-                  {beat === B.transcript && (
+                  {transcriptOpen && (
                     <motion.div
                       key="scrim"
                       aria-hidden
@@ -269,6 +284,25 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
               </div>
               <StatusLine beat={beat} />
 
+              {beat >= B.mailed ? (
+                <div role="status" className="flex items-center gap-3 rounded-lg border border-zinc-200 p-3">
+                  <motion.div
+                    layoutId="case-paper"
+                    transition={PAPER_MORPH}
+                    className="flex size-12 shrink-0 flex-col items-center justify-center rounded-md border border-zinc-300 bg-white text-zinc-500"
+                  >
+                    <FileText className="size-5" aria-hidden />
+                    <span className="text-[0.55em] font-semibold tracking-wide">PDF</span>
+                  </motion.div>
+                  <div className="min-w-0 text-sm leading-snug">
+                    <p className="font-medium text-zinc-900">
+                      Gesendet an {CASE.client} · <span className="font-mono">08:02</span>
+                    </p>
+                    <p className="truncate font-mono text-xs text-zinc-500">Behinderungsanzeige_{CASE.reference}.pdf</p>
+                  </div>
+                </div>
+              ) : null}
+
               {/* 3.2: waiting → 3.3: the reply */}
               <AnimatePresence mode="popLayout" initial={false}>
                 {beat === B.sent && (
@@ -334,7 +368,7 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
 
               {/* Transcript: proof of where every fact came from */}
               <AnimatePresence>
-                {beat === B.transcript && (
+                {transcriptOpen && (
                   <motion.section
                     key="transcript"
                     aria-label="Call transcript"
@@ -352,8 +386,7 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                         variant="ghost"
                         size="icon-lg"
                         aria-label="Close transcript"
-                        className={next(B.closeTranscript)}
-                        {...nextAttr(B.closeTranscript)}
+                        onClick={() => setTranscriptOpen(false)}
                       >
                         <X aria-hidden />
                       </Button>
@@ -379,11 +412,51 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
         <div className="pointer-events-none absolute right-5 bottom-5 flex flex-col items-end gap-2">
           {beat === B.sent && <TimedToast key="sent">Sent to site manager · <span className="font-mono">07:52</span></TimedToast>}
           {beat === B.validated && <TimedToast key="validated">Validiert · ready to send to Wohnbau Riem GmbH</TimedToast>}
+          {beat === B.mailed && <TimedToast key="mailed">Gesendet · Zustellung protokolliert</TimedToast>}
         </div>
       </div>
+
+      {/* 3.5: the formal letter, generated from the validated form */}
+      <AnimatePresence>
+        {beat === B.letter && (
+          <motion.div key="dim" aria-hidden className="absolute inset-0 bg-zinc-900/20" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.4 }} />
+        )}
+      </AnimatePresence>
+      {beat === B.letter && (
+        <>
+          <motion.article
+            layoutId="case-paper"
+            transition={PAPER_MORPH}
+            aria-label={`Behinderungsanzeige ${CASE.reference}`}
+            className={cn("absolute overflow-hidden rounded-sm border border-zinc-200 bg-white", PAPER_SHADOW)}
+            style={{ left: u(580), top: u(40), width: u(760), height: u(1000) }}
+          >
+            <motion.div className="h-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, delay: 0.45 }}>
+              <CaseLetter today={today} highlight />
+            </motion.div>
+          </motion.article>
+          <motion.div
+            className="absolute flex flex-col items-start"
+            style={{ left: u(1370), top: u(56), gap: u(14) }}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ ...ease, delay: 0.55 }}
+          >
+            <p className="rounded-full border border-zinc-200 bg-white px-3 py-1 text-xs text-zinc-600">
+              Generiert aus <span className="font-mono">{CASE.reference}</span> · Freigegeben von Bauleiter
+            </p>
+            <Button size="lg" className={next(B.mailed)} {...nextAttr(B.mailed)}>
+              <Send aria-hidden /> Senden
+            </Button>
+          </motion.div>
+        </>
+      )}
     </LightScene>
   );
 }
+
+/** The form card ↔ letter ↔ PDF icon morph. */
+const PAPER_MORPH = { layout: { duration: 0.7, ease: EASE_IN_OUT } };
 
 /** Disabled until the reply completes the case; one soft pulse when it unlocks. */
 function ValidateButton({ complete, validated, isNext }: { complete: boolean; validated: boolean; isNext: boolean }) {
