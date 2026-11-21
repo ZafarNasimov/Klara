@@ -8,6 +8,7 @@ import type { Template } from "./kit";
 import { ergaenzung } from "./ergaenzung";
 import { infoFolgegewerk } from "./info-folgegewerk";
 import { mehrkostenanzeige } from "./mehrkostenanzeige";
+import { bedenken, maengelanzeige } from "./meeting-letters";
 import { meldung } from "./meldung";
 import { stellungnahmeZurueckweisung } from "./stellungnahme-zurueckweisung";
 import { verzugNu } from "./verzug-nu";
@@ -23,6 +24,8 @@ export const TEMPLATES: Partial<Record<DocTypeId, Template>> = {
   verzug_nu: verzugNu,
   info_folgegewerk: infoFolgegewerk,
   bautagesbericht,
+  maengelanzeige,
+  bedenken,
 };
 
 export type { Template, TemplateCtx } from "./kit";

@@ -3,6 +3,7 @@ import { anordnungBestaetigung } from "./anordnung-bestaetigung";
 import { behinderungEnde } from "./behinderung-ende";
 import { behinderungsanzeige } from "./behinderungsanzeige";
 import { mehrkostenanzeige } from "./mehrkostenanzeige";
+import { bedenken, maengelanzeige } from "./meeting-letters";
 import { bautagesbericht, ergaenzung, infoFolgegewerk, meldung, stellungnahmeZurueckweisung, verzugNu } from "./others";
 import type { DocTypeDef, DocTypeId, FieldDef } from "./types";
 
@@ -19,6 +20,8 @@ export const REGISTRY: Record<DocTypeId, DocTypeDef> = {
   bautagesbericht,
   verzug_nu: verzugNu,
   info_folgegewerk: infoFolgegewerk,
+  maengelanzeige,
+  bedenken,
 };
 
 export function getDocType(id: string): DocTypeDef | null {

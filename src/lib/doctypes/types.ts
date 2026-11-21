@@ -13,7 +13,10 @@ export type DocTypeId =
   | "meldung"
   | "bautagesbericht"
   | "verzug_nu"
-  | "info_folgegewerk";
+  | "info_folgegewerk"
+  // From meeting notes only (not in the call agent's REPORTABLE list).
+  | "maengelanzeige"
+  | "bedenken";
 
 export type FieldType = "text" | "datetime" | "date" | "number" | "enum" | "bool" | "list";
 
