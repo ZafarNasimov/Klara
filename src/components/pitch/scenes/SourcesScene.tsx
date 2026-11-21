@@ -41,7 +41,7 @@ export function SourcesScene({ phase, step, revealMode }: SceneProps) {
         </p>
       </SourceCard>
 
-      <SourceCard index={1} show={beat >= 2} title="Email parsing" result="Additional work detected → Mehrkostenanzeige drafted (before execution)">
+      <SourceCard index={1} show={beat >= 2} title="Email integration" result="Additional work detected → Mehrkostenanzeige drafted (before execution)">
         <MiniHeader icon={<Mail aria-hidden />} title="Lehner Architekten" meta="09:14" />
         <div className="flex flex-col gap-1 text-xs">
           <p className="text-zinc-500">Betreff: Brandschutz 3. OG</p>
