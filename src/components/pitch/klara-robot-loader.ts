@@ -18,7 +18,8 @@ let webglSupport: boolean | null = null;
 async function fetchAsObjectUrl(url: string): Promise<string> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Spline scene ${url}: HTTP ${res.status}`);
-  return URL.createObjectURL(await res.blob());
+  // The runtime warns unless the URL ends in ".splinecode"; fetch ignores the fragment.
+  return `${URL.createObjectURL(await res.blob())}#klara-robot.splinecode`;
 }
 
 /** Blob URL of the robot scene: local file first, Spline CDN second. */

@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
+  type CSSProperties,
   type ReactNode,
   type Ref,
 } from "react";
@@ -20,17 +21,25 @@ import { EASE_OUT, u } from "./stage";
 
 const Spline = dynamic(() => import("@splinetool/react-spline"), { ssr: false });
 
-/** Transparent capture of the scene's first frame (the head close-up). */
+/** Transparent 2× capture of the scene's first frame (head close-up), 2160×2040. */
 export const KLARA_ROBOT_PNG = "/pitch/klara-robot.png";
 
 /**
- * Head (visor) position in % of the robot box, tuned for a 1000×1080 design box.
+ * Head (visor) position in % of the robot box, tuned for the 1080×1020 design
+ * box the scenes use (ROBOT_BOX). The scene keeps a fixed vertical field of
+ * view, so y holds for any box; x assumes that aspect ratio.
  * The scene opens on a close-up of the head (that frame is the PNG), then the
  * camera pulls back to the full robot within ~2.5 s.
  */
-const HEAD_INTRO = { x: 48, y: 45 };
-const HEAD_SETTLED = { x: 49.3, y: 25 };
+const HEAD_INTRO = { x: 48, y: 46 };
+const HEAD_SETTLED = { x: 50.3, y: 26 };
 const INTRO_MS = 2400;
+
+const EDGE_FADE: CSSProperties = {
+  maskImage:
+    "linear-gradient(to bottom, #000 66%, transparent 92%), linear-gradient(to right, transparent, #000 8%, #000 92%, transparent)",
+  maskComposite: "intersect",
+};
 
 /** Live → PNG if WebGL is missing, loading fails or takes longer than this. */
 const DEFAULT_LOAD_TIMEOUT_MS = 2000;
@@ -131,8 +140,9 @@ export function KlaraRobot({
       data-robot-state={state}
       className={cn("relative select-none", className)}
     >
-      {/* Legs dissolve into the background; the name plate sits below. */}
-      <div className="absolute inset-0 mask-[linear-gradient(to_bottom,#000_66%,transparent_92%)]">
+      {/* Legs dissolve into the background (the name plate sits below); the
+          side edges fade so a shoulder or hand never meets a hard line. */}
+      <div className="absolute inset-0" style={EDGE_FADE}>
         <motion.div
           className="absolute inset-0"
           initial={false}
