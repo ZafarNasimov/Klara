@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-21 00:00 UTC (local session: call latency) · branch `claude/project-thread-jrqak8`
+Last update: 2026-11-21 01:20 UTC (local session: M4 e-mail loop) · branch `claude/project-thread-jrqak8`
 
 ## Milestones (SPEC §11)
 
@@ -12,8 +12,8 @@ Last update: 2026-11-21 00:00 UTC (local session: call latency) · branch `claud
 | M0 | Skeleton: Next.js, store, schema, seed, role switcher, screen shells | ✅ done |
 | M1 | Text pipeline: rules engine, `/api/agent/turn`, readback/confirm, text chat | ✅ done |
 | M2 | Documents: templates, PDF + DOCX, sha256, versions, admin case view | ✅ done |
-| M3 | Voice: call screen, hands-free + push-to-talk, STT/TTS (needs `OPENAI_API_KEY`) | 🟡 built; latency cut to 2.6–4.3 s per voice turn (server side); real-phone test pending |
-| M4 | E-mail: composer, Postmark send, inbound reply analysis | ⬜ |
+| M3 | Voice: call screen, hands-free + push-to-talk, STT/TTS (needs `OPENAI_API_KEY`) | 🟡 built; latency cut to 2.6–4.3 s per voice turn (server side); laptop test passed (Zafar), real-phone test pending |
+| M4 | E-mail: composer, Postmark send, inbound reply analysis | 🟡 built and tested end to end with simulated send; live Postmark (token, DNS, inbound URL) pending |
 | M5 | Realtime, polish, fallbacks ("Antwort simulieren") | ⬜ |
 | M6 | Eval set (`eval/utterances.json`, ≥30) and `eval/run.ts` | ⬜ |
 
@@ -35,13 +35,25 @@ Last update: 2026-11-21 00:00 UTC (local session: call latency) · branch `claud
 - **Voice, step 2 hands-free** (`src/lib/voice/vad.ts`): default mode once the mic is open. Silero VAD (`@ricky0123/vad-web`, model v5) runs on the call's own mic stream and AudioContext (created in the start tap for iOS); each utterance goes as a 16 kHz WAV to the same `/api/voice`. Paused while Klara thinks and speaks, resumed 300 ms after she stops (no barge-in). Toggle "Freihändig" ⇄ "Push-to-Talk" keeps the conversation; in hands-free the centre button mutes. If the detector cannot load, the screen falls back to push-to-talk with a notice. Settings (silence before end of turn, minimum speech, threshold) come from `/admin/demo` (`POST /api/demo/vad`) via `GET /api/voice`. `npm install` copies the model, worklet and ONNX runtime to `public/vad/` (`scripts/copy-vad-assets.mjs`, gitignored output). Verified with Playwright and a fake mic playing synthetic speech (`--use-file-for-fake-audio-capture`): three spoken turns to a confirmed Behinderungsanzeige; `/api/voice` was stubbed because this session has no OpenAI key. Noise filter keeps one-word answers ("Ja", "2") on purpose, otherwise confirm by voice would break (SPEC says "under 2 words").
 - **Turn timing** (`src/lib/timing.ts`): `/api/voice` and `/api/agent/turn` log one line per request (`[klara] timing POST /api/voice total=… stt=… db=…(23x) llm.record_turn=… render=… document=…`, plus model, effort and token counts) and send the same steps as a `Server-Timing` header (browser network panel). `db` is wall time with a store call in flight. `scripts/bench-call.mjs` replays the golden-path call turn by turn (text or real audio) and prints those steps.
 - **Fewer database round trips per turn** (each is ~110 ms to Supabase from a laptop): `loadTurn` reads conversation → team, open cases, last turns, the conversation's cases side by side → project context (2 rounds instead of 3); `/api/voice` runs these reads while speech-to-text runs. During a turn case changes stay in memory and are written once per case (`flush` before anything reads cases from the store: letter, Bautagesbericht, open hindrance lookup); evidence and Klara's turn are written side by side; **events are written last** (they trigger the office screen's refetch, so the data must be stored first), +1 ms each to keep their order in "Verlauf". `generateDocument` takes the caller's project context and queued events.
-- **Tests:** 110 Vitest tests, incl. SPEC §10 scenarios (`src/lib/agent/turn.test.ts`) and office/Polier actions (`src/lib/cases/actions.test.ts`).
+- **E-mail loop (M4)** (`src/lib/mail/`):
+  - `compose.ts`: subject per SPEC §8 (`Behinderungsanzeige gem. § 6 Abs. 1 VOB/B – BV … – Zeichen KL-…`; "gem." only for plain VOB/B bases), To/CC from `resolveRecipient()` like the letter, body suggested by the fast model (`suggest_email_body`, checked: starts with "Sehr geehrte Damen und Herren,", ends with "Mit freundlichen Grüßen", ≤ 110 words, no §) with a fixed German text as fallback (8 s timeout), signature from the Bauleiter.
+  - `drafts.ts`: one unsent draft per case (`POST /api/mail/draft`, `GET`/`PATCH /api/mail/[id]`), `POST /api/mail/[id]/send`. Send is refused unless the case is `validiert`, the attached version is the validated latest one, the letter's addressee is under "An" (an e-mail must not go only to the architect without Vollmacht), and the sender is Bauleiter or Büro. `validate: true` = "Validieren und senden" for the Bauleiter (validates the version on screen; if validating rebuilds the letter, it stops and shows the new version). After sending: version `immutable` + `sent_at` + `delivery_status`, case `versendet`, "Übermittlung" check amber ("versendet, Zustellung nicht bestätigt" or "Testversand"), e-mail evidence, event `email_sent` (last).
+  - `postmark.ts`: Postmark `POST /email` with the letter PDF (page 1, no audit page) and optional DOCX, `Metadata` with the case reference, optional `POSTMARK_REPLY_TO`. Without `POSTMARK_SERVER_TOKEN` nothing leaves the app: message id `sim-…`, the UI says "Testversand".
+  - `inbound.ts` + `classify.ts`: `POST /api/email/inbound?token=…` (403 on a wrong token, which stops Postmark's retries; duplicates by Message-ID are ignored) and "Antwort simulieren" (`POST /api/demo/reply`, SPEC D5 text: "Wir weisen Ihre Behinderungsanzeige vom … zurück. Die Elektroarbeiten liegen im Zeitplan.") share `receiveReply`: match by our message id in `In-Reply-To`/`References` (substring, so `<id@mtasv.net>` works), else `KL-\d{4}-\d{4}` in subject/text, else stored unassigned; classify with `classify_reply` (main model) or German keywords; quotes only the client's own sentence (`verbatimQuote`). Rejection of a Behinderungsanzeige → `stellungnahme_zurueckweisung` (no team, so not in the Polier's channel; `parent_case_id`; facts reply_date, reply_quote, orig_reference, orig_date, evidence_bullets from start/area/cause/idle staff, transcript time, Bauzeitenplan due date of the causing trade, photos; weather only for weather hindrances) with letter v1 and the Hinweis "Eine Zurückweisung macht die Behinderungsanzeige nicht unwirksam. Vorschlag: Stellungnahme mit Nachweisen." Acceptance closes the case. The reply turns "Übermittlung" green ("Zugang belegt").
+- **Tests:** 121 Vitest tests (`src/lib/mail/mail.test.ts`: subject, draft + send gate, immutability, addressee rule, one-step approval, SPEC §10 scenario 7, duplicate webhook, matching fallbacks, webhook token, keyword classifier, verbatim quotes), incl. SPEC §10 scenarios (`src/lib/agent/turn.test.ts`) and office/Polier actions (`src/lib/cases/actions.test.ts`).
 
 ### M2 screens
 
 - ✅ Bautagesbericht: report form PDF/DOCX/preview, compiled each evening, crew asked in the chat.
 - ✅ `/app/case/[id]` mobile case page with "Per Sprache korrigieren" (critique notes in `.impeccable/critique/`).
 - ✅ `/admin/case/[id]` office case page (`src/app/admin/case/[id]/case-detail.tsx`): header with status, deadline, **Validieren** (shows why it is blocked), **Zurück zur Ergänzung** dialog, **E-Mail vorbereiten** once validated (M4 composer still a shell); tabs Dokument (HTML letter preview from the same DocBody, version switch, SHA-256, PDF/Word download), Nachweise (transcript, weather), Verlauf, Hinweise; right rail with checks and facts. Critiqued (29/40) and the findings fixed.
+
+### M4 screens
+
+- `/admin/mail/[draftId]` composer (`composer.tsx`; `new?case=<id>` prepares the draft): mail header rows (Von = Bauleiter, An/CC as tokens with contact names and an amber mark for a contact without Vollmacht, Betreff), the suggested body, autosave; right rail = page 1 of the letter as paper (shared `LetterThumb`), file name, "Word-Datei mitsenden", "Prüfseite wird nicht mitgesendet". "Senden" / "Validieren und senden" stays focusable when blocked and names the reason; Strg+Enter sends. Sent e-mails open read-only.
+- `/admin/case/[id]`: after sending "Wartet auf Antwort" (after 15 s a quiet "Antwort simulieren" link, SPEC §1 fallback); a reply appears as a card ("Antwort des Bauherrn: Zurückweisung", the client's sentence, Klara's Hinweis, "Stellungnahme öffnen KL-…"), announced with a toast. Follow-up letters show "Folgeschreiben zu KL-…" and Klara's Hinweis above the tabs. "E-Mail vorbereiten" shows from status `bereit`.
+- `/admin/demo`: "Antwort simulieren" and the e-mail mode under "Betriebsart".
+- `/impeccable critique` 28/40 (dual-agent; snapshot in `.impeccable/critique/`). Fixed all 5 priority issues (addressee rule, one-step approval, sender row and test-mode wording, inline field errors and uncommitted addresses, quiet fallback + announced reply) plus contrast and quotes; then `/impeccable polish` (selection and caret colour, primary hover kept above AA). Verified with Playwright on a production build: golden path → composer → wrong addressee blocked → validate and send → simulated rejection → Stellungnahme v1, no console errors.
 
 ### Call latency work (2026-11-21, local, real keys)
 
@@ -73,32 +85,13 @@ Earlier cloud test (2026-11-20, 23:20 UTC, HTTP only): STT exact and 1.15 s, TTS
 
 ### Next steps, in order
 
-1. **Finish M3** (latency work done, see above).
-   - Real phone over HTTPS (`next dev --experimental-https` or a tunnel) with the Supabase backend: check the `[klara] timing` lines (or `Server-Timing` in the browser) against the numbers above, the iOS start tap, and the VAD defaults in `/admin/demo` for a loud site. Then mark M3 ✅.
-   - Ask Zafar whether to do option (a) (after M6 eval) or (b) (paid) from "Call latency work". Without them a readback turn in English is ~4 s on the server plus ~1 s until Klara speaks.
-   - Where the app runs for the demo matters: hosted in the same region as the Supabase project (e.g. Vercel), a store call should take a few ms instead of ~110 ms, so most of the remaining DB wait would go (not measured).
-2. **M4 e-mail loop** (SPEC §6.4, §8 `/admin/mail/[draftId]`, §11 M4). Pieces that already exist:
-   - tables and types `email_out` (status default `entwurf`) and `email_in`;
-   - doc type and template `stellungnahme_zurueckweisung`;
-   - the stub page `src/app/admin/mail/[draftId]/page.tsx`. "E-Mail vorbereiten" on `/admin/case/[id]` links to `/admin/mail/new?case=<id>` once the case is `validiert`;
-   - `callTool()` in `src/lib/agent/llm.ts` for forced tool calls.
-
-   Suggested build:
-   - `src/lib/mail/`:
-     - subject `{title_de} gem. {legal_basis} – BV {project.name} – Zeichen {reference}` (add "gem. …" only for the plain `§ … VOB/B` bases);
-     - To/CC from `resolveRecipient()` (the contact emails);
-     - body from a `suggest_email_body` tool call on the fast model, with a fixed German template as the fallback. Use the letter's salutation, no legal claims, under 90 words.
-   - Routes:
-     - `POST /api/mail/draft {case_id}` creates the draft or reuses the unsent one for the latest version. The draft is an `email_out` row with status `entwurf`; draftId is its id.
-     - `PATCH` saves edits.
-     - `POST /api/mail/send` refuses unless the case is `validiert` and the version is validated. It then sends through Postmark (`POST https://api.postmarkapp.com/email`, header `X-Postmark-Server-Token`, attachment = PDF page 1 only via `?variant=letter`, DOCX optional), stores `message_id`, sets the version `immutable`, `sent_at` and `delivery_status`, sets the case to `versendet` and logs an event. Without `POSTMARK_SERVER_TOKEN`, "send" is simulated with a local message id.
-   - Composer UI as in SPEC §8. "Senden" is disabled until `validiert`.
-   - `POST /api/email/inbound?token=…` (Postmark inbound JSON). It checks `POSTMARK_INBOUND_TOKEN`, stores `email_in`, and matches the case: `In-Reply-To` contains our `message_id`, else `KL-\d{4}-\d{4}` in the subject or body, else unassigned. Then it classifies with the forced tool `classify_reply`, with a keyword fallback ("zurückweisen" → rejection, and so on), and maps the result per SPEC §6.4. A rejection of a `behinderungsanzeige` creates a `stellungnahme_zurueckweisung` case (`parent_case_id`) with the facts `reply_date`, `reply_quote`, `orig_reference`, `orig_date` and `evidence_bullets` (from evidence: transcript times, weather, diary, plan vs. actual), generates v1, and logs the event "Antwort des Bauherrn: Zurückweisung" plus the Hinweis.
-   - `/admin/demo` "Antwort simulieren" (SPEC D5: scripted rejection) goes through the same inbound handler. It is also the 15 s fallback on the case page.
-   - Tests: the SPEC §10 scenario 7 path, send blocked without `validiert`, sent version immutable.
-   - Done criterion (SPEC §12): scenario 2 → validated → sent → reply → follow-up draft in ≤ 2:30 without reload.
-3. **Photo button** (SPEC §8: channel and call screen). Not built. `evidence.case_id` is NOT NULL, so a photo needs a case: the conversation's pending case, else the team's latest open case of the day, else that day's Bautagesbericht. Store files in Supabase Storage (`SUPABASE_STORAGE_BUCKET`) or `.data/files/` in memory mode. Show thumbnails on the audit page (PDF page 2) and in the Bautagesbericht.
-4. M5 (realtime admin updates, timeline, fallbacks), M6 (eval set ≥ 30 utterances, `eval/run.ts`), per SPEC §11.
+1. **Live checks of M3 and M4** (needs Zafar):
+   - M3: real phone over HTTPS (`npm run build && npm start` plus a tunnel, e.g. `cloudflared tunnel --url http://localhost:3000`), compare the `[klara] timing` lines with "Call latency work", iOS start tap, VAD defaults for a loud site.
+   - M4: Postmark account with a verified sender domain (SPEC D4), set `POSTMARK_SERVER_TOKEN`, `POSTMARK_FROM`, `POSTMARK_REPLY_TO` (the inbound address) and `POSTMARK_INBOUND_TOKEN`; point Postmark's inbound webhook to `https://<host>/api/email/inbound?token=<POSTMARK_INBOUND_TOKEN>`; send the golden-path letter to `DEMO_CLIENT_MAILBOX` and reply from it. Check that the reply is matched (In-Reply-To or "Zeichen KL-…" in "AW:"). Not tested with real mail yet.
+   - Latency options still open (see "Call latency work"): (a) after M6, (b) paid.
+2. **Photo button** (SPEC §8: channel and call screen). Not built. `evidence.case_id` is NOT NULL, so a photo needs a case: the conversation's pending case, else the team's latest open case of the day, else that day's Bautagesbericht. Store files in Supabase Storage (`SUPABASE_STORAGE_BUCKET`) or `.data/files/` in memory mode. Show thumbnails on the audit page (PDF page 2) and in the Bautagesbericht; the rebuttal evidence already counts photos.
+3. **M5** (SPEC §11): realtime polish, timeline of the full chain (incl. e-mails) on the case page, demo page. Open M4 follow-ups that belong here: replies classified `request_info` / `change_request` / `counter_instruction` only get a summary card (SPEC §6.4 wants supplement / Mehrkosten + Anordnung drafts and a 30-day counter for BGB); unassigned replies are stored and logged but have no screen to assign them; a Postmark delivery webhook could turn "Übermittlung" green on delivery.
+4. **M6**: eval set (`eval/utterances.json`, ≥ 30, RU/PL/DE/TR), `eval/run.ts` (`npm run eval`), then 5 full rehearsals on the real phone + projector.
 
 Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-0039..0041 so the board is not empty before the demo case.
 
@@ -121,6 +114,7 @@ Without any keys Klara runs fully: memory store + keyword reader (only simple se
 - `npm install` also copies the voice-detector files to `public/vad/` (postinstall). If hands-free says it cannot start, run `node scripts/copy-vad-assets.mjs`.
 - The microphone needs a secure page: `http://localhost` works; for a phone on your network use `next dev --experimental-https` or a tunnel.
 - Memory mode keeps data in `.data/db.json` (`MEMORY_PERSIST=1`). `/admin/demo` → "Demo zurücksetzen" reloads the seed.
+- Try the e-mail loop without a mail server: confirm a Behinderungsanzeige (call or chat), open it under `/admin` as Bauleiter, "E-Mail vorbereiten" → "Validieren und senden"; on the case page wait 15 s → "Antwort simulieren" (or `/admin/demo`) → "Stellungnahme öffnen". Without `POSTMARK_SERVER_TOKEN` everything is a test send.
 - Measure call latency without touching Supabase:
   ```bash
   # PowerShell: $env:DATA_BACKEND='memory'; $env:MEMORY_PERSIST='0'; $env:DB_SIMULATED_LATENCY_MS='110'; npx next dev -p 3100
@@ -139,7 +133,7 @@ See `.env.example` for all names. Never commit `.env*` files.
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser realtime | optional |
 | `KLARA_ANTHROPIC_API_KEY`, `KLARA_ANTHROPIC_MODEL`, `KLARA_ANTHROPIC_MODEL_FAST` (optional `KLARA_ANTHROPIC_EFFORT`) | Live extraction + phrasing | Each falls back to the plain `ANTHROPIC_*` name. Claude Code cloud environments reserve `ANTHROPIC_*` (the key is not passed to the app, and `ANTHROPIC_MODEL` would change Claude Code's own model), so use the `KLARA_` names there; locally and on Vercel either works. `LLM_MODE` defaults to `live` when a key is set. The model names have no default (SPEC D10): set both. |
 | `OPENAI_API_KEY` | M3 voice (speech-to-text, Klara's voice) | without it the call screen takes typed text and the browser speaks. Optional: `STT_MODEL`, `TTS_MODEL`, `TTS_VOICE`, `TTS_PROVIDER=browser` |
-| `POSTMARK_SERVER_TOKEN`, `POSTMARK_FROM`, `POSTMARK_INBOUND_TOKEN`, `DEMO_CLIENT_MAILBOX` | M4 e-mail | not used yet. The seed gives the Bauherr contact the `DEMO_CLIENT_MAILBOX` address, so the teammate's mailbox receives the demo letter. Postmark domain/DNS must be verified before the event (SPEC D4) |
+| `POSTMARK_SERVER_TOKEN`, `POSTMARK_FROM`, `POSTMARK_REPLY_TO`, `POSTMARK_INBOUND_TOKEN`, `DEMO_CLIENT_MAILBOX` | M4 e-mail | without the token every send is a test send (nothing leaves the app). `POSTMARK_REPLY_TO` = the Postmark inbound address, so the client's answer reaches `/api/email/inbound?token=…`. The seed gives the Bauherr contact the `DEMO_CLIENT_MAILBOX` address, so the teammate's mailbox receives the demo letter. Postmark domain/DNS must be verified before the event (SPEC D4) |
 | `DATA_BACKEND` (`memory` / `supabase`), `MEMORY_PERSIST` | data store | default: Supabase when its URL and key are set, else memory |
 | `NODE_USE_ENV_PROXY=1` | **Claude Code cloud only** | Node `fetch` there must go through the egress proxy (Supabase, OpenAI, Anthropic). Not needed locally or on Vercel |
 | `WEATHER_DISABLED=1` | skip Open-Meteo | tests set it |
@@ -161,7 +155,9 @@ Status (2026-11-20, checked from a separate session): all 18 tables exist and th
 - Hands-free was verified only with a simulated mic (Playwright `--use-file-for-fake-audio-capture` with synthetic speech) and a stubbed `/api/voice`.
 - Open-Meteo's free tier rate-limits shared cloud IPs ("Daily API request limit exceeded"); then no weather is attached.
 - All letter texts are prototype drafts: **TODO legal review** (SPEC D8). Weather "unusual" thresholds are a heuristic.
-- "E-Mail vorbereiten" lands in M4. Photo upload is not built yet.
+- Photo upload is not built yet.
+- **Dev server reload loop:** twice in this session `next dev` (Turbopack) reloaded every page endlessly ("HMR hash mismatch" in the HMR socket, "✓ Compiled in 2ms" in the log) after many file edits. A restart helped once, not the second time; `npm run build && npm start` was fine. Not diagnosed (maybe OneDrive touching synced files in this folder). If pages keep reloading, restart `npm run dev` or use the production server.
+- The rebuttal letter lists weather only for weather hindrances (next to a trade's hindrance it would invite "it was the weather"). Decision taken in the M4 critique; tell Zafar if he wants it always.
 - Next.js 16 here differs from older versions: read `node_modules/next/dist/docs/` first (AGENTS.md). With `cacheComponents`, async page work goes inside `<Suspense>`, GET handlers call `await connection()`, and run `npx next typegen` after adding routes (for `RouteContext` / `PageProps`).
 - react-pdf: fixed absolute `View`s don't render (use fixed `Text`s); no `lineHeight` on `Page`; a unitless `lineHeight` needs `fontSize` in the same style. tsx cannot load react-pdf; test PDFs via Vitest.
 - JS `\b` is ASCII-only; the keyword reader uses Unicode lookarounds.

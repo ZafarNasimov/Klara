@@ -18,7 +18,7 @@ export function DeadlineBadge({ d, className }: { d: DeadlineInfo | null | undef
     >
       <Clock className={cn("size-3.5 shrink-0", overdue ? "text-light-red-text" : "text-muted-foreground")} aria-hidden />
       <span className="truncate">
-        <span className="sr-only">Frist: </span>
+        <span className="sr-only">{d.label_de.startsWith("versendet") ? "Frist eingehalten, " : "Frist: "}</span>
         {d.label_de}
       </span>
     </span>

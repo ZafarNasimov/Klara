@@ -3,13 +3,15 @@
 // its evidence and history, the checks always in view on the right, and the
 // two decisions the Bauleiter makes here: validate, or send it back.
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
-import { ChevronLeft, CloudSun, Download, ExternalLink, FileText, MessagesSquare, Send, Undo2 } from "lucide-react";
+import { ChevronLeft, CloudSun, Download, ExternalLink, FileText, Mail, MessagesSquare, Send, Undo2 } from "lucide-react";
 import { eventDetail, eventTitle } from "@/components/admin/event-text";
 import { formatFact } from "@/components/admin/format-fact";
 import { LetterPreview } from "@/components/documents/letter-preview";
 import { DeadlineBadge } from "@/components/klara/deadline-badge";
+import { KlaraAvatar } from "@/components/klara/klara-avatar";
 import { CheckList, LightDot } from "@/components/klara/traffic-light";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,13 +21,15 @@ import { Textarea } from "@/components/ui/textarea";
 import type { ProjectContext } from "@/lib/db/repo";
 import { docTitle, getDocType, hasValue } from "@/lib/doctypes";
 import type { DocBody } from "@/lib/documents/types";
-import { CASE_STATUS_DE, fmtDateTime, fmtShort, fmtTime, SPHERE_DE } from "@/lib/labels";
+import { CASE_STATUS_DE, fmtDate, fmtDateTime, fmtShort, fmtTime, REPLY_KIND_DE, ROLE_GENITIVE_DE, SPHERE_DE } from "@/lib/labels";
 import { useRole } from "@/lib/role";
-import type { CaseDetail, CaseView, DocumentVersion, Evidence } from "@/lib/types";
+import type { CaseDetail, CaseStatus, CaseView, DocumentVersion, EmailIn, EmailOut, Evidence, ReplyClassification } from "@/lib/types";
 import { ApiError, postJson, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 
 type ProjectResponse = ProjectContext & { now: string };
+
+const SENT = new Set<CaseStatus>(["versendet", "beantwortet", "abgeschlossen"]);
 
 const FLAG_DE: Record<string, string> = {
   escalate: "Ankündigung vor Ausführung versäumt – Bauleitung einbinden",
@@ -71,9 +75,11 @@ export function CaseDetailView({ id }: { id: string }) {
   const correcting = c.flags.includes("correcting");
   const collecting = c.flags.includes("collecting");
   const isBauleiter = user.role === "bauleiter";
+  const sentMail = data.emails.find((m) => m.status !== "entwurf") ?? null;
+  const sent = SENT.has(c.status);
   const canValidate = c.status !== "validiert" && !data.validation_blocker && isBauleiter && !!latest;
   const validateHint =
-    c.status === "validiert"
+    c.status === "validiert" || SENT.has(c.status)
       ? null
       : data.validation_blocker ?? (!isBauleiter ? "Validieren kann nur die Bauleitung (Rolle oben rechts wechseln)." : null);
 
@@ -110,8 +116,24 @@ export function CaseDetailView({ id }: { id: string }) {
               <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
                 <span className="font-mono text-foreground">{c.reference}</span>
                 <span className="text-muted-foreground">
-                  {c.team_name ?? "Ohne Team"}
-                  {c.author_name ? `, gemeldet von ${c.author_name}` : null}
+                  {c.team_name ? (
+                    <>
+                      {c.team_name}
+                      {c.author_name ? `, gemeldet von ${c.author_name}` : null}
+                    </>
+                  ) : data.parent ? (
+                    <>
+                      Folgeschreiben zu{" "}
+                      <Link
+                        href={`/admin/case/${data.parent.id}`}
+                        className="font-mono text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {data.parent.reference}
+                      </Link>
+                    </>
+                  ) : (
+                    "Ohne Team"
+                  )}
                 </span>
                 <span className="inline-flex h-7 items-center rounded-md border border-border px-2 text-foreground">
                   {returned ? "Zur Ergänzung beim Polier" : correcting ? "Korrektur beim Polier" : collecting ? "Klara fragt nach" : CASE_STATUS_DE[c.status]}
@@ -121,11 +143,26 @@ export function CaseDetailView({ id }: { id: string }) {
             </div>
             <div className="flex flex-col items-end gap-2">
               <div className="flex flex-wrap justify-end gap-2">
-                <Button variant="outline" size="lg" disabled={returnOpen || c.status === "versendet"} onClick={() => setReturnOpen(true)}>
-                  <Undo2 aria-hidden />
-                  Zurück zur Ergänzung
-                </Button>
-                {c.status === "validiert" ? (
+                {sent ? (
+                  sentMail ? (
+                    <Link href={`/admin/mail/${sentMail.id}`} className={buttonVariants({ variant: "outline", size: "lg" })}>
+                      <Mail aria-hidden />
+                      E-Mail ansehen
+                    </Link>
+                  ) : null
+                ) : !c.team_id ? null : (
+                  <Button variant="outline" size="lg" disabled={returnOpen} onClick={() => setReturnOpen(true)}>
+                    <Undo2 aria-hidden />
+                    Zurück zur Ergänzung
+                  </Button>
+                )}
+                {!sent && c.status === "bereit" && def && def.recipient !== "internal" && latest ? (
+                  <Link href={`/admin/mail/new?case=${c.id}`} className={buttonVariants({ variant: "outline", size: "lg" })}>
+                    <Send aria-hidden />
+                    E-Mail vorbereiten
+                  </Link>
+                ) : null}
+                {sent ? null : c.status === "validiert" ? (
                   <Link href={`/admin/mail/new?case=${c.id}`} className={buttonVariants({ size: "lg" })}>
                     <Send aria-hidden />
                     E-Mail vorbereiten
@@ -148,6 +185,18 @@ export function CaseDetailView({ id }: { id: string }) {
             </div>
           </div>
         </header>
+
+        {!sentMail && typeof c.facts._hint_de === "string" && data.parent ? (
+          <div className="px-8 pt-5">
+            <FollowupNote c={c} parent={data.parent} />
+          </div>
+        ) : null}
+
+        {sentMail ? (
+          <div className="px-8 pt-5">
+            <MailStatus mail={sentMail} data={data} contacts={ctx?.contacts ?? []} now={ctx?.now ?? null} onChange={reload} />
+          </div>
+        ) : null}
 
         {/* ── Tabs ───────────────────────────────────────────────── */}
         <Tabs defaultValue="dokument" className="px-8 pt-4 pb-10">
@@ -226,6 +275,244 @@ export function CaseDetailView({ id }: { id: string }) {
 
 function Count({ n }: { n: number }) {
   return n ? <span className="font-mono text-xs text-muted-foreground">{n}</span> : null;
+}
+
+// ── E-Mail und Antwort ────────────────────────────────────────────────
+
+type Contacts = ProjectContext["contacts"];
+
+/** Waiting for the client, or the client's answer with Klara's proposal (SPEC §6.4 step 5). */
+function MailStatus({
+  mail,
+  data,
+  contacts,
+  now,
+  onChange,
+}: {
+  mail: EmailOut;
+  data: CaseDetail;
+  contacts: Contacts;
+  now: string | null;
+  onChange: () => void;
+}) {
+  const reduce = useReducedMotion();
+  const reply = data.replies[0] ?? null;
+  const cardRef = useRef<HTMLDivElement>(null);
+  const seen = useRef<string | null | undefined>(undefined);
+  // A reply that arrives while the page is open is announced and scrolled into view; one that was already there is not.
+  useEffect(() => {
+    const id = reply?.id ?? null;
+    if (seen.current !== undefined && id && id !== seen.current && reply) {
+      const sender = contacts.find((x) => x.email?.toLowerCase() === reply.from_addr.toLowerCase());
+      const kind = (reply.classification as ReplyClassification | null)?.kind ?? "other";
+      toast(`Antwort von ${sender?.name ?? reply.from_addr} eingegangen: ${REPLY_KIND_DE[kind]}`);
+      cardRef.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+    }
+    seen.current = id;
+  }, [reply, contacts, reduce]);
+  return (
+    <div ref={cardRef} className="max-w-[760px] scroll-mt-4">
+      {/* The answer arrives by itself (realtime); its card fades in where the waiting note was. */}
+      <AnimatePresence initial={false}>
+        {reply ? (
+          <motion.div
+            key={reply.id}
+            initial={{ opacity: 0, y: reduce ? 0 : 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+          >
+            <ReplyCard reply={reply} data={data} contacts={contacts} />
+          </motion.div>
+        ) : (
+          <Waiting key="waiting" mail={mail} caseId={data.case.id} contacts={contacts} now={now} onChange={onChange} />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+const contactName = (email: string, contacts: Contacts) => {
+  const k = contacts.find((x) => x.email?.toLowerCase() === email.toLowerCase());
+  return k ? `${k.name} (${k.organisation})` : email;
+};
+
+/** SPEC §1 fallback: if the client's e-mail has not arrived after 15 s, the demo can play it in. */
+const SIMULATE_AFTER_MS = 15_000;
+
+function Waiting({
+  mail,
+  caseId,
+  contacts,
+  now,
+  onChange,
+}: {
+  mail: EmailOut;
+  caseId: string;
+  contacts: Contacts;
+  now: string | null;
+  onChange: () => void;
+}) {
+  const sentAgo = now && mail.sent_at ? Date.parse(now) - Date.parse(mail.sent_at) : 0;
+  const [late, setLate] = useState(sentAgo >= SIMULATE_AFTER_MS);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (late) return;
+    const t = setTimeout(() => setLate(true), Math.max(0, SIMULATE_AFTER_MS - sentAgo));
+    return () => clearTimeout(t);
+  }, [late, sentAgo]);
+  const simulated = mail.message_id?.startsWith("sim-") ?? false;
+
+  const simulate = async () => {
+    setBusy(true);
+    try {
+      await postJson("/api/demo/reply", { case_id: caseId });
+      onChange();
+    } catch (e) {
+      toast.error(e instanceof ApiError && e.status < 500 ? e.message : "Die Antwort konnte nicht eingespielt werden.");
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby="waiting-h" className="rounded-xl border border-border bg-background px-5 py-4">
+      <div className="flex items-start justify-between gap-6">
+        <div className="min-w-0">
+          <h2 id="waiting-h" className="text-sm font-medium text-foreground">
+            Wartet auf Antwort
+          </h2>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {mail.sent_at ? (
+              <>
+                Versendet am{" "}
+                <time dateTime={mail.sent_at} className="font-mono">
+                  {fmtDateTime(mail.sent_at)}
+                </time>{" "}
+              </>
+            ) : null}
+            an {mail.to.map((a) => contactName(a, contacts)).join(", ")}
+            {simulated ? " als Testversand, nicht zugestellt" : null}. Antworten auf diese E-Mail ordnet Klara diesem Vorgang zu.
+          </p>
+        </div>
+      </div>
+      {late ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Noch keine Antwort?{" "}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void simulate()}
+            className="rounded-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+          >
+            {busy ? "Antwort wird eingespielt …" : "Antwort simulieren"}
+          </button>{" "}
+          (Zurückweisung des Bauherrn, für die Vorführung)
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+/** On a follow-up letter: why it exists, before anything else (Klara's Hinweis and the client's words). */
+function FollowupNote({ c, parent }: { c: CaseView; parent: CaseView }) {
+  const quote = typeof c.facts.reply_quote === "string" ? c.facts.reply_quote : null;
+  const date = typeof c.facts.reply_date === "string" ? c.facts.reply_date : null;
+  return (
+    <section aria-label="Hinweis von Klara" className="flex max-w-[760px] items-start gap-3 rounded-xl border border-border bg-background px-5 py-4">
+      <KlaraAvatar size={32} className="shrink-0" />
+      <div className="min-w-0 text-sm">
+        <p className="font-medium text-foreground">Hinweis von Klara</p>
+        <p className="text-foreground">{String(c.facts._hint_de)}</p>
+        {quote ? (
+          <p className="mt-2 text-muted-foreground">
+            Antwort des Bauherrn{date ? (
+              <>
+                {" "}vom <span className="font-mono">{fmtDate(`${date}T12:00:00Z`)}</span>
+              </>
+            ) : null}{" "}
+            auf <span className="font-mono">{parent.reference}</span>: „{quote}“
+          </p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function ReplyCard({ reply, data, contacts }: { reply: EmailIn; data: CaseDetail; contacts: Contacts }) {
+  const cls = reply.classification as ReplyClassification | null;
+  const kind = cls?.kind ?? "other";
+  const sender = contacts.find((x) => x.email?.toLowerCase() === reply.from_addr.toLowerCase()) ?? null;
+  const who = sender ? ROLE_GENITIVE_DE[sender.role] : "des Absenders";
+  // Quotation marks only around the client's own words; otherwise Klara's summary, labelled as such.
+  const quote = cls ? (cls.quote === undefined ? (cls.key_points[0] ?? null) : cls.quote) : null;
+  const followup =
+    data.children.find((x) => x.facts._reply_email_id === reply.id) ?? data.children.find((x) => x.doc_type === "stellungnahme_zurueckweisung") ?? null;
+  const hint =
+    typeof followup?.facts._hint_de === "string"
+      ? followup.facts._hint_de
+      : kind === "acceptance"
+        ? "Der Auftraggeber hat zugestimmt. Der Vorgang ist abgeschlossen."
+        : null;
+  return (
+    <section aria-labelledby="reply-h" className="rounded-xl border border-border bg-background">
+      <div className="px-5 pt-4 pb-4">
+        <div className="flex items-baseline justify-between gap-4">
+          <h2 id="reply-h" className="text-base font-semibold tracking-tight text-foreground">
+            Antwort {who}: {REPLY_KIND_DE[kind]}
+          </h2>
+          <time dateTime={reply.received_at} className="shrink-0 font-mono text-xs text-muted-foreground">
+            {fmtDateTime(reply.received_at)}
+          </time>
+        </div>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          {sender ? `${sender.name}, ${sender.organisation}` : reply.from_addr}, per E-Mail
+        </p>
+        {quote ? (
+          <blockquote lang="de" className="mt-3 text-[15px] leading-6 text-foreground">
+            „{quote}“
+          </blockquote>
+        ) : cls?.summary_de ? (
+          <p className="mt-3 text-sm text-foreground">
+            <span className="text-muted-foreground">Kernaussage laut Klara: </span>
+            {cls.summary_de}
+          </p>
+        ) : null}
+        {cls?.requested_items.length ? (
+          <ul className="mt-2 list-disc pl-5 text-sm text-foreground">
+            {cls.requested_items.map((x) => (
+              <li key={x}>{x}</li>
+            ))}
+          </ul>
+        ) : null}
+        <details className="mt-3 text-sm">
+          <summary className="w-fit cursor-pointer rounded-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+            Ganze Antwort lesen
+          </summary>
+          <p className="mt-2 whitespace-pre-wrap text-foreground">{reply.body_text || "Ohne Text"}</p>
+        </details>
+      </div>
+      {hint || followup ? (
+        <div className="flex items-center justify-between gap-6 rounded-b-xl border-t border-border bg-surface px-5 py-4">
+          {hint ? (
+            <div className="flex min-w-0 items-start gap-3">
+              <KlaraAvatar size={32} className="shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">Hinweis von Klara</p>
+                <p className="text-sm text-foreground">{hint}</p>
+              </div>
+            </div>
+          ) : (
+            <span />
+          )}
+          {followup ? (
+            <Link href={`/admin/case/${followup.id}`} className={buttonVariants({ size: "lg", className: "shrink-0 px-4" })}>
+              Stellungnahme öffnen{" "}
+              <span className="font-mono">{followup.reference}</span>
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
 }
 
 // ── Dokument ──────────────────────────────────────────────────────────
@@ -431,6 +718,7 @@ function Notes({ c, parent, linked }: { c: CaseView; parent: CaseView | null; li
     ...(def?.when_de ? [{ label: "Anwendungsfall", value: def.when_de }] : []),
     ...(c.sphere ? [{ label: "Sphäre", value: SPHERE_DE[c.sphere] }] : []),
     ...(c.deadline ? [{ label: "Frist", value: c.deadline.label_de }] : []),
+    ...(typeof c.facts._hint_de === "string" ? [{ label: "Hinweis von Klara", value: c.facts._hint_de }] : []),
     ...(flags.length ? [{ label: "Interne Hinweise", value: <ul className="space-y-1">{flags.map((f) => <li key={f}>{f}</li>)}</ul> }] : []),
     ...(parent || linked.length
       ? [
@@ -491,7 +779,15 @@ function Facts({ c }: { c: CaseView }) {
                 {inferred.includes(f.key) ? <span> (aus dem Bauzeitenplan abgeleitet)</span> : null}
               </dt>
               <dd className={cn("text-sm text-foreground", (f.type === "number" || f.type === "datetime" || f.type === "date") && "font-mono")}>
-                {formatFact(f.type, c.facts[f.key])}
+                {f.type === "list" && Array.isArray(c.facts[f.key]) ? (
+                  <ul className="mt-0.5 list-disc space-y-1 pl-4">
+                    {(c.facts[f.key] as unknown[]).map((x) => (
+                      <li key={String(x)}>{String(x)}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  formatFact(f.type, c.facts[f.key])
+                )}
               </dd>
             </div>
           ),

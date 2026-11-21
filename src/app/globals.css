@@ -150,6 +150,14 @@
   [role="button"] {
     touch-action: manipulation;
   }
+  /* Browser surfaces carry the palette too (DESIGN.md: one accent, blue-600). */
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 20%, transparent);
+  }
+  input,
+  textarea {
+    caret-color: var(--primary);
+  }
 }
 
 /* Call screen (DESIGN.md: a call rings; state loops run only while that state lasts). */
