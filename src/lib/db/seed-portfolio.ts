@@ -146,20 +146,20 @@ function portfolioSchedule(wt: Wt): { items: ScheduleItem[]; pace: Record<string
   ];
   const pace: Record<string, Pace> = {
     [IDS.schedRohbauA]: { factor: 1.02 },
-    [IDS.schedTrockenbauA]: { factor: 0.97 },
-    [IDS.schedElektroA]: { factor: 1.0 },
+    [IDS.schedTrockenbauA]: { factor: 1.03 },
+    [IDS.schedElektroA]: { factor: 1.02 },
     [IDS.schedSanitaerA]: { factor: 1.08 },
-    [IDS.schedRohbauC]: { factor: 1.0 },
+    [IDS.schedRohbauC]: { factor: 1.02 },
     [IDS.schedFassadeC]: { factor: 1.0, skip: [-1, -2] }, // no quantities for two days
     [IDS.schedSanitaerC]: { factor: 1.05 },
-    [IDS.schedElektroC]: { factor: 1.0 },
+    [IDS.schedElektroC]: { factor: 1.03 },
   };
   return { items, pace };
 }
 
 /** How B's items progressed. B's schedule itself lives in seed.ts. */
 export const B_PACE: Record<string, Pace> = {
-  [IDS.schedElektro2]: { factor: 0.79 }, // planned end passed; ~2 Werktage of work left → the Estrich waits
+  [IDS.schedElektro2]: { factor: 0.85 }, // planned end passed, a day of work left → 2 Werktage late; the Estrich waits
   [IDS.schedEstrich1]: { factor: 1.0 },
   [IDS.schedTrockenbau2]: { factor: 0.95 },
   [IDS.schedSanitaer3]: { factor: 1.1 },
@@ -362,7 +362,7 @@ function casesFor(base: Base, today: string, now: Date, region: string): { case:
         delivery_status: sentAt ? "zugestellt" : null,
         immutable: !!sentAt,
       });
-      if (validatedAt) events.push(ev(c, "document_validated", validatedAt, { reference: ref }));
+      if (validatedAt) events.push(ev(c, "case_validated", validatedAt, { reference: ref }));
       if (sentAt) events.push(ev(c, "email_sent", sentAt, { reference: ref, source: "email", summary_de: `${docTitle(c.doc_type)} ${ref} versendet` }));
       if (spec.status === "beantwortet" && sentAt) {
         events.push(ev(c, "reply_received", new Date(sentAt.getTime() + 26 * 3600_000), { reference: ref, source: "email", summary_de: "Bauherr bestätigt den Nachtrag dem Grunde nach" }));
