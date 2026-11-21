@@ -15,7 +15,57 @@ export const MEETING_TYPE_DE: Record<MeetingType, string> = {
 
 export type MeetingStatus = "recording" | "processing" | "ready" | "failed";
 
-export type Segment = { speaker: string; start_sec: number; text: string };
+/**
+ * One transcript segment. Spoken in any language; `text_original` is what was
+ * said, `text_de` the German translation (equal to the original for German).
+ * Before the translation step, `language`, `text_de` and `confidence` are null.
+ */
+export type Segment = {
+  speaker: string;
+  start_sec: number;
+  end_sec: number;
+  /** ISO 639-1, detected per segment ("de", "pl", "ru", "sr" …). */
+  language: string | null;
+  text_original: string;
+  text_de: string | null;
+  /** 0–1: speech recognition and translation together. Below 0.6 = "unsicher". */
+  confidence: number | null;
+  /** e.g. "Etagenangabe umgerechnet: RU „Третий этаж“ → 2. OG". */
+  notes: string[];
+};
+
+export const UNCERTAIN_BELOW = 0.6;
+export const isUncertain = (s: Pick<Segment, "confidence">) => s.confidence !== null && s.confidence < UNCERTAIN_BELOW;
+/** The German text of a segment (the original until translated). */
+export const segmentDe = (s: Segment) => s.text_de ?? s.text_original;
+
+export const LANGUAGE_DE: Record<string, string> = {
+  de: "Deutsch",
+  en: "Englisch",
+  pl: "Polnisch",
+  ru: "Russisch",
+  uk: "Ukrainisch",
+  sr: "Serbisch",
+  hr: "Kroatisch",
+  bs: "Bosnisch",
+  tr: "Türkisch",
+  ro: "Rumänisch",
+  bg: "Bulgarisch",
+  cs: "Tschechisch",
+  sk: "Slowakisch",
+  hu: "Ungarisch",
+  it: "Italienisch",
+  pt: "Portugiesisch",
+  sq: "Albanisch",
+  ar: "Arabisch",
+};
+export const languageName = (code: string | null) => (code ? (LANGUAGE_DE[code] ?? code.toUpperCase()) : "unbekannt");
+
+/** Languages in the order of the header: German first, then alphabetical. */
+export function sortLanguages(codes: Iterable<string | null>): string[] {
+  const set = [...new Set([...codes].filter((c): c is string => !!c))];
+  return set.sort((a, b) => (a === "de" ? -1 : b === "de" ? 1 : a.localeCompare(b)));
+}
 
 export type ItemKind = "decision" | "task" | "anordnung" | "mehrkosten" | "behinderung" | "mangel" | "bedenken" | "termin";
 export const ITEM_KINDS: ItemKind[] = ["decision", "task", "anordnung", "mehrkosten", "behinderung", "mangel", "bedenken", "termin"];
@@ -44,8 +94,15 @@ export type MeetingItem = {
   owner: string | null;
   /** YYYY-MM-DD */
   due_date: string | null;
-  /** Verbatim from the transcript. Items without one are discarded. */
-  quote: string;
+  /** Verbatim from the German text of the segment. Items without one are discarded. */
+  quote_de: string;
+  /** Verbatim from what was said, in the speaker's language. */
+  quote_original: string;
+  quote_language: string;
+  /** The only evidence is an "unsicher" segment: never fills a template. */
+  uncertain?: boolean;
+  /** task: the statement that waits for it ("Ohne Revision C können wir im 3. OG nicht anfangen."). */
+  depends?: { text_de: string; text_original: string; language: string; speaker: string; ts_sec: number } | null;
   speaker: string;
   ts_sec: number;
   /** Termin / Behinderung: new end, e.g. "Freitag" resolved to a date. */
@@ -55,7 +112,7 @@ export type MeetingItem = {
   /** KL-… of the case this item created or updated (stays readable if the case is gone). */
   case_ref: string | null;
   /** What happened to the case: drafted, updated, or it already existed (re-run). */
-  case_action?: "created" | "updated" | "existing" | "noop";
+  case_action?: "created" | "updated" | "existing" | "noop" | "uncertain";
   /** The doc type of that case: a reference only links if the case is of this type. */
   case_doc_type?: string;
   status: "offen" | "erledigt";
@@ -71,10 +128,11 @@ export type MeetingChange = {
 
 export type Participant = { name: string; role: string; contact_id: string | null; email: string | null };
 
-export const PROCESSING_STEPS = ["transcription", "speakers", "items", "templates"] as const;
+export const PROCESSING_STEPS = ["transcription", "translation", "speakers", "items", "templates"] as const;
 export type ProcessingStep = (typeof PROCESSING_STEPS)[number];
 export const PROCESSING_STEP_DE: Record<ProcessingStep, string> = {
   transcription: "Transkription",
+  translation: "Übersetzung ins Deutsche",
   speakers: "Sprecher erkennen",
   items: "Entscheidungen & Aufgaben",
   templates: "Vorlagen prüfen",
@@ -94,6 +152,8 @@ export type MeetingProtocol = {
   duration_sec: number;
   status: MeetingStatus;
   steps: Record<ProcessingStep, boolean>;
+  /** Languages detected in the meeting (ISO 639-1), for the header. */
+  languages?: string[];
   summary: string[];
   items: MeetingItem[];
   changes: MeetingChange[];
@@ -136,7 +196,7 @@ export function outcomeChips(m: Pick<MeetingProtocol, "items" | "changes">): str
 }
 
 export function emptySteps(done = false): Record<ProcessingStep, boolean> {
-  return { transcription: done, speakers: done, items: done, templates: done };
+  return { transcription: done, translation: done, speakers: done, items: done, templates: done };
 }
 
 /** "Baubesprechung KW 47" for a date. */

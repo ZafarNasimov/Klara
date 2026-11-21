@@ -1,44 +1,83 @@
 // Sample meetings: the seed (MT-2026-0007, MT-2026-0006) and the recording
 // behind "Beispielaufnahme verwenden". The sample transcript runs through the
 // real pipeline; SAMPLE_RESULT is only the offline fallback (LLM unreachable).
-// Names follow the demo project "Neubau Bürogebäude München" (seed.ts).
+// Names follow the demo project "Neubau Bürogebäude München" (seed.ts). The
+// sample is multilingual: German, Russian, Polish and Serbian.
 import { berlinDay, berlinTime, subWerktage, werktageBetween, addWerktage, DEFAULT_HOLIDAY_REGION } from "@/lib/deadlines";
 import { IDS } from "@/lib/ids";
 import type { Meeting } from "@/lib/types";
 import { verifyItems } from "./items";
-import { defaultTitle, emptySteps, isoWeek, type ItemKind, type MeetingChange, type MeetingProtocol, type Participant, type Segment } from "./model";
+import { finalizeSegment } from "./language";
+import { defaultTitle, emptySteps, isoWeek, sortLanguages, type ItemKind, type MeetingChange, type MeetingProtocol, type Participant, type Segment } from "./model";
 
 export const SAMPLE_REF = "MT-2026-0007";
 
 export const SAMPLE_PARTICIPANTS: Participant[] = [
   { name: "Markus Hofmann", role: "Bauleiter (Muster Bau GmbH)", contact_id: null, email: "m.hofmann@muster-bau.example" },
+  { name: "Sergej Iwanow", role: "Polier Estrich (Muster Bau GmbH)", contact_id: null, email: null },
+  { name: "Tomasz Wiśniewski", role: "Elektro (Elektro Berger GmbH, vom Bauherrn beauftragt)", contact_id: null, email: null },
   { name: "Dr. Petra Lang", role: "Bauherr (Immobilien Isar GmbH)", contact_id: null, email: null },
-  { name: "Florian Berger", role: "Elektro (vom Bauherrn beauftragt)", contact_id: null, email: null },
+  { name: "Dragan Petrović", role: "Polier Trockenbau (Nowak Trockenbau GmbH, unser NU)", contact_id: null, email: null },
   { name: "Thomas Weber", role: "Architekt (Büro Weber Architekten)", contact_id: null, email: null },
 ];
 
 const H = "Markus Hofmann";
+const I = "Sergej Iwanow";
+const E = "Tomasz Wiśniewski";
 const L = "Dr. Petra Lang";
-const B = "Florian Berger";
+const D = "Dragan Petrović";
 const W = "Thomas Weber";
 
-/** About 8 minutes of Baubesprechung, the parts that matter. */
-export const SAMPLE_SEGMENTS: Segment[] = [
-  { speaker: H, start_sec: 4, text: "Guten Morgen zusammen. Baubesprechung, erster Punkt: Stand Elektro im 2. OG." },
-  { speaker: B, start_sec: 38, text: "Die Leerrohre und Bodentanks im 2. OG sind noch nicht fertig. Das 2. OG schaffen wir erst Freitag." },
-  { speaker: H, start_sec: 71, text: "Dann verschiebt sich unser Estrich im 2. OG entsprechend." },
-  { speaker: H, start_sec: 84, text: "Wir halten fest: Estrich 2. OG startet nach Freigabe durch Elektro." },
-  { speaker: L, start_sec: 97, text: "Einverstanden." },
-  { speaker: L, start_sec: 152, text: "Noch etwas zum 3. OG: Bitte im 3. OG pro Büroeinheit zwei zusätzliche Steckdosen." },
-  { speaker: H, start_sec: 171, text: "Das ist eine Zusatzleistung, die zeigen wir vor Beginn als Mehrkosten an." },
-  { speaker: W, start_sec: 246, text: "Plan-Revision C für Trockenbau kommt Montag." },
-  { speaker: H, start_sec: 263, text: "Gut. Trockenbau im 2. OG läuft nach Plan, keine Mängel bisher." },
-  { speaker: H, start_sec: 318, text: "Florian, schick uns bitte bis Mittwoch den aktualisierten Terminplan Elektro." },
-  { speaker: B, start_sec: 331, text: "Mache ich." },
-  { speaker: L, start_sec: 377, text: "Die Bemusterung der Bodenbeläge machen wir am Donnerstag um zehn, Herr Hofmann organisiert das." },
-  { speaker: H, start_sec: 420, text: "Ich schicke das Protokoll heute an alle." },
-  { speaker: H, start_sec: 468, text: "Dann danke, das war es für heute." },
+/** A segment as the recognizer delivers it: words as said, not yet translated. */
+const said = (speaker: string, start_sec: number, end_sec: number, text_original: string): Segment => ({
+  speaker,
+  start_sec,
+  end_sec,
+  language: null,
+  text_original,
+  text_de: null,
+  confidence: null,
+  notes: [],
+});
+
+/**
+ * About 8 minutes of a multilingual Baubesprechung, as recorded: everyone
+ * speaks their own language (DE, RU, PL, SR), and the Trockenbau-Polier
+ * switches to German later. "Beispielaufnahme verwenden" sends exactly this
+ * through the real translation and extraction.
+ */
+export const SAMPLE_RECORDING: Segment[] = [
+  said(H, 4, 19, "Guten Morgen zusammen. Erster Punkt: Stand im 2. OG."),
+  said(I, 21, 35, "Третий этаж до сих пор не освобождён, мы стоим с утра."),
+  said(H, 37, 43, "Herr Wiśniewski, wie sieht es bei Elektro aus?"),
+  said(E, 44, 52, "Drugie piętro skończymy dopiero w piątek."),
+  said(H, 71, 82, "Dann verschiebt sich unser Estrich im 2. OG entsprechend."),
+  said(H, 84, 95, "Wir halten fest: Estrich 2. OG startet nach Freigabe durch Elektro."),
+  said(L, 97, 99, "Einverstanden."),
+  said(L, 152, 168, "Noch etwas zum 3. OG: Bitte im 3. OG pro Büroeinheit zwei zusätzliche Steckdosen."),
+  said(H, 171, 184, "Das ist eine Zusatzleistung, die zeigen wir vor Beginn als Mehrkosten an."),
+  said(D, 205, 214, "Bez revizije C ne možemo da počnemo na trećem spratu."),
+  said(W, 246, 252, "Plan-Revision C für Trockenbau kommt Montag."),
+  said(D, 263, 272, "Im 2. OG läuft Trockenbau nach Plan, keine Mängel bisher."),
+  said(H, 318, 328, "Herr Wiśniewski, schicken Sie uns bitte bis Mittwoch den aktualisierten Terminplan Elektro."),
+  said(E, 331, 333, "Dobrze, zrobię to."),
+  said(L, 377, 388, "Die Bemusterung der Bodenbeläge machen wir am Donnerstag um zehn, Herr Hofmann organisiert das."),
+  said(H, 420, 424, "Ich schicke das Protokoll heute an alle."),
+  said(H, 468, 472, "Dann danke, das war es für heute."),
 ];
+
+/** Stored translation (seed, and the offline fallback for the sample). */
+const STORED: Record<number, { language: string; text_de: string }> = {
+  1: { language: "ru", text_de: "Das 2. OG ist immer noch nicht frei, wir stehen seit heute Morgen." },
+  3: { language: "pl", text_de: "Das 2. OG schaffen wir erst Freitag." },
+  9: { language: "sr", text_de: "Ohne Revision C können wir im 3. OG nicht anfangen." },
+  13: { language: "pl", text_de: "Gut, mache ich." },
+};
+
+/** The sample after the translation step (floor notes come from floors.ts). */
+export const SAMPLE_SEGMENTS: Segment[] = SAMPLE_RECORDING.map((s, i) =>
+  finalizeSegment(s, STORED[i] ? { ...STORED[i], confidence: 0.92 } : { language: "de", text_de: s.text_original, confidence: 0.96 }),
+);
 
 export const SAMPLE_DURATION_SEC = 482;
 
@@ -46,8 +85,15 @@ export const SAMPLE_DURATION_SEC = 482;
 export type RawItem = {
   kind: ItemKind;
   text: string;
-  quote: string;
+  /** Verbatim from the German text of `segment`. */
+  quote_de: string;
+  /** Verbatim from the original words of `segment` (any language). */
+  quote_original?: string | null;
   segment: number;
+  /** Other segments that independently say the same (evidence besides `segment`). */
+  support?: number[] | null;
+  /** task: the segment whose statement waits for this task. */
+  depends_on?: number | null;
   trade?: string | null;
   area?: string | null;
   owner?: string | null;
@@ -55,45 +101,57 @@ export type RawItem = {
   new_end?: string | null;
 };
 
-const ELEKTRO = SAMPLE_SEGMENTS[1].text.split(". ")[1];
-const STECKDOSEN = "Bitte im 3. OG pro Büroeinheit zwei zusätzliche Steckdosen.";
+const ELEKTRO = { quote_de: "Das 2. OG schaffen wir erst Freitag.", quote_original: "Drugie piętro skończymy dopiero w piątek.", segment: 3, support: [1] };
+const STECKDOSEN = { quote_de: "Bitte im 3. OG pro Büroeinheit zwei zusätzliche Steckdosen.", segment: 7 };
 
 /** The stored result of MT-2026-0007 (seed, and the offline fallback for the sample). */
 export const SAMPLE_RESULT: { summary: string[]; items: RawItem[] } = {
   summary: [
-    "Elektro (vom Bauherrn beauftragt) stellt das 2. OG erst Freitag fertig; der Estrich im 2. OG verschiebt sich.",
-    "Estrich 2. OG startet erst nach Freigabe durch Elektro.",
+    "Das 2. OG ist noch nicht frei: Elektro (vom Bauherrn beauftragt) wird erst Freitag fertig, unser Estrich steht seit heute Morgen.",
+    "Estrich 2. OG startet nach Freigabe durch Elektro.",
     "Bauherr ordnet im 3. OG zwei zusätzliche Steckdosen pro Büroeinheit an; Mehrkosten werden vor Beginn angezeigt.",
-    "Architekt liefert Plan-Revision C für den Trockenbau am Montag.",
-    "Trockenbau 2. OG läuft nach Plan; keine Mängel festgestellt.",
+    "Trockenbau 3. OG kann erst mit Plan-Revision C beginnen; der Architekt liefert sie am Montag.",
+    "Trockenbau 2. OG läuft nach Plan, keine Mängel.",
   ],
   items: [
-    { kind: "behinderung", text: "Elektro 2. OG wird erst Freitag fertig; Estricharbeiten 2. OG können bis dahin nicht beginnen.", quote: ELEKTRO, segment: 1, trade: "Elektro", area: "2.OG", new_end: "Freitag" },
-    { kind: "termin", text: "Elektroinstallation 2. OG: neues Ende Freitag.", quote: ELEKTRO, segment: 1, trade: "Elektro", area: "2.OG", new_end: "Freitag" },
-    { kind: "decision", text: "Estrich 2. OG startet nach Freigabe durch Elektro.", quote: "Estrich 2. OG startet nach Freigabe durch Elektro.", segment: 3 },
-    { kind: "anordnung", text: "Im 3. OG pro Büroeinheit zwei zusätzliche Steckdosen.", quote: STECKDOSEN, segment: 5, trade: "Elektro", area: "3.OG" },
-    { kind: "mehrkosten", text: "Zwei zusätzliche Steckdosen pro Büroeinheit im 3. OG (Zusatzleistung).", quote: STECKDOSEN, segment: 5, trade: "Elektro", area: "3.OG" },
-    { kind: "task", text: "Plan-Revision C für den Trockenbau liefern", quote: "Plan-Revision C für Trockenbau kommt Montag.", segment: 7, owner: "Thomas Weber (Architekt)", due: "Montag", trade: "Trockenbau" },
-    { kind: "task", text: "Aktualisierten Terminplan Elektro schicken", quote: "schick uns bitte bis Mittwoch den aktualisierten Terminplan Elektro", segment: 9, owner: "Florian Berger (Elektro)", due: "Mittwoch", trade: "Elektro" },
-    { kind: "task", text: "Bemusterung der Bodenbeläge organisieren", quote: "Die Bemusterung der Bodenbeläge machen wir am Donnerstag um zehn", segment: 11, owner: "Markus Hofmann (Bauleiter)", due: "Donnerstag", trade: "Bodenbelag" },
-    { kind: "task", text: "Protokoll an alle Teilnehmer schicken", quote: "Ich schicke das Protokoll heute an alle.", segment: 12, owner: "Markus Hofmann (Bauleiter)", due: "heute" },
+    { kind: "behinderung", text: "Elektro 2. OG wird erst Freitag fertig; Estricharbeiten 2. OG können bis dahin nicht beginnen.", ...ELEKTRO, trade: "Elektro", area: "2.OG", new_end: "Freitag" },
+    { kind: "termin", text: "Elektroinstallation 2. OG: neues Ende Freitag.", ...ELEKTRO, trade: "Elektro", area: "2.OG", new_end: "Freitag" },
+    { kind: "decision", text: "Estrich 2. OG startet nach Freigabe durch Elektro.", quote_de: "Estrich 2. OG startet nach Freigabe durch Elektro.", segment: 5 },
+    { kind: "anordnung", text: "Im 3. OG pro Büroeinheit zwei zusätzliche Steckdosen.", ...STECKDOSEN, trade: "Elektro", area: "3.OG" },
+    { kind: "mehrkosten", text: "Zwei zusätzliche Steckdosen pro Büroeinheit im 3. OG (Zusatzleistung).", ...STECKDOSEN, trade: "Elektro", area: "3.OG" },
+    { kind: "task", text: "Plan-Revision C für den Trockenbau liefern", quote_de: "Plan-Revision C für Trockenbau kommt Montag.", segment: 10, depends_on: 9, owner: "Thomas Weber (Büro Weber Architekten)", due: "Montag", trade: "Trockenbau" },
+    { kind: "task", text: "Aktualisierten Terminplan Elektro schicken", quote_de: "schicken Sie uns bitte bis Mittwoch den aktualisierten Terminplan Elektro", segment: 12, owner: "Tomasz Wiśniewski (Elektro)", due: "Mittwoch", trade: "Elektro" },
+    { kind: "task", text: "Bemusterung der Bodenbeläge organisieren", quote_de: "Die Bemusterung der Bodenbeläge machen wir am Donnerstag um zehn", segment: 14, owner: "Markus Hofmann (Bauleiter)", due: "Donnerstag", trade: "Bodenbelag" },
+    { kind: "task", text: "Protokoll an alle Teilnehmer schicken", quote_de: "Ich schicke das Protokoll heute an alle.", segment: 15, owner: "Markus Hofmann (Bauleiter)", due: "heute" },
   ],
 };
 
+/** A German segment as stored (no translation needed). */
+const de = (speaker: string, start_sec: number, end_sec: number, text: string): Segment => ({
+  speaker,
+  start_sec,
+  end_sec,
+  language: "de",
+  text_original: text,
+  text_de: text,
+  confidence: 0.96,
+  notes: [],
+});
+
 /** MT-2026-0006: a short NU coordination, two tasks, no letters. */
 export const PREVIOUS_SEGMENTS: Segment[] = [
-  { speaker: H, start_sec: 3, text: "Koordination Haustechnik: Wo stehen wir mit den Schächten im 3. OG?" },
-  { speaker: "Anna Huber", start_sec: 40, text: "Die Bodenbeläge können wir erst nach Belegreife legen, das passt zum Plan." },
-  { speaker: H, start_sec: 95, text: "Frau Huber, schicken Sie uns bitte bis Freitag die Muster für den Flur." },
-  { speaker: "Marek Nowak", start_sec: 140, text: "Die Schachtwände im 3. OG stellen wir bis Dienstag fertig." },
-  { speaker: H, start_sec: 201, text: "Gut, dann sehen wir uns nächste Woche wieder." },
+  de(H, 3, 12, "Koordination Haustechnik: Wo stehen wir mit den Schächten im 3. OG?"),
+  de("Anna Huber", 40, 49, "Die Bodenbeläge können wir erst nach Belegreife legen, das passt zum Plan."),
+  de(H, 95, 102, "Frau Huber, schicken Sie uns bitte bis Freitag die Muster für den Flur."),
+  de("Marek Nowak", 140, 146, "Die Schachtwände im 3. OG stellen wir bis Dienstag fertig."),
+  de(H, 201, 205, "Gut, dann sehen wir uns nächste Woche wieder."),
 ];
 
 export const PREVIOUS_RESULT: { summary: string[]; items: RawItem[] } = {
   summary: ["Bodenbeläge nach Belegreife, im Plan.", "Muster für den Flur kommen bis Freitag.", "Schachtwände 3. OG bis Dienstag fertig."],
   items: [
-    { kind: "task", text: "Muster für den Flur schicken", quote: "schicken Sie uns bitte bis Freitag die Muster für den Flur", segment: 2, owner: "Anna Huber (Huber Bodenbeläge)", due: "Freitag", trade: "Bodenbelag" },
-    { kind: "task", text: "Schachtwände 3. OG fertigstellen", quote: "Die Schachtwände im 3. OG stellen wir bis Dienstag fertig.", segment: 3, owner: "Marek Nowak (Nowak Trockenbau)", due: "Dienstag", trade: "Trockenbau" },
+    { kind: "task", text: "Muster für den Flur schicken", quote_de: "schicken Sie uns bitte bis Freitag die Muster für den Flur", segment: 2, owner: "Anna Huber (Huber Bodenbeläge)", due: "Freitag", trade: "Bodenbelag" },
+    { kind: "task", text: "Schachtwände 3. OG fertigstellen", quote_de: "Die Schachtwände im 3. OG stellen wir bis Dienstag fertig.", segment: 3, owner: "Marek Nowak (Nowak Trockenbau)", due: "Dienstag", trade: "Trockenbau" },
   ],
 };
 
@@ -151,6 +209,7 @@ export function buildSeedMeetings(now: Date): Meeting[] {
     duration_sec: SAMPLE_DURATION_SEC,
     status: "ready",
     steps: emptySteps(true),
+    languages: sortLanguages(SAMPLE_SEGMENTS.map((s) => s.language)),
     summary: SAMPLE_RESULT.summary,
     items,
     changes,
@@ -179,6 +238,7 @@ export function buildSeedMeetings(now: Date): Meeting[] {
     duration_sec: 214,
     status: "ready",
     steps: emptySteps(true),
+    languages: ["de"],
     summary: PREVIOUS_RESULT.summary,
     items: prevItems,
     changes: [{ kind: "tasks_created", text_de: "2 Aufgaben angelegt", case_id: null, case_ref: null }],

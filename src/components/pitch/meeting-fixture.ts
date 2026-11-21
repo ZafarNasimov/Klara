@@ -5,12 +5,13 @@
 import type { MeetingView } from "@/lib/meetings/model";
 
 const quote = {
-  elektro: "Das 2. OG schaffen wir erst Freitag.",
+  elektro: { de: "Das 2. OG schaffen wir erst Freitag.", original: "Drugie piętro skończymy dopiero w piątek.", language: "pl" },
   steckdosen: "Bitte im 3. OG pro Wohnung zwei zusätzliche Steckdosen.",
   revision: "Plan-Revision C für Trockenbau kommt Montag.",
 };
 
-const item = (id: string, kind: MeetingView["items"][number]["kind"], text: string, q: string, speaker: string, ts: number, ref: string | null = null) => ({
+type Q = string | { de: string; original: string; language: string };
+const item = (id: string, kind: MeetingView["items"][number]["kind"], text: string, q: Q, speaker: string, ts: number, ref: string | null = null) => ({
   id,
   meeting_id: "pitch",
   kind,
@@ -20,7 +21,9 @@ const item = (id: string, kind: MeetingView["items"][number]["kind"], text: stri
   text,
   owner: null,
   due_date: null,
-  quote: q,
+  quote_de: typeof q === "string" ? q : q.de,
+  quote_original: typeof q === "string" ? q : q.original,
+  quote_language: typeof q === "string" ? "de" : q.language,
   speaker,
   ts_sec: ts,
   new_date: null,
@@ -47,7 +50,8 @@ export const PITCH_MEETING: MeetingView = {
   ended_at: null,
   duration_sec: 482,
   status: "ready",
-  steps: { transcription: true, speakers: true, items: true, templates: true },
+  steps: { transcription: true, translation: true, speakers: true, items: true, templates: true },
+  languages: ["de", "pl", "ru", "sr"],
   summary: [
     "Elektro wird im 2. OG erst Freitag fertig; der Estrich verschiebt sich.",
     "Bauherr ordnet im 3. OG zwei zusätzliche Steckdosen pro Wohnung an.",

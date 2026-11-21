@@ -4,13 +4,14 @@ import { DEFAULT_PROJECT_ID, getProjectContext, projectNow } from "@/lib/db/repo
 import { defaultTitle } from "@/lib/meetings/model";
 import { processMeeting } from "@/lib/meetings/pipeline";
 import { createMeeting, getMeeting, patchMeeting } from "@/lib/meetings/repo";
-import { SAMPLE_DURATION_SEC, SAMPLE_PARTICIPANTS, SAMPLE_SEGMENTS } from "@/lib/meetings/sample";
+import { SAMPLE_DURATION_SEC, SAMPLE_PARTICIPANTS, SAMPLE_RECORDING } from "@/lib/meetings/sample";
 
 export const maxDuration = 300;
 
 /**
- * "Beispielaufnahme verwenden": a new meeting with the MT-2026-0007 transcript,
- * run through the real pipeline (extraction + templates), not a stored result.
+ * "Beispielaufnahme verwenden": a new meeting with the MT-2026-0007 recording
+ * (DE, RU, PL, SR, untranslated), run through the real pipeline: translation,
+ * extraction, templates. Not a stored result.
  */
 export async function POST(req: Request) {
   await connection();
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
     const id =
       body.meeting_id ??
       (await createMeeting({ projectId, title: defaultTitle(now), type: "bauherr", teamId: null, participants, consent: true, source: "sample" }, now)).id;
-    await patchMeeting(id, { status: "processing", source: "sample", participants, ended_at: now.toISOString(), duration_sec: SAMPLE_DURATION_SEC }, { transcript: SAMPLE_SEGMENTS });
+    await patchMeeting(id, { status: "processing", source: "sample", participants, ended_at: now.toISOString(), duration_sec: SAMPLE_DURATION_SEC }, { transcript: SAMPLE_RECORDING });
     after(() => processMeeting(id, now, { sample: true }));
     return getMeeting(id);
   });

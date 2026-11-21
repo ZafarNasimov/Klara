@@ -2,11 +2,15 @@
 
 import Link from "next/link";
 import { useRef, useState, type ReactNode } from "react";
-import { CalendarClock, ChevronDown, CircleDashed, FilePlus2, FilePen, ListChecks, Quote } from "lucide-react";
+import { CalendarClock, ChevronDown, CircleDashed, FilePlus2, FilePen, Info, Link2, ListChecks, Quote } from "lucide-react";
 import { fmtDate } from "@/lib/labels";
 import {
   fmtClock,
+  isUncertain,
+  languageName,
   MEETING_TYPE_DE,
+  segmentDe,
+  sortLanguages,
   TEMPLATE_DE,
   TEMPLATE_KINDS,
   type MeetingChange,
@@ -37,6 +41,8 @@ export function MeetingDetail({
 }) {
   const show = (s: DetailSection) => sections.includes(s);
   const [openTranscript, setOpenTranscript] = useState(false);
+  const [view, setView] = useState<TranscriptView>("beide");
+  const languages = m.languages?.length ? m.languages : sortLanguages(m.transcript.map((s) => s.language));
   const [flash, setFlash] = useState<number | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
 
@@ -77,6 +83,14 @@ export function MeetingDetail({
             </p>
             {m.participants.length ? (
               <p className="mt-1 text-sm text-muted-foreground">Teilnehmer: {m.participants.map((p) => `${p.name} (${p.role})`).join(", ")}</p>
+            ) : null}
+            {languages.length ? (
+              <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+                Sprachen:
+                {languages.map((l) => (
+                  <LangBadge key={l} code={l} />
+                ))}
+              </p>
             ) : null}
           </div>
           {actions}
@@ -206,23 +220,86 @@ export function MeetingDetail({
             <ChevronDown className={cn("ml-auto size-4 text-muted-foreground transition-transform duration-200", openTranscript && "rotate-180")} aria-hidden />
           </button>
           {openTranscript ? (
-            <div ref={transcriptRef} className="max-h-[420px] space-y-1 overflow-y-auto border-t border-border px-5 py-3">
-              {m.transcript.map((s, i) => (
-                <p
-                  key={i}
-                  id={`seg-${m.id}-${i}`}
-                  className={cn("grid grid-cols-[3.5rem_9rem_1fr] gap-2 rounded-md px-1 py-1 text-sm", flash === i && "bg-primary/10")}
-                >
-                  <span className="font-mono text-xs text-muted-foreground">{fmtClock(s.start_sec)}</span>
-                  <span className="truncate text-muted-foreground">{s.speaker}</span>
-                  <span className="text-foreground">{s.text}</span>
-                </p>
-              ))}
+            <div className="border-t border-border">
+              <div className="flex items-center justify-between gap-3 px-5 pt-3">
+                <p className="text-xs text-muted-foreground">Jeder Abschnitt in der gesprochenen Sprache und auf Deutsch.</p>
+                <div role="group" aria-label="Transkript anzeigen" className="inline-flex rounded-lg border border-border p-0.5">
+                  {TRANSCRIPT_VIEWS.map(([v, label]) => (
+                    <button
+                      key={v}
+                      type="button"
+                      aria-pressed={view === v}
+                      onClick={() => setView(v)}
+                      className={cn(
+                        "rounded-md px-2.5 py-1 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        view === v ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div ref={transcriptRef} className="max-h-[480px] space-y-1 overflow-y-auto px-5 py-3">
+                {m.transcript.map((s, i) => {
+                  const foreign = !!s.language && s.language !== "de";
+                  const unsure = isUncertain(s);
+                  return (
+                    <div
+                      key={i}
+                      id={`seg-${m.id}-${i}`}
+                      className={cn("grid grid-cols-[3.5rem_10rem_1fr] gap-2 rounded-md px-1 py-1.5 text-sm", flash === i && "bg-primary/10")}
+                    >
+                      <span className="pt-0.5 font-mono text-xs text-muted-foreground">{fmtClock(s.start_sec)}</span>
+                      <span className="flex min-w-0 flex-wrap items-start gap-1.5 text-muted-foreground">
+                        <span className="truncate">{s.speaker}</span>
+                        {s.language ? <LangBadge code={s.language} /> : null}
+                      </span>
+                      <div className="min-w-0">
+                        {view !== "original" || !foreign ? <p lang="de" className="text-foreground">{segmentDe(s)}</p> : null}
+                        {foreign && view !== "deutsch" ? (
+                          <p lang={s.language ?? undefined} className={view === "original" ? "text-foreground" : "mt-0.5 text-xs text-muted-foreground"}>
+                            {s.text_original}
+                          </p>
+                        ) : null}
+                        {unsure ? (
+                          <p className="mt-1 text-xs font-medium text-light-yellow-text">Unsicher erkannt oder übersetzt: nicht allein als Beleg für eine Vorlage verwendet</p>
+                        ) : null}
+                        {s.notes.map((n) => (
+                          <p key={n} className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
+                            <Info className="mt-px size-3.5 shrink-0" aria-hidden />
+                            {n}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
         </section>
       ) : null}
     </div>
+  );
+}
+
+type TranscriptView = "deutsch" | "original" | "beide";
+const TRANSCRIPT_VIEWS: [TranscriptView, string][] = [
+  ["deutsch", "Deutsch"],
+  ["original", "Original"],
+  ["beide", "Beide"],
+];
+
+/** "PL" with the language name for screen readers and on hover. */
+function LangBadge({ code }: { code: string }) {
+  return (
+    <abbr
+      title={languageName(code)}
+      className="inline-flex h-[18px] items-center rounded border border-border bg-background px-1 font-mono text-[10px] font-medium text-muted-foreground no-underline"
+    >
+      {code.toUpperCase()}
+    </abbr>
   );
 }
 
@@ -241,21 +318,38 @@ function Section({ title, note, icon, children }: { title: string; note?: string
 
 const Empty = ({ children }: { children: ReactNode }) => <p className="text-sm text-muted-foreground">{children}</p>;
 
-/** Quote, speaker and timestamp (click jumps to the transcript). */
+/** German quote, the words as said (with language), speaker and timestamp (click jumps to the transcript). */
 function Evidence({ item, onJump }: { item: MeetingItem; onJump: (ts: number) => void }) {
+  const foreign = item.quote_language !== "de" && item.quote_original && item.quote_original !== item.quote_de;
   return (
-    <span className="mt-1 inline-flex flex-wrap items-baseline gap-x-1.5 text-xs text-muted-foreground">
-      <Quote className="size-3 translate-y-0.5" aria-hidden />
-      <span className="italic">„{item.quote.replace(/[.]$/, "")}“</span>
-      <span>– {item.speaker},</span>
-      <button
-        type="button"
-        onClick={() => onJump(item.ts_sec)}
-        className="rounded font-mono text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-        aria-label={`Im Transkript bei ${fmtClock(item.ts_sec)} zeigen`}
-      >
-        {fmtClock(item.ts_sec)}
-      </button>
+    <span className="mt-1 flex flex-col gap-0.5 text-xs text-muted-foreground">
+      <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
+        <Quote className="size-3 translate-y-0.5" aria-hidden />
+        <span lang="de" className="italic">„{item.quote_de.replace(/[.]$/, "")}“</span>
+        <span>– {item.speaker},</span>
+        <button
+          type="button"
+          onClick={() => onJump(item.ts_sec)}
+          className="rounded font-mono text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={`Im Transkript bei ${fmtClock(item.ts_sec)} zeigen`}
+        >
+          {fmtClock(item.ts_sec)}
+        </button>
+      </span>
+      {foreign ? (
+        <span className="inline-flex flex-wrap items-center gap-x-1.5 pl-[18px]">
+          <LangBadge code={item.quote_language} />
+          <span lang={item.quote_language}>„{item.quote_original.replace(/[.]$/, "")}“</span>
+        </span>
+      ) : null}
+      {item.depends ? (
+        <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
+          <Link2 className="size-3 translate-y-0.5" aria-hidden />
+          <span>
+            Voraussetzung für: „{item.depends.text_de.replace(/[.]$/, "")}“ – {item.depends.speaker}, <span className="font-mono">{fmtClock(item.depends.ts_sec)}</span>
+          </span>
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -263,7 +357,9 @@ function Evidence({ item, onJump }: { item: MeetingItem; onJump: (ts: number) =>
 function DetectedRow({ item, link, onJump, dense }: { item: MeetingItem; link: ReactNode; onJump: (ts: number) => void; dense: boolean }) {
   const t = TEMPLATE_DE[item.kind as TemplateKind];
   const action =
-    item.case_action === "existing"
+    item.case_action === "uncertain"
+      ? "nicht erstellt: Beleg unsicher erkannt oder übersetzt, bitte prüfen"
+      : item.case_action === "existing"
       ? "bereits vorhanden"
       : item.case_action === "noop"
         ? "festgehalten, kein Eintrag im Terminplan geändert"
@@ -278,7 +374,7 @@ function DetectedRow({ item, link, onJump, dense }: { item: MeetingItem; link: R
     <li className="rounded-lg border border-border px-3.5 py-2.5">
       <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
         <span className="font-medium text-foreground">{t.title}</span>
-        <span className="text-xs text-muted-foreground">{action}</span>
+        <span className={cn("text-xs", item.case_action === "uncertain" ? "font-medium text-light-yellow-text" : "text-muted-foreground")}>{action}</span>
         <span className="ml-auto">{link}</span>
       </p>
       {dense ? null : (

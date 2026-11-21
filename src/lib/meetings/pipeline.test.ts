@@ -6,7 +6,8 @@ import { buildSeed, IDS } from "@/lib/db/seed";
 import { berlinTime } from "@/lib/deadlines";
 import { processMeeting } from "./pipeline";
 import { createMeeting, getMeeting, patchMeeting } from "./repo";
-import { SAMPLE_PARTICIPANTS, SAMPLE_SEGMENTS } from "./sample";
+import { SAMPLE_PARTICIPANTS, SAMPLE_RECORDING, SAMPLE_SEGMENTS } from "./sample";
+import type { Segment } from "./model";
 
 const DAY = "2026-11-20"; // a Friday: "erst Freitag" = 2026-11-27
 let clock = berlinTime(DAY, 9, 30);
@@ -20,12 +21,12 @@ async function goldenPathCall() {
   await say("Yes.");
 }
 
-async function runSample() {
+async function runSample(transcript: Segment[] = SAMPLE_RECORDING) {
   const m = await createMeeting(
     { projectId: IDS.project, title: "Baubesprechung KW 47", type: "bauherr", teamId: null, participants: SAMPLE_PARTICIPANTS, consent: true, source: "sample" },
     tick(),
   );
-  await patchMeeting(m.id, { duration_sec: 482 }, { transcript: SAMPLE_SEGMENTS });
+  await patchMeeting(m.id, { duration_sec: 482 }, { transcript });
   await processMeeting(m.id, tick(), { sample: true });
   return getMeeting(m.id);
 }
@@ -44,10 +45,17 @@ describe("meeting pipeline (rule extraction, memory store)", () => {
 
     const m = await runSample();
     expect(m.status).toBe("ready");
-    expect(m.notice).toMatch(/Testmodus/);
-    // Every item quotes the transcript.
-    const transcript = m.transcript.map((s) => s.text).join(" ");
-    for (const i of m.items) expect(transcript).toContain(i.quote.replace(/[.]$/, ""));
+    expect(m.notice).toMatch(/gespeicherte Übersetzung/);
+    expect(m.languages).toEqual(["de", "pl", "ru", "sr"]);
+    expect(m.steps.translation).toBe(true);
+    // Every item quotes the German transcript, and the words as said.
+    const german = m.transcript.map((s) => s.text_de).join(" ");
+    const said = m.transcript.map((s) => s.text_original).join(" ");
+    for (const i of m.items) {
+      expect(german).toContain(i.quote_de.replace(/[.]$/, ""));
+      expect(said).toContain(i.quote_original.replace(/[.]$/, ""));
+    }
+    expect(m.items.find((i) => i.kind === "behinderung")).toMatchObject({ quote_language: "pl", quote_original: "Drugie piętro skończymy dopiero w piątek." });
 
     const after = await listCases(IDS.project);
     const byType = (t: string) => after.filter((c) => c.doc_type === t);
@@ -75,6 +83,15 @@ describe("meeting pipeline (rule extraction, memory store)", () => {
     expect(evidence.some((e) => e.kind === "meeting" && e.data.quote === "Das 2. OG schaffen wir erst Freitag.")).toBe(true);
     const events = await listEvents({ projectId: IDS.project });
     expect(events.filter((e) => String(e.payload.source ?? "") === `meeting:${m.ref}`).length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("an 'unsicher' segment alone fills no template", async () => {
+    const unsure = SAMPLE_SEGMENTS.map((s, i) => (i === 3 ? { ...s, confidence: 0.4 } : s));
+    const m = await runSample(unsure);
+    const cases = await listCases(IDS.project);
+    expect(cases.filter((c) => c.doc_type === "behinderungsanzeige")).toHaveLength(0);
+    expect(m.items.filter((i) => i.kind === "behinderung").every((i) => i.case_action === "uncertain")).toBe(true);
+    expect(cases.filter((c) => c.doc_type === "anordnung_bestaetigung")).toHaveLength(1); // sure German segment
   });
 
   it("without an open case it drafts a Behinderungsanzeige, and a second run never duplicates", async () => {

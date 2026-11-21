@@ -25,7 +25,7 @@ export function protocolText(m: MeetingView): string {
     lines.push("", "Aufgaben", ...tasks.map((i) => `- ${i.text}${i.owner ? ` – ${i.owner}` : ""}${i.due_date ? ` – bis ${fmtDayDe(i.due_date)}` : ""}`));
   }
   const letters = m.items.filter((i) => (TEMPLATE_KINDS as readonly string[]).includes(i.kind));
-  if (letters.length) lines.push("", "Festgehalten", ...letters.map((i) => `- ${i.text} („${i.quote}“, ${i.speaker}, ${fmtClock(i.ts_sec)})`));
+  if (letters.length) lines.push("", "Festgehalten", ...letters.map((i) => `- ${i.text} („${i.quote_de}“${i.quote_language !== "de" ? ` – ${i.quote_language.toUpperCase()}: „${i.quote_original}“` : ""}, ${i.speaker}, ${fmtClock(i.ts_sec)})`));
   lines.push("", "Bitte melden Sie Korrekturen innerhalb von 3 Werktagen.", "", "Mit freundlichen Grüßen", "Muster Bau GmbH");
   return lines.join("\n");
 }

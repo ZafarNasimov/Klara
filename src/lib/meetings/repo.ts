@@ -5,7 +5,7 @@ import { store } from "@/lib/db";
 import { DEFAULT_PROJECT_ID, listCases, uid } from "@/lib/db/repo";
 import { berlinDay } from "@/lib/deadlines";
 import type { Meeting } from "@/lib/types";
-import { emptySteps, MEETING_TYPES, type MeetingProtocol, type MeetingType, type MeetingView, type Participant, type Segment } from "./model";
+import { emptySteps, MEETING_TYPES, type MeetingItem, type MeetingProtocol, type MeetingType, type MeetingView, type Participant, type Segment } from "./model";
 
 const REF = /^MT-(\d{4})-(\d{4})$/;
 
@@ -18,10 +18,29 @@ export function toView(row: Meeting, caseRefs: Record<string, string> = {}): Mee
     project_id: row.project_id,
     type: (MEETING_TYPES as string[]).includes(row.type) ? (row.type as MeetingType) : "intern",
     audio_url: row.audio_url,
-    transcript: t?.segments ?? [],
+    transcript: (t?.segments ?? []).map(segmentOf),
+    items: (p.items ?? []).map(itemOf),
     created_at: row.created_at,
     case_refs: caseRefs,
   };
+}
+
+type LegacySegment = Partial<Segment> & { text?: string };
+type LegacyItem = Partial<MeetingItem> & { quote?: string };
+
+/** Rows written before meetings were multilingual (German only, one `text`). */
+function segmentOf(s: LegacySegment): Segment {
+  if (typeof s.text_original === "string") return { notes: [], end_sec: s.start_sec ?? 0, language: null, text_de: null, confidence: null, ...s } as Segment;
+  const text = s.text ?? "";
+  return { speaker: s.speaker ?? "Sprecher", start_sec: s.start_sec ?? 0, end_sec: s.start_sec ?? 0, language: "de", text_original: text, text_de: text, confidence: null, notes: [] };
+}
+
+function itemOf(i: LegacyItem): MeetingItem {
+  if (typeof i.quote_de === "string") return i as MeetingItem;
+  const q = i.quote ?? "";
+  const rest = { ...i };
+  delete rest.quote;
+  return { ...(rest as MeetingItem), quote_de: q, quote_original: q, quote_language: "de" };
 }
 
 /**

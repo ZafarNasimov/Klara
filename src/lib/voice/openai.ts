@@ -47,43 +47,26 @@ export async function transcribe(audio: Blob, filename: string, language: string
   return (json.text ?? "").trim();
 }
 
-/**
- * Speech to text with timestamps (meeting recordings). Whisper returns
- * segments with start times; if that fails, the plain transcript comes back
- * as one segment so nothing is lost.
- */
-export async function transcribeSegments(audio: Blob, filename: string, language: string | null): Promise<{ start: number; end: number; text: string }[]> {
-  const form = new FormData();
-  form.append("file", audio, filename);
-  form.append("model", "whisper-1");
-  form.append("response_format", "verbose_json");
-  form.append("timestamp_granularities[]", "segment");
-  if (language && LANGUAGE_NAMES[language]) form.append("language", language);
-  form.append("prompt", "Baubesprechung, Bauleitung, Bauherr, Architekt, Elektro, Estrich, Trockenbau, 2. OG, Mehrkosten, Anordnung, Behinderung.");
-  try {
-    const res = await fetch(`${BASE}/audio/transcriptions`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key()}` },
-      body: form,
-      signal: AbortSignal.timeout(120_000),
-    });
-    if (!res.ok) throw new VoiceError(`Spracherkennung fehlgeschlagen (${res.status})`);
-    const json = (await res.json()) as { segments?: { start: number; end: number; text: string }[]; text?: string };
-    const segs = (json.segments ?? []).map((x) => ({ start: x.start, end: x.end, text: x.text.trim() })).filter((x) => x.text);
-    if (segs.length) return segs;
-    return json.text?.trim() ? [{ start: 0, end: 0, text: json.text.trim() }] : [];
-  } catch (err) {
-    if (err instanceof VoiceError && err.status === 503) throw err;
-    const text = await transcribe(audio, filename, language);
-    return text ? [{ start: 0, end: 0, text }] : [];
-  }
-}
+// ── Meeting recordings ───────────────────────────────────────────────────
+// Meetings are multilingual: NO language is set and no German prompt is sent
+// (a prompt biases the detected language). The language is detected per
+// segment afterwards, in the translation step (src/lib/meetings/translate.ts).
+
+export type MeetingSttSegment = { start: number; end: number; speaker: string | null; text: string; confidence: number | null };
 
 /**
- * Who speaks when (speaker turns "A", "B", …), for meeting recordings. Only the
- * timing is used; the words come from transcribeSegments. Empty on failure.
+ * Speech to text for a meeting: speaker turns with their words, each in the
+ * language spoken. gpt-4o-transcribe-diarize first; if that fails, Whisper
+ * segments without speakers (with a confidence from the log probability).
  */
-export async function diarize(audio: Blob, filename: string): Promise<{ start: number; end: number; speaker: string }[]> {
+export async function transcribeMeeting(audio: Blob, filename: string): Promise<MeetingSttSegment[]> {
+  const turns = await diarizedTranscript(audio, filename);
+  if (turns.length) return turns;
+  return whisperSegments(audio, filename);
+}
+
+/** Who said what, when ("A", "B" …). Language auto-detected. Empty on failure. */
+async function diarizedTranscript(audio: Blob, filename: string): Promise<MeetingSttSegment[]> {
   try {
     const form = new FormData();
     form.append("file", audio, filename);
@@ -94,14 +77,63 @@ export async function diarize(audio: Blob, filename: string): Promise<{ start: n
       method: "POST",
       headers: { Authorization: `Bearer ${key()}` },
       body: form,
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(180_000),
     });
-    if (!res.ok) return [];
-    const json = (await res.json()) as { segments?: { start: number; end: number; speaker: string }[] };
-    return (json.segments ?? []).filter((s) => typeof s.speaker === "string");
-  } catch {
+    if (!res.ok) {
+      console.warn("[meetings] diarized transcription failed:", res.status, (await res.text()).slice(0, 200));
+      return [];
+    }
+    const json = (await res.json()) as { segments?: { start: number; end: number; speaker?: string; text?: string }[] };
+    const segs = (json.segments ?? [])
+      .map((x) => ({ start: x.start, end: x.end, speaker: typeof x.speaker === "string" ? x.speaker : null, text: (x.text ?? "").trim(), confidence: null }))
+      .filter((x) => x.text);
+    return mergeFragments(segs);
+  } catch (err) {
+    if (err instanceof VoiceError && err.status === 503) throw err;
+    console.warn("[meetings] diarized transcription failed:", err);
     return [];
   }
+}
+
+/** Fragments of one sentence by the same speaker become one segment. */
+function mergeFragments(segs: MeetingSttSegment[]): MeetingSttSegment[] {
+  const out: MeetingSttSegment[] = [];
+  for (const s of segs) {
+    const prev = out.at(-1);
+    if (prev && prev.speaker === s.speaker && !/[.!?…。]$/.test(prev.text) && s.start - prev.end < 1.2 && s.end - prev.start < 30) {
+      prev.text = `${prev.text} ${s.text}`;
+      prev.end = s.end;
+    } else out.push({ ...s });
+  }
+  return out;
+}
+
+/** Whisper segments, language auto-detected, no speakers. */
+async function whisperSegments(audio: Blob, filename: string): Promise<MeetingSttSegment[]> {
+  const form = new FormData();
+  form.append("file", audio, filename);
+  form.append("model", "whisper-1");
+  form.append("response_format", "verbose_json");
+  form.append("timestamp_granularities[]", "segment");
+  const res = await fetch(`${BASE}/audio/transcriptions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key()}` },
+    body: form,
+    signal: AbortSignal.timeout(180_000),
+  });
+  if (!res.ok) throw new VoiceError(`Spracherkennung fehlgeschlagen (${res.status})`);
+  const json = (await res.json()) as { segments?: { start: number; end: number; text: string; avg_logprob?: number; no_speech_prob?: number }[]; text?: string };
+  const segs = (json.segments ?? [])
+    .map((x) => ({
+      start: x.start,
+      end: x.end,
+      speaker: null,
+      text: x.text.trim(),
+      confidence: typeof x.avg_logprob === "number" ? Math.round(Math.exp(x.avg_logprob) * (1 - (x.no_speech_prob ?? 0)) * 100) / 100 : null,
+    }))
+    .filter((x) => x.text);
+  if (segs.length) return segs;
+  return json.text?.trim() ? [{ start: 0, end: 0, speaker: null, text: json.text.trim(), confidence: null }] : [];
 }
 
 /** Text to speech as a streamed MP3 body. */

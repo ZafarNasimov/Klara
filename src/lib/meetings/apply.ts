@@ -28,6 +28,11 @@ export async function applyItems(m: MeetingView, items: MeetingItem[], at: Date)
 
   for (const item of items) {
     let next = item;
+    // The only evidence is an "unsicher" segment (recognition or translation): never fill a template.
+    if (item.uncertain) {
+      out.push({ ...item, case_action: "uncertain" });
+      continue;
+    }
     switch (item.kind) {
       case "anordnung":
         next = await draftOnce(c, item, "anordnung_bestaetigung", {
@@ -127,14 +132,14 @@ async function draftOnce(
   sphere: Sphere | null,
   changes: MeetingChange[],
 ): Promise<MeetingItem> {
-  const q = normalizeText(item.quote);
+  const q = normalizeText(item.quote_de);
   const existing = c.cases.find((x) => x.doc_type === docType && OPEN.includes(x.status) && normalizeText(String(x.facts._meeting_quote ?? "")) === q);
   const title = TEMPLATE_DE[item.kind as keyof typeof TEMPLATE_DE]?.title ?? docType;
   if (existing) {
     changes.push({ kind: "case_updated", text_de: `${existing.reference} bereits vorhanden: ${title}`, case_id: existing.id, case_ref: existing.reference, case_doc_type: docType });
     return { ...item, updated_case_id: existing.id, case_ref: existing.reference, case_action: "existing", case_doc_type: docType };
   }
-  const full = { ...clean(facts), _meeting_id: c.m.id, _meeting_ref: c.m.ref, _meeting_quote: item.quote, _confidence: 0.9 };
+  const full = { ...clean(facts), _meeting_id: c.m.id, _meeting_ref: c.m.ref, _meeting_quote: item.quote_de, _meeting_quote_original: item.quote_original, _meeting_quote_language: item.quote_language, _confidence: 0.9 };
   const ev = evaluate(docType, full, sphere, c);
   const created = await createCase(
     {
@@ -238,7 +243,7 @@ async function reschedule(c: Ctx, item: MeetingItem, changes: MeetingChange[]): 
 
 async function evidence(c: Ctx, caseId: string, item: MeetingItem) {
   await addEvidence(
-    { case_id: caseId, kind: "meeting", ref: c.m.id, data: { meeting_ref: c.m.ref, title: c.m.title, quote: item.quote, speaker: item.speaker, ts_sec: item.ts_sec } },
+    { case_id: caseId, kind: "meeting", ref: c.m.id, data: { meeting_ref: c.m.ref, title: c.m.title, quote: item.quote_de, quote_original: item.quote_original, quote_language: item.quote_language, speaker: item.speaker, ts_sec: item.ts_sec } },
     c.at,
   );
 }
