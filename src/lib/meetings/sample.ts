@@ -1,7 +1,7 @@
 // Sample meetings: the seed (MT-2026-0007, MT-2026-0006) and the recording
 // behind "Beispielaufnahme verwenden". The sample transcript runs through the
 // real pipeline; SAMPLE_RESULT is only the offline fallback (LLM unreachable).
-// Names follow the demo project "Neubau Bürogebäude München" (seed.ts). The
+// Names follow the demo project, Baustelle B "Wohnanlage Riem" (seed.ts). The
 // sample is multilingual: German, Russian, Polish and Serbian.
 import { berlinDay, berlinTime, subWerktage, werktageBetween, addWerktage, DEFAULT_HOLIDAY_REGION } from "@/lib/deadlines";
 import { IDS } from "@/lib/ids";
@@ -16,7 +16,7 @@ export const SAMPLE_PARTICIPANTS: Participant[] = [
   { name: "Markus Hofmann", role: "Bauleiter (Muster Bau GmbH)", contact_id: null, email: "m.hofmann@muster-bau.example" },
   { name: "Sergej Iwanow", role: "Polier Estrich (Muster Bau GmbH)", contact_id: null, email: null },
   { name: "Tomasz Wiśniewski", role: "Elektro (Elektro Berger GmbH, vom Bauherrn beauftragt)", contact_id: null, email: null },
-  { name: "Dr. Petra Lang", role: "Bauherr (Immobilien Isar GmbH)", contact_id: null, email: null },
+  { name: "Dr. Petra Lang", role: "Bauherr (Wohnbau Riem GmbH)", contact_id: null, email: null },
   { name: "Dragan Petrović", role: "Polier Trockenbau (Nowak Trockenbau GmbH, unser NU)", contact_id: null, email: null },
   { name: "Thomas Weber", role: "Architekt (Büro Weber Architekten)", contact_id: null, email: null },
 ];
@@ -54,7 +54,7 @@ export const SAMPLE_RECORDING: Segment[] = [
   said(H, 71, 82, "Dann verschiebt sich unser Estrich im 2. OG entsprechend."),
   said(H, 84, 95, "Wir halten fest: Estrich 2. OG startet nach Freigabe durch Elektro."),
   said(L, 97, 99, "Einverstanden."),
-  said(L, 152, 168, "Noch etwas zum 3. OG: Bitte im 3. OG pro Büroeinheit zwei zusätzliche Steckdosen."),
+  said(L, 152, 168, "Noch etwas zum 3. OG: Bitte im 3. OG pro Wohnung zwei zusätzliche Steckdosen."),
   said(H, 171, 184, "Das ist eine Zusatzleistung, die zeigen wir vor Beginn als Mehrkosten an."),
   said(D, 205, 214, "Bez revizije C ne možemo da počnemo na trećem spratu."),
   said(W, 246, 252, "Plan-Revision C für Trockenbau kommt Montag."),
@@ -102,14 +102,14 @@ export type RawItem = {
 };
 
 const ELEKTRO = { quote_de: "Das 2. OG schaffen wir erst Freitag.", quote_original: "Drugie piętro skończymy dopiero w piątek.", segment: 3, support: [1] };
-const STECKDOSEN = { quote_de: "Bitte im 3. OG pro Büroeinheit zwei zusätzliche Steckdosen.", segment: 7 };
+const STECKDOSEN = { quote_de: "Bitte im 3. OG pro Wohnung zwei zusätzliche Steckdosen.", segment: 7 };
 
 /** The stored result of MT-2026-0007 (seed, and the offline fallback for the sample). */
 export const SAMPLE_RESULT: { summary: string[]; items: RawItem[] } = {
   summary: [
     "Das 2. OG ist noch nicht frei: Elektro (vom Bauherrn beauftragt) wird erst Freitag fertig, unser Estrich steht seit heute Morgen.",
     "Estrich 2. OG startet nach Freigabe durch Elektro.",
-    "Bauherr ordnet im 3. OG zwei zusätzliche Steckdosen pro Büroeinheit an; Mehrkosten werden vor Beginn angezeigt.",
+    "Bauherr ordnet im 3. OG zwei zusätzliche Steckdosen pro Wohnung an; Mehrkosten werden vor Beginn angezeigt.",
     "Trockenbau 3. OG kann erst mit Plan-Revision C beginnen; der Architekt liefert sie am Montag.",
     "Trockenbau 2. OG läuft nach Plan, keine Mängel.",
   ],
@@ -117,8 +117,8 @@ export const SAMPLE_RESULT: { summary: string[]; items: RawItem[] } = {
     { kind: "behinderung", text: "Elektro 2. OG wird erst Freitag fertig; Estricharbeiten 2. OG können bis dahin nicht beginnen.", ...ELEKTRO, trade: "Elektro", area: "2.OG", new_end: "Freitag" },
     { kind: "termin", text: "Elektroinstallation 2. OG: neues Ende Freitag.", ...ELEKTRO, trade: "Elektro", area: "2.OG", new_end: "Freitag" },
     { kind: "decision", text: "Estrich 2. OG startet nach Freigabe durch Elektro.", quote_de: "Estrich 2. OG startet nach Freigabe durch Elektro.", segment: 5 },
-    { kind: "anordnung", text: "Im 3. OG pro Büroeinheit zwei zusätzliche Steckdosen.", ...STECKDOSEN, trade: "Elektro", area: "3.OG" },
-    { kind: "mehrkosten", text: "Zwei zusätzliche Steckdosen pro Büroeinheit im 3. OG (Zusatzleistung).", ...STECKDOSEN, trade: "Elektro", area: "3.OG" },
+    { kind: "anordnung", text: "Im 3. OG pro Wohnung zwei zusätzliche Steckdosen.", ...STECKDOSEN, trade: "Elektro", area: "3.OG" },
+    { kind: "mehrkosten", text: "Zwei zusätzliche Steckdosen pro Wohnung im 3. OG (Zusatzleistung).", ...STECKDOSEN, trade: "Elektro", area: "3.OG" },
     { kind: "task", text: "Plan-Revision C für den Trockenbau liefern", quote_de: "Plan-Revision C für Trockenbau kommt Montag.", segment: 10, depends_on: 9, owner: "Thomas Weber (Büro Weber Architekten)", due: "Montag", trade: "Trockenbau" },
     { kind: "task", text: "Aktualisierten Terminplan Elektro schicken", quote_de: "schicken Sie uns bitte bis Mittwoch den aktualisierten Terminplan Elektro", segment: 12, owner: "Tomasz Wiśniewski (Elektro)", due: "Mittwoch", trade: "Elektro" },
     { kind: "task", text: "Bemusterung der Bodenbeläge organisieren", quote_de: "Die Bemusterung der Bodenbeläge machen wir am Donnerstag um zehn", segment: 14, owner: "Markus Hofmann (Bauleiter)", due: "Donnerstag", trade: "Bodenbelag" },

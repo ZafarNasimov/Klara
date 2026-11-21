@@ -103,10 +103,12 @@ describe("seed meetings", async () => {
     expect(p47.changes.map((c) => c.text_de)).toContain("4 Aufgaben angelegt");
   });
 
-  it("buildSeed carries the meetings but no cases", () => {
+  it("buildSeed carries the meetings; Baustelle B starts without cases (history is on A and C)", async () => {
     const seed = buildSeed(now);
     expect(seed.meeting).toHaveLength(2);
-    expect(seed.case).toHaveLength(0);
+    const { IDS } = await import("@/lib/ids");
+    expect((seed.case ?? []).filter((c) => c.project_id === IDS.project)).toHaveLength(0);
+    expect((seed.case ?? []).every((c) => /^KL-\d{4}-00(2\d|3\d|4[01])$/.test(c.reference))).toBe(true); // the call gets KL-…-0042
   });
 });
 
