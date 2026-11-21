@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-21, 23:55 (Vasily's dashboard-v2 and fixes checked; deploy of `main`) · branch `main`
+Last update: 2026-11-22, 00:20 (Vasily's dashboard fit fix 46f2191 checked: typecheck, 189 tests; deploy of `main`) · branch `main`
 
 ## Milestones (SPEC §11)
 
