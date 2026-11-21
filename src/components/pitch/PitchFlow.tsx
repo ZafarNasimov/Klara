@@ -19,10 +19,13 @@ type Transition = { id: number; from: number; to: number; kind: Kind };
 /** Timeline in ms (see the choreography notes in the PR / PROGRESS.md). */
 const T = {
   glow: 300, // visor glow 0 → 0.8 → 0
+  // On the reveal the glow stays up until the disc is wider than the head
+  // (~220 px at 450 ms), so its hard clip edge never shows on the face.
+  revealGlow: 450,
   wipeStart: 150, // circle starts at the glow's peak
-  wipe: 1100, // clip-path circle, ease (0.65, 0, 0.35, 1)
+  wipe: 1100, // clip-path circle, ease (0.65, 0, 0.35, 1), radius = farthest corner
   revealContentAt: 0.6, // light scene content enters once the circle passes ~60 %
-  collapseContentAt: 0.4, // dark scene text enters once the light has left the left half
+  collapseContentAt: 0.35, // dark scene text enters as the light uncovers the text column
   fade: 900, // fallback background crossfade
   swapDelay: 150,
   swap: 300,
@@ -42,6 +45,13 @@ function readOptions(sceneCount: number): Options {
     fadeOnly: params.get("transition") === "fade",
     reveal: params.get("reveal") === "auto" ? "auto" : "click",
   };
+}
+
+/** Circle radius that just covers the window from (x, y): the farthest corner. */
+function coverRadius(x: number, y: number) {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  return Math.ceil(Math.max(Math.hypot(x, y), Math.hypot(w - x, y), Math.hypot(x, h - y), Math.hypot(w - x, h - y))) + 2;
 }
 
 function centerOf(el: Element | undefined) {
@@ -80,6 +90,13 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
       }),
     [scenes],
   );
+
+  // Keep the scene in the URL so a reload (or a clicker's F5) stays on it.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("scene", String(index + 1));
+    window.history.replaceState(window.history.state, "", url);
+  }, [index]);
 
   // Start the robot download the moment /pitch mounts.
   useEffect(() => {
@@ -145,6 +162,7 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
     if (tx.kind === "reveal" || tx.kind === "collapse") {
       const head = headEls.current.get(tx.kind === "reveal" ? tx.from : tx.to);
       const { x, y } = centerOf(head);
+      const far = `${coverRadius(x, y)}px`;
       const circle = (r: string) => `circle(${r} at ${x}px ${y}px)`;
       if (glow) {
         glow.style.left = `${x}px`;
@@ -152,14 +170,14 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
       }
       if (tx.kind === "reveal") {
         // Glow peaks as the light starts, so the light comes out of Klara.
-        if (glow) running.push(animate(glow, { opacity: [0, 0.8, 0] }, { duration: sec(T.glow), times: [0, 0.5, 1], ease: "easeInOut" }));
+        if (glow) running.push(animate(glow, { opacity: [0, 0.8, 0] }, { duration: sec(T.revealGlow), times: [0, T.wipeStart / T.revealGlow, 1], ease: "easeInOut" }));
         running.push(
-          animate(toEl, { clipPath: [circle("0%"), circle("150%")] }, { duration: sec(T.wipe), delay: sec(T.wipeStart), ease: EASE_IN_OUT }),
+          animate(toEl, { clipPath: [circle("0px"), circle(far)] }, { duration: sec(T.wipe), delay: sec(T.wipeStart), ease: EASE_IN_OUT }),
         );
         at(T.wipeStart + T.wipe * T.revealContentAt, () => setIncomingPhase("enter"));
       } else {
         running.push(
-          animate(fromEl, { clipPath: [circle("150%"), circle("0%")] }, { duration: sec(T.wipe), delay: sec(T.wipeStart), ease: EASE_IN_OUT }),
+          animate(fromEl, { clipPath: [circle(far), circle("0px")] }, { duration: sec(T.wipe), delay: sec(T.wipeStart), ease: EASE_IN_OUT }),
         );
         // Mirror of the reveal: the visor glows as the last light disappears into it.
         if (glow) running.push(animate(glow, { opacity: [0, 0.8, 0] }, { duration: sec(T.glow), delay: sec(T.wipeStart + T.wipe - T.glow / 2), times: [0, 0.5, 1], ease: "easeInOut" }));
@@ -194,7 +212,7 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
     switch (tx.kind) {
       case "reveal":
         layers.push({ i: tx.from, phase: fromPhase, z: 1 });
-        layers.push({ i: tx.to, phase: incomingPhase, z: 3, style: { clipPath: "circle(0% at 50% 50%)" } });
+        layers.push({ i: tx.to, phase: incomingPhase, z: 3, style: { clipPath: "circle(0px at 50% 50%)" } });
         break;
       case "collapse":
         layers.push({ i: tx.to, phase: incomingPhase, z: 1 });
@@ -221,20 +239,30 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
     <MotionConfig reducedMotion="user">
       <div
         lang="en"
-        className="fixed inset-0 overflow-hidden select-none"
+        className="fixed inset-0 cursor-none overflow-hidden select-none"
         style={{ "--pitch-u": PITCH_UNIT, background: current.theme === "dark" ? DARK_BG : LIGHT_BG } as CSSProperties}
         onClick={(e) => e.button === 0 && advance()}
       >
         {layers.map(({ i, phase, z, style }) => {
           const { Component } = scenes[i];
           return (
-            <div key={scenes[i].id} ref={layerRefs[i]} className="absolute inset-0" style={{ zIndex: z, ...style }}>
+            <div
+              key={scenes[i].id}
+              ref={layerRefs[i]}
+              className="absolute inset-0"
+              style={{ zIndex: z, ...style }}
+              // A scene waiting underneath must not be read out (it would
+              // spoil the punchline) or take focus.
+              inert={phase === "standby"}
+              aria-hidden={phase === "standby" || undefined}
+            >
               <Component
                 phase={phase}
                 step={steps[i]}
                 revealMode={options.reveal}
                 headRef={headRefs[i]}
-                robotPaused={phase === "exit"}
+                // Covered robots stop rendering (a waiting one after its intro).
+                robotPaused={phase !== "enter"}
               />
             </div>
           );
@@ -246,7 +274,7 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
             aria-hidden
             className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
             style={{
-              zIndex: tx.kind === "reveal" ? 2 : 4,
+              zIndex: 4,
               width: u(380),
               height: u(380),
               opacity: 0,

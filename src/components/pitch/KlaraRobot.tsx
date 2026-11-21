@@ -52,7 +52,11 @@ export type KlaraRobotProps = {
   onLoad?: (app: Application) => void;
   /** 1×1 px element over the robot's visor: origin for the scene transitions. */
   headRef?: Ref<HTMLDivElement>;
-  /** Stops Spline rendering, e.g. while a transition covers the robot. */
+  /**
+   * Stops Spline rendering while the robot is covered (a transition, or a scene
+   * waiting underneath). Takes effect once the camera intro has settled, so a
+   * robot that loads hidden still arrives in its final pose.
+   */
   paused?: boolean;
   loadTimeoutMs?: number;
   namePlate?: boolean;
@@ -128,9 +132,9 @@ export function KlaraRobot({
   useEffect(() => {
     const app = appRef.current;
     if (!app || !live) return;
-    if (paused) app.stop();
-    else if (app.isStopped) app.play();
-  }, [paused, live]);
+    if (paused && settled) app.stop();
+    else if (!paused && app.isStopped) app.play();
+  }, [paused, live, settled]);
 
   const head = live && settled ? HEAD_SETTLED : HEAD_INTRO;
 
@@ -198,7 +202,8 @@ export function KlaraRobot({
           style={{
             left: `${HEAD_SETTLED.x}%`,
             bottom: u(56),
-            fontSize: u(13),
+            // 13 design px; never below 11 px on small laptop screens.
+            fontSize: `max(11px, ${u(13)})`,
             // Tracking adds space after the last letter; trim it so the text centres.
             padding: `${u(5)} calc(${u(12)} - 0.2em) ${u(5)} ${u(12)}`,
           }}
