@@ -41,7 +41,7 @@ export function SourcesScene({ phase, step, revealMode }: SceneProps) {
         </p>
       </SourceCard>
 
-      <SourceCard index={1} show={beat >= 2} title="Email integration" result="Additional work detected → Mehrkostenanzeige drafted (before execution)">
+      <SourceCard index={1} show={beat >= 2} title="Email integration" result="1 extra-work request detected → Mehrkostenanzeige drafted">
         <MiniHeader icon={<Mail aria-hidden />} title="Lehner Architekten" meta="09:14" />
         <div className="flex flex-col gap-1 text-xs">
           <p className="text-zinc-500">Betreff: Brandschutz 3. OG</p>
@@ -58,7 +58,7 @@ export function SourcesScene({ phase, step, revealMode }: SceneProps) {
         </div>
       </SourceCard>
 
-      <SourceCard index={2} show={beat >= 3} title="Daily plans & reports" result="Delay forecast: +2 days, flooring team informed">
+      <SourceCard index={2} show={beat >= 3} title="Daily plans & reports" result="1 delay detected → +2 days forecast, flooring team informed">
         <div className="flex flex-col gap-2 rounded-md border border-zinc-200 p-3">
           <p className="flex items-center gap-2 text-xs text-zinc-500">
             <Sunrise className="size-4" aria-hidden /> Morgens <span className="font-mono">07:00</span>
