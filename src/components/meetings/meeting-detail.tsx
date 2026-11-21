@@ -82,7 +82,7 @@ export function MeetingDetail({
               {MEETING_TYPE_DE[m.type]} · {fmtDate(m.started_at)} · Dauer <span className="font-mono">{fmtClock(m.duration_sec)}</span>
             </p>
             {m.participants.length ? (
-              <p className="mt-1 text-sm text-muted-foreground">Teilnehmer: {m.participants.map((p) => `${p.name} (${p.role})`).join(", ")}</p>
+              <p className="mt-1 text-sm text-muted-foreground">Teilnehmer: {m.participants.map((p) => `${p.name}, ${p.role}`).join(" · ")}</p>
             ) : null}
             {languages.length ? (
               <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
@@ -322,11 +322,15 @@ const Empty = ({ children }: { children: ReactNode }) => <p className="text-sm t
 function Evidence({ item, onJump }: { item: MeetingItem; onJump: (ts: number) => void }) {
   const foreign = item.quote_language !== "de" && item.quote_original && item.quote_original !== item.quote_de;
   return (
-    <span className="mt-1 flex flex-col gap-0.5 text-xs text-muted-foreground">
-      <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
-        <Quote className="size-3 translate-y-0.5" aria-hidden />
-        <span lang="de" className="italic">„{item.quote_de.replace(/[.]$/, "")}“</span>
-        <span>– {item.speaker},</span>
+    <span className="mt-1 grid grid-cols-[auto_1fr] items-baseline gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+      <Quote className="size-3 translate-y-0.5" aria-hidden />
+      <span>
+        {foreign ? null : (
+          <>
+            <LangBadge code="de" />{" "}
+          </>
+        )}
+        <span lang="de" className="italic">„{item.quote_de.replace(/[.]$/, "")}“</span> – {item.speaker},{" "}
         <button
           type="button"
           onClick={() => onJump(item.ts_sec)}
@@ -337,18 +341,18 @@ function Evidence({ item, onJump }: { item: MeetingItem; onJump: (ts: number) =>
         </button>
       </span>
       {foreign ? (
-        <span className="inline-flex flex-wrap items-center gap-x-1.5 pl-[18px]">
+        <span className="col-start-2 flex items-baseline gap-1.5">
           <LangBadge code={item.quote_language} />
           <span lang={item.quote_language}>„{item.quote_original.replace(/[.]$/, "")}“</span>
         </span>
       ) : null}
       {item.depends ? (
-        <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
+        <>
           <Link2 className="size-3 translate-y-0.5" aria-hidden />
           <span>
             Voraussetzung für: „{item.depends.text_de.replace(/[.]$/, "")}“ – {item.depends.speaker}, <span className="font-mono">{fmtClock(item.depends.ts_sec)}</span>
           </span>
-        </span>
+        </>
       ) : null}
     </span>
   );
