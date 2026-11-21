@@ -11,8 +11,8 @@ const SPOT = { x: 77, y: 30 };
 
 /**
  * Scene 6b – close. Same Klara and light as the title; the text arrives line
- * by line. Line 1 comes with the scene; in click mode lines 2–4 follow on
- * clicks (steps 1–3), in auto mode on a reading-pace timer.
+ * by line: "No missing reports." comes with the scene, then one line per click
+ * (steps 1–4) up to the sign-off. In auto mode the lines follow on a timer.
  *
  * The robot is never faded in here: the light→dark wipe collapses onto it,
  * so it must already stand there when the wipe starts.
@@ -20,18 +20,16 @@ const SPOT = { x: 77, y: 30 };
 export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: SceneProps) {
   const show = phase !== "standby";
   const auto = revealMode === "auto";
-  const line2 = show && (auto || step >= 1);
-  const line3 = show && (auto || step >= 2);
-  const line4 = show && (auto || step >= 3);
+  const at = (n: number) => show && (auto || step >= n);
   const rootRef = useRef<HTMLElement>(null);
   const robotRef = useRef<KlaraRobotHandle>(null);
 
-  // She looks at the first line, then turns to the room for the punchline.
+  // She reads the two "No …" lines, then turns to the room for the money line.
   useEffect(() => {
     if (phase !== "enter") return;
     const cues: [string, number][] = auto
-      ? [["line-1", 300], ["audience", 1100]]
-      : [step === 0 ? ["line-1", 300] : ["audience", 150]];
+      ? [["line-1", 300], ["line-2", 1000], ["audience", 1900]]
+      : [step === 0 ? ["line-1", 300] : step === 1 ? ["line-2", 150] : ["audience", 150]];
     return scheduleGlances(rootRef.current, robotRef.current, cues);
   }, [phase, step, auto]);
 
@@ -60,40 +58,42 @@ export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: 
           <FadeUp
             as="p"
             gaze="line-1"
-            show={show}
+            show={at(0)}
             className="leading-[1.15] tracking-[-0.02em] text-neutral-300"
             style={{ fontSize: u(56) }}
           >
-            He didn’t ask for a letter.
+            No missing reports.
           </FadeUp>
 
-          <p
-            className="text-balance font-bold leading-[1.02] tracking-[-0.035em]"
-            style={{ fontSize: u(88), marginTop: u(24) }}
+          <FadeUp
+            as="p"
+            gaze="line-2"
+            show={at(1)}
+            delay={auto ? 0.9 : 0}
+            className="leading-[1.15] tracking-[-0.02em] text-neutral-300"
+            style={{ fontSize: u(56), marginTop: u(12) }}
           >
-            <RevealWords
-              text="Klara noticed the money."
-              show={line2}
-              delay={auto ? 1.1 : 0}
-              stagger={0.05}
-              wordClassName={SILVER_TEXT}
-            />
+            No missed notices.
+          </FadeUp>
+
+          <p className="font-bold leading-[1.02] tracking-[-0.035em]" style={{ fontSize: u(88), marginTop: u(20) }}>
+            <RevealWords text="No lost money." show={at(2)} delay={auto ? 1.8 : 0} stagger={0.06} wordClassName={SILVER_TEXT} />
           </p>
 
           <FadeUp
             as="p"
-            show={line3}
-            delay={auto ? 2.2 : 0.1}
+            show={at(3)}
+            delay={auto ? 2.9 : 0.1}
             className="tracking-[-0.02em] text-neutral-300"
-            style={{ fontSize: u(36), marginTop: u(36), lineHeight: 1.2 }}
+            style={{ fontSize: u(36), marginTop: u(40), lineHeight: 1.2 }}
           >
             The operating system for construction companies.
           </FadeUp>
 
           <FadeUp
             as="p"
-            show={line4}
-            delay={auto ? 3.2 : 0.1}
+            show={at(4)}
+            delay={auto ? 3.8 : 0.1}
             duration={0.5}
             className="text-zinc-400"
             style={{ fontSize: u(20), marginTop: u(56) }}
