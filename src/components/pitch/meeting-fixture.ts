@@ -56,7 +56,7 @@ export const PITCH_MEETING: MeetingView = {
     { ...item("p1", "behinderung", "Estrich 2. OG wartet auf Elektro bis Freitag.", quote.elektro, "Elektro", 38, "KL-2026-0042"), case_action: "updated", updated_case_id: "z" },
     { ...item("p2", "anordnung", "Zwei zusätzliche Steckdosen pro Wohnung im 3. OG.", quote.steckdosen, "Wohnbau Riem GmbH", 152, "KL-2026-0043"), case_action: "created", created_case_id: "x" },
     { ...item("p3", "mehrkosten", "Zusatzleistung vor Beginn anzeigen.", quote.steckdosen, "Wohnbau Riem GmbH", 152, "KL-2026-0044"), case_action: "created", created_case_id: "y" },
-    item("p4", "task", "Plan-Revision C liefern", quote.revision, "Architekt Büro Weber", 246),
+    item("p4", "task", "Plan-Revision C liefern", quote.revision, "Lehner Architekten", 246),
   ],
   changes: [
     { kind: "case_updated", text_de: "KL-2026-0042 aktualisiert: voraussichtliches Ende Freitag", case_id: null, case_ref: "KL-2026-0042" },
