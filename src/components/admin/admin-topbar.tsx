@@ -6,6 +6,7 @@ import { KlaraAvatar } from "@/components/klara/klara-avatar";
 import { RoleSwitcher } from "@/components/klara/role-switcher";
 import type { ProjectContext } from "@/lib/db/repo";
 import { fmtDateTime } from "@/lib/labels";
+import { useProjectId } from "@/lib/project-choice";
 import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +19,8 @@ const NAV = [
 type ProjectResponse = ProjectContext & { now: string; llm_mode: "live" | "mock"; backend: "memory" | "supabase" };
 
 export function AdminTopbar() {
-  const { data } = useApi<ProjectResponse>("/api/project", { pollMs: 30000 });
+  const [projectId] = useProjectId();
+  const { data } = useApi<ProjectResponse>(`/api/project?id=${projectId}`, { pollMs: 30000 });
   return (
     <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-6 border-b border-border bg-background px-4">
       <Link href="/admin" className="flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring">

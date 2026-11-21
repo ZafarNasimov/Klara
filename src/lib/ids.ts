@@ -1,6 +1,9 @@
 // Fixed seed ids (client-safe). The seed and the role switcher share them.
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 
+/** Stable ids for generated demo rows (history cases, versions, events …). */
+export const seedId = (n: number) => id(900000 + n);
+
 export const IDS = {
   company: id(1),
   project: id(10),
@@ -24,5 +27,46 @@ export const IDS = {
   schedTrockenbau2: id(504),
   schedBodenbelag2: id(505),
   progressEstrich2: id(601),
-} as const;
 
+  // Wohnanlage Riem, Haus B (VOB/B)
+  projectRiem: id(11),
+  contactRiemBauherr: id(111),
+  contactRiemSteuerung: id(112),
+  contactRiemGeruest: id(113),
+  tradeRiemRohbau: id(211),
+  tradeRiemFassade: id(212),
+  tradeRiemGeruest: id(213),
+  tradeRiemFenster: id(214),
+  tradeRiemHeizung: id(215),
+  teamRohbau: id(311),
+  teamFassade: id(312),
+  userPolierRohbau: id(405),
+  userPolierFassade: id(406),
+  schedRiemMauerwerk: id(511),
+  schedRiemDecke: id(512),
+  schedRiemGeruest: id(513),
+  schedRiemFenster: id(514),
+  schedRiemWdvs: id(515),
+  schedRiemHeizung: id(516),
+
+  // Sanierung Wohnhaus Schwabing (BGB)
+  projectSchwabing: id(12),
+  contactSchwBauherr: id(121),
+  contactSchwArchitekt: id(122),
+  contactSchwSanitaer: id(123),
+  contactSchwMaler: id(124),
+  tradeSchwAbbruch: id(221),
+  tradeSchwInnenausbau: id(222),
+  tradeSchwElektro: id(223),
+  tradeSchwSanitaer: id(224),
+  tradeSchwMaler: id(225),
+  teamAbbruch: id(321),
+  teamInnenausbau: id(322),
+  userPolierAbbruch: id(407),
+  userPolierInnenausbau: id(408),
+  schedSchwRueckbau: id(521),
+  schedSchwElektro: id(522),
+  schedSchwVorsatz: id(523),
+  schedSchwSanitaer: id(524),
+  schedSchwMaler: id(525),
+} as const;

@@ -9,23 +9,28 @@ import { DeadlineBadge } from "@/components/klara/deadline-badge";
 import { CheckList, LightDot, LightSummary, overallLight } from "@/components/klara/traffic-light";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ProjectContext } from "@/lib/db/repo";
-import { docTitle, fieldLabel, getDocType, hasValue } from "@/lib/doctypes";
+import { docTitle, fieldLabel, getDocType, hasValue, isOpenCase } from "@/lib/doctypes";
 import { CASE_STATUS_DE, fmtShort, fmtTime, SPHERE_DE } from "@/lib/labels";
 import type { AppEvent, CaseView } from "@/lib/types";
+import { useProjectId } from "@/lib/project-choice";
 import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { eventDetail, eventTitle } from "./event-text";
 import { formatFact } from "./format-fact";
 
-type ProjectResponse = ProjectContext & { now: string };
-
-const OPEN = new Set(["unvollstaendig", "bereit", "validiert"]);
+type ProjectResponse = ProjectContext & { now: string; projects: { id: string; name: string; contract_type: string; contract_no: string }[] };
 
 export function CaseBoard() {
-  const { data: ctx } = useApi<ProjectResponse>("/api/project");
-  const { data: cases, error } = useApi<CaseView[]>("/api/cases");
-  const { data: events } = useApi<AppEvent[]>("/api/events?limit=30");
+  const [projectId, setProjectId] = useProjectId();
+  const { data: ctx } = useApi<ProjectResponse>(`/api/project?id=${projectId}`);
+  const { data: cases, error } = useApi<CaseView[]>(`/api/cases?project=${projectId}`);
+  const { data: events } = useApi<AppEvent[]>(`/api/events?limit=30&project=${projectId}`);
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
+  const pickProject = (id: string) => {
+    setTeamFilter(null);
+    setSelectedId(null);
+    setProjectId(id);
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scope, setScope] = useState<"open" | "all">("open");
 
@@ -33,18 +38,18 @@ export function CaseBoard() {
   const visible = useMemo(() => (cases ?? []).filter((c) => c.status !== "entwurf"), [cases]);
   const rows = useMemo(
     () =>
-      visible.filter((c) => (teamFilter ? c.team_id === teamFilter : true)).filter((c) => (scope === "open" ? OPEN.has(c.status) : true)),
+      visible.filter((c) => (teamFilter ? c.team_id === teamFilter : true)).filter((c) => (scope === "open" ? isOpenCase(c) : true)),
     [visible, teamFilter, scope],
   );
   const selected = rows.find((c) => c.id === selectedId) ?? null;
 
-  const dueToday = visible.filter((c) => OPEN.has(c.status) && c.deadline && c.deadline.status !== "ok");
+  const dueToday = visible.filter((c) => isOpenCase(c) && c.deadline && c.deadline.status !== "ok");
   const tomorrow = ctx ? berlinDayOffset(ctx.now, 1) : null;
   const dueTomorrow = visible.filter(
-    (c) => OPEN.has(c.status) && c.deadline?.status === "ok" && c.deadline.due_at && berlinDayOffset(c.deadline.due_at, 0) === tomorrow,
+    (c) => isOpenCase(c) && c.deadline?.status === "ok" && c.deadline.due_at && berlinDayOffset(c.deadline.due_at, 0) === tomorrow,
   );
   const redFlags = visible.filter(
-    (c) => OPEN.has(c.status) && (overallLight(c.checks) === "red" || c.flags.includes("escalate") || c.flags.includes("internal_risk")),
+    (c) => isOpenCase(c) && (overallLight(c.checks) === "red" || c.flags.includes("escalate") || c.flags.includes("internal_risk")),
   );
 
   return (
@@ -57,23 +62,30 @@ export function CaseBoard() {
               <Building2 className="size-3.5" aria-hidden />
               {ctx.company.name}
             </p>
-            <button
-              type="button"
-              onClick={() => setTeamFilter(null)}
-              aria-pressed={teamFilter === null}
-              className={cn(
-                "mt-2 w-full rounded-md px-2 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                teamFilter === null ? "bg-muted font-medium text-foreground" : "text-foreground hover:bg-muted",
-              )}
-            >
-              {ctx.project.name}
-              <span className="block text-xs font-normal text-muted-foreground">
-                {ctx.project.contract_type === "VOB_B" ? "VOB/B" : "BGB"}, <span className="font-mono">{ctx.project.contract_no}</span>
-              </span>
-            </button>
-            <ul className="mt-1 space-y-0.5 border-l border-border pl-2 ml-3">
+            <ul className="mt-2 space-y-1">
+              {(ctx.projects ?? [ctx.project]).map((p) => {
+                const current = p.id === ctx.project.id;
+                return (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => (current ? setTeamFilter(null) : pickProject(p.id))}
+                      aria-pressed={current && teamFilter === null}
+                      aria-current={current ? "true" : undefined}
+                      className={cn(
+                        "w-full rounded-md px-2 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        current && teamFilter === null ? "bg-muted font-medium text-foreground" : current ? "font-medium text-foreground hover:bg-muted" : "text-foreground hover:bg-muted",
+                      )}
+                    >
+                      {p.name}
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        {p.contract_type === "VOB_B" ? "VOB/B" : "BGB"}, <span className="font-mono">{p.contract_no}</span>
+                      </span>
+                    </button>
+                    {current ? (
+            <ul className="mt-1 mb-2 space-y-0.5 border-l border-border pl-2 ml-3">
               {ctx.teams.map((t) => {
-                const n = visible.filter((c) => c.team_id === t.id && OPEN.has(c.status)).length;
+                const n = visible.filter((c) => c.team_id === t.id && isOpenCase(c)).length;
                 return (
                   <li key={t.id}>
                     <button
@@ -89,6 +101,11 @@ export function CaseBoard() {
                       <span className="flex-1 truncate">{t.name}</span>
                       {n > 0 ? <span className="font-mono text-xs text-foreground">{n}</span> : null}
                     </button>
+                  </li>
+                );
+              })}
+            </ul>
+                    ) : null}
                   </li>
                 );
               })}

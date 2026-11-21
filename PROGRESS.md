@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-21 (real e-mail round trip verified; crash on translated pages fixed) · branch `main`
+Last update: 2026-11-21 (demo data: three sites, six languages, three weeks of history) · branch `claude/project-thread-jrqak8`, not yet on `main`
 
 ## Milestones (SPEC §11)
 
@@ -126,6 +126,15 @@ Instead of Postmark, Klara can use a normal mailbox: `src/lib/mail/mailbox.ts` s
 - Site password: `SITE_PASSWORD` → `src/proxy.ts` sends visitors without the cookie to `/login` (API: 401); `/api/email/inbound` stays open (own token).
 - Live site (2026-11-21): `SITE_PASSWORD`, `DEMO_CLIENT_MAILBOX` and `MAIL_FROM_NAME` are set on Vercel and deployed; the login works, pages without it redirect, the API answers 401. Demo data reset there (Bauherr contact = the client mailbox, no cases).
 - 2026-11-21: Gmail login works (the address had a typo in `.env.local`); `MAIL_USER` + `MAIL_PASSWORD` set on Vercel and deployed. Live site reports mail mode `smtp`; an inbox check from Vercel takes ~2 s and leaves non-Klara mail unread. Next: the real round trip (send → client replies → Klara analyses).
+
+## Demo data: three sites, six languages (2026-11-21)
+
+- **Sites** (`src/lib/db/seed.ts`, ids in `src/lib/ids.ts`): Neubau Bürogebäude München (VOB/B; Team Estrich RU, Team Ausbau PL; unchanged, the demo story and the tests), **Wohnanlage Riem, Haus B** (VOB/B; Team Rohbau TR Mehmet Yılmaz, Team Fassade EN Liam O'Connor; Fenster and Heizung hired by the client, Gerüstbau Schmid our NU) and **Sanierung Wohnhaus Schwabing** (BGB, Eigentümergemeinschaft; Team Abbruch DE Klaus Becker, Team Innenausbau RO Andrei Popescu; Elektro hired by the client, Gruber Haustechnik and Demir Malerbetrieb our NUs). Schedules and daily quantities relative to today; all Bauherr e-mails go to `DEMO_CLIENT_MAILBOX` when set. New trade aliases: Gerüstbau, Fassade, Rohbau, Abbruch, Innenausbau (six languages).
+- **History** (`src/lib/db/demo-history.ts`, `withDemoHistory`): KL-2026-0031..0041 over the last three weeks, built with the real templates: Mehrkosten + Anordnung (RU, accepted), Abhilfeaufforderung to Nowak (PL), storm hindrance (TR, weather), window hindrance (EN) → rejection → Stellungnahme → Wegfall to validate, Mehrkosten BGB (DE, accepted), Elektro hindrance (RO) → question → Ergänzende Angaben to validate, Meldung zur Prüfung (DE). Transcripts in the team's language with German, sent e-mails, replies, timeline events, six Bautagesberichte. Loaded by "Demo zurücksetzen" and the memory store's first start, not by the test seed. The live demo's first case stays **KL-2026-0042**.
+- **Screens:** the office tree lists every site (switch by click; top bar follows; `useProjectId` in `src/lib/project-choice.ts`, kept per browser); a case page uses its own site's data and switches the top bar to it; the Polier start page lists all sites with their team channels (`GET /api/projects`). Demo clock and hands-free settings apply to every site.
+- Validated internal reports (Bautagesbericht, Meldung) count as done: "geprüft am …", not under "Fristen heute" or "offen" (`isOpenCase`).
+- Checked with the live model: EN scaffolders → Abhilfeaufforderung to Gerüstbau Schmid; TR heating → Behinderungsanzeige (client); RO electricians → Behinderungsanzeige (client); DE painters → Abhilfeaufforderung to Demir; each reply in the team's language. 154 tests (4 new: demo data, every case page and PDF of it).
+- **Live site:** the new data appears after "Demo zurücksetzen" on `/admin/demo` (this deletes the test cases there).
 
 ## Unclear reports: one complaint, one case (decided by Zafar, 2026-11-21)
 

@@ -10,12 +10,14 @@ import { canonicalTradeName, computeSphere, resolveTrade, routeHindrance } from 
 
 const NOW = berlinTime("2026-11-20", 9, 30);
 const seed = buildSeed(NOW);
+// The first site only, as getProjectContext loads it (the seed has three sites).
+const mine = <T extends { project_id: string }>(rows: T[]) => rows.filter((r) => r.project_id === IDS.project);
 const ctx: RulesCtx = {
   project: seed.project![0],
-  contacts: seed.contact!,
-  trades: seed.trade!,
-  teams: seed.team!,
-  schedule: seed.schedule_item!,
+  contacts: mine(seed.contact!),
+  trades: mine(seed.trade!),
+  teams: mine(seed.team!),
+  schedule: mine(seed.schedule_item!),
 };
 
 describe("sphere", () => {

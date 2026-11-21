@@ -15,7 +15,7 @@ import type { ProgressRow } from "@/lib/documents/templates/bautagesbericht";
 import { getDocType, requireDocType } from "@/lib/doctypes";
 import { fmtNumber } from "@/lib/labels";
 import { evaluateCase } from "@/lib/rules";
-import type { Case, CaseStatus, Team } from "@/lib/types";
+import type { Case, CaseStatus } from "@/lib/types";
 import { fetchWeather } from "@/lib/weather";
 
 const DOC = "bautagesbericht";
@@ -24,16 +24,9 @@ const SENT = new Set<CaseStatus>(["versendet", "beantwortet", "abgeschlossen"]);
 const COMPUTED = ["date", "work_performed", "instructions", "incidents", "_progress", "_instructions", "_incidents", "_team_name", "_lead_name", "_bauleiter_name"];
 const SUMMARY_KEYS = ["cause", "instruction_text", "description", "still_affected", "basis"];
 
-export function reportReference(team: Pick<Team, "name">, day: string): string {
-  const crew = team.name
-    .replace(/^Team\s+/i, "")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/ß/g, "SS")
-    .replace(/[^A-Za-z0-9]+/g, "")
-    .toUpperCase();
-  return `BTB-${day.replaceAll("-", "")}-${crew || "TEAM"}`;
-}
+import { reportReference } from "./reference";
+
+export { reportReference };
 
 export async function findDailyReportCase(teamId: string, day: string): Promise<Case | null> {
   const cases = await store().list("case", { where: { team_id: teamId, doc_type: DOC } });
