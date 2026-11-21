@@ -99,10 +99,10 @@ Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-003
 
 Instead of Postmark, Klara can use a normal mailbox: `src/lib/mail/mailbox.ts` sends over SMTP (nodemailer, Klara sets the Message-ID, letter PDF attached) and reads answers over IMAP (imapflow + mailparser): unread mails of the last 7 days that reply to a Klara e-mail or carry "KL-…" in the subject go through `receiveReply` and are marked read. The case page calls `POST /api/email/poll` every 10 s while it shows "Wartet auf Antwort" ("Jetzt prüfen" link; "Antwort simulieren" after 60 s instead of 15 s). `delivery.ts` picks the mailbox first, then Postmark, else the test send. SPEC §13 lists Gmail/Outlook (OAuth) as out of scope; this uses an app password, and Zafar chose it.
 
-- Mailbox: musterbau.bauleitung@gmail.com (Gmail app password in `MAIL_PASSWORD`, needs 2-Step Verification). The Bauherr contact gets `DEMO_CLIENT_MAILBOX` on "Demo zurücksetzen".
+- Mailbox: **musterbau.bauleitun@gmail.com** (no final "g"; Gmail app password in `MAIL_PASSWORD`, needs 2-Step Verification). The Bauherr contact gets `DEMO_CLIENT_MAILBOX` on "Demo zurücksetzen".
 - Site password: `SITE_PASSWORD` → `src/proxy.ts` sends visitors without the cookie to `/login` (API: 401); `/api/email/inbound` stays open (own token).
 - Live site (2026-11-21): `SITE_PASSWORD`, `DEMO_CLIENT_MAILBOX` and `MAIL_FROM_NAME` are set on Vercel and deployed; the login works, pages without it redirect, the API answers 401. Demo data reset there (Bauherr contact = the client mailbox, no cases).
-- Open: Gmail refused the first app password ("535-5.7.8 Username and Password not accepted" for SMTP and IMAP, the password has the right 16-letter shape). Most likely it was created under another signed-in Google account. Zafar recreates it (https://myaccount.google.com/apppasswords?authuser=musterbau.bauleitung@gmail.com); then set `MAIL_USER` + `MAIL_PASSWORD` on Vercel, redeploy, and run the live test. Until then the live site test-sends.
+- 2026-11-21: Gmail login works (the address had a typo in `.env.local`); `MAIL_USER` + `MAIL_PASSWORD` set on Vercel and deployed. Live site reports mail mode `smtp`; an inbox check from Vercel takes ~2 s and leaves non-Klara mail unread. Next: the real round trip (send → client replies → Klara analyses).
 
 ## Deployment (Vercel)
 
