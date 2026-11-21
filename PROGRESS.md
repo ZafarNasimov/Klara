@@ -52,8 +52,18 @@ Last update: 2026-11-21 01:45 UTC (local session: pitch flow; merged the M4 e-ma
 
 Full-screen pitch deck for the 3-minute presentation. Code in `src/components/pitch/**`, route `src/app/pitch/page.tsx`, assets in `public/pitch/**`.
 
-- **Scenes** (`src/components/pitch/pitch-scenes.ts`): 1 title (dark), 2–5 **light stand-ins**, 6 close (dark). A content spec for **7 scenes** arrived on 2026-11-21 but was cut off in Scene 2 ("The call", EN → DE replay); waiting for the rest. Real scenes: swap each `Component`, wrap content in `<SceneContent phase>`.
-- **Control:** →, Space, Enter, PageDown or click = next (title: 3 clicks reveal the pain points; close: 2 clicks reveal lines 2–3); ←, PageUp = back. Input is ignored while a transition runs. The scene is kept in the URL (`?scene=N`), so a reload stays put. Rehearsal switches: `?reveal=auto` (timed reveals), `?transition=fade` (crossfade instead of the circle wipe; also used with reduced motion). Cursor hidden on all scenes.
+- **Scenes** (`src/components/pitch/pitch-scenes.ts`, content spec of 2026-11-21, one story in `pitch-story.ts`: Baustelle B Wohnanlage Riem, team Estrich, client's electricians, 07:00, crew of 4, missing = duration + photo):
+  | Key | Scene | Clicks inside |
+  |---|---|---|
+  | 1 | Title (dark): Ask Klara, 3 pain points | 3 |
+  | 2 | The call (REPLAY): chat EN, German Behinderungsanzeige fills live; then 5 capabilities | 4 exchanges + 1 |
+  | 3 | The office (app mock, cursor visible, ring marks the next control): open Estrich, transcript, close, Clarify, Site manager, Send, Validate | 7 |
+  | 4 | More sources: meeting summary, email parsing, daily plan | 3 |
+  | 5 | Portfolio: KPIs, plan vs actual by trade, sites/teams table, Elektro problem | 1 |
+  | 6a | Ecosystem: strike-through, "An operating system…", inputs → Klara → outputs, people | 5 |
+  | 6b | Close (dark): 4 lines | 3 |
+  Light scenes use shadcn (Badge, Button, Table, Chart) at presentation scale via `appScaleVars()` (re-bases `--spacing`, `--text-*`, `--radius` on the 1920×1080 grid; app mocks at 150 %).
+- **Control:** →, Space, Enter, PageDown or click = next; ←, PageUp = back; number keys 1–6 jump to a scene. Input is ignored while a transition runs. The scene is kept in the URL (`?scene=6b`), so a reload stays put. Rehearsal switches: `?reveal=auto` (timed reveals), `?transition=fade` (crossfade instead of the circle wipe; also used with reduced motion). Cursor hidden on all scenes.
 - **Klara robot** (`KlaraRobot.tsx`): 21st.dev Spline scene, served offline: `public/pitch/klara-robot.splinecode` + the runtime's `bevel.wasm` / `process.wasm` in `public/pitch/spline/` (the runtime fetches them from unpkg / cdn.spline.design otherwise). `@splinetool/runtime` is pinned to 2.0.211; **re-copy the two wasm files from `node_modules/@splinetool/runtime/build` when you bump it.** PNG fallback (`klara-robot.png`, transparent first frame) while loading, without WebGL, on errors or after 2 s. The scene opens on a head close-up and pulls back to the full robot in ~2.5 s (built into the scene). Head follows the pointer page-wide; **scripted gaze** via `glanceAt()`: she looks at the headline, each pain point as it appears, closing line 1, then the audience on the punchline (a real mouse move takes over).
 - **Transitions** (`PitchFlow.tsx`): dark→light = text blur-out, visor glow, clip-path circle from the robot's head to the farthest window corner (1100 ms); light→dark = the light collapses into the head of the closing scene, which is mounted (inert, paused after its intro) under Scene 5.
 - **Critique** 22/32 (dual-agent, snapshot `.impeccable/critique/…pitchflow-tsx.md`). Fixed: spotlight not rendering, off-screen wipe time and blank collapse start, white disc on the head, cursor on light scenes, hidden Scene 6 read out by screen readers, reload reset, plate < 11 px, label contrast (zinc-400 / neutral-300). Open: Back from Scene 2 replays the title robot's intro; the wipe origin ignores the head's turn.
@@ -104,7 +114,7 @@ Earlier cloud test (2026-11-20, 23:20 UTC, HTTP only): STT exact and 1.15 s, TTS
 2. **Photo button** (SPEC §8: channel and call screen). Not built. `evidence.case_id` is NOT NULL, so a photo needs a case: the conversation's pending case, else the team's latest open case of the day, else that day's Bautagesbericht. Store files in Supabase Storage (`SUPABASE_STORAGE_BUCKET`) or `.data/files/` in memory mode. Show thumbnails on the audit page (PDF page 2) and in the Bautagesbericht; the rebuttal evidence already counts photos.
 3. **M5** (SPEC §11): realtime polish, timeline of the full chain (incl. e-mails) on the case page, demo page. Open M4 follow-ups that belong here: replies classified `request_info` / `change_request` / `counter_instruction` only get a summary card (SPEC §6.4 wants supplement / Mehrkosten + Anordnung drafts and a 30-day counter for BGB); unassigned replies are stored and logged but have no screen to assign them; a Postmark delivery webhook could turn "Übermittlung" green on delivery.
 4. **M6**: eval set (`eval/utterances.json`, ≥ 30, RU/PL/DE/TR), `eval/run.ts` (`npm run eval`), then 5 full rehearsals on the real phone + projector.
-5. **Pitch:** get the rest of the 7-scene content spec, build Scenes 2–6 into `src/components/pitch/pitch-scenes.ts` (the close becomes Scene 7), then rehearse on the presentation laptop (see "Pitch `/pitch`").
+5. **Pitch:** critique + polish of Scenes 2–6a (running), then rehearse the whole deck on the presentation laptop (see "Pitch `/pitch`"). Then the app review (white, shadcn, anti-slop) for `/admin` and `/app`, on the memory store.
 
 Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-0039..0041 so the board is not empty before the demo case.
 
