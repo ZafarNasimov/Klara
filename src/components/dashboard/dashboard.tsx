@@ -9,7 +9,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PERIODS, type DashboardFilters, type DashboardView, type Period } from "@/lib/dashboard/compute";
 import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
-import { Actions, ActivityFeed, Card, CompletenessGrid, Heatmap, InfoTip, KpiCard, MiniSchedule, Pipeline, SiteMap, TradeBullets } from "./widgets";
+import { Actions, ActivityFeed, Card, CompletenessGrid, Heatmap, HeatLegend, InfoTip, KpiCard, MiniSchedule, Pipeline, SiteMap, TradeBullets } from "./widgets";
+
+// At ≥ 760 px viewport height the Überblick fills the screen exactly; below, the page scrolls.
+// (Class names are written out in full: Tailwind only generates what it finds literally in the source.)
 
 type Tab = "overview" | "details";
 
@@ -45,15 +48,15 @@ export function Dashboard({ initial, fixedProject = null }: { initial: Dashboard
 
   return (
     <TooltipProvider delay={150}>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1600px] px-6 pt-5 pb-10">
+      <div className="min-h-0 flex-1 overflow-y-auto" data-dash-scroll>
+        <div className={cn("mx-auto flex max-w-[1600px] flex-col px-6 pt-3 pb-4", tab === "overview" ? "[@media(min-height:760px)]:h-full" : "pb-10")}>
           <FilterBar v={data} filters={filters} fixedProject={fixedProject} onChange={update} tab={tab} onTab={setTab} />
           {error && !data ? (
             <p role="alert" className="mt-6 rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground">
               Das Dashboard konnte nicht geladen werden: {error}
             </p>
           ) : data ? (
-            <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+            <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="min-h-0 flex-1">
               {tab === "overview" ? (
                 <Overview v={data} linkable onPick={fixedProject ? null : (id) => update({ project: filters.project === id ? null : id })} />
               ) : (
@@ -72,15 +75,15 @@ export function Dashboard({ initial, fixedProject = null }: { initial: Dashboard
 /** Tab "Überblick": KPIs, map + Handlungsbedarf, heatmap + Plan und Ist (also the pitch, without links). */
 export function Overview({ v, linkable, onPick = null }: { v: DashboardView; linkable: boolean; onPick?: ((id: string) => void) | null }) {
   return (
-    <div className="mt-4 flex flex-col gap-3">
-      <div className="grid grid-cols-4 gap-3">
+    <div className="mt-3 grid gap-4 [@media(min-height:760px)]:h-full [@media(min-height:760px)]:grid-rows-[auto_minmax(220px,1fr)_minmax(200px,1fr)]">
+      <div className="grid grid-cols-4 gap-4">
         {v.kpis
           .filter((k) => k.key !== "claims")
           .map((k, i) => (
             <KpiCard key={k.key} kpi={k} index={i} />
           ))}
       </div>
-      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
+      <div className="grid min-h-0 grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
         <Card title="Baustellen">
           <SiteMap v={v} onPick={onPick} />
         </Card>
@@ -88,8 +91,8 @@ export function Overview({ v, linkable, onPick = null }: { v: DashboardView; lin
           <Actions v={v} linkable={linkable} />
         </Card>
       </div>
-      <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-3">
-        <Card title="Gewerke">
+      <div className="grid min-h-0 grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
+        <Card title="Gewerke" action={<HeatLegend />}>
           <Heatmap v={v} linkable={linkable} />
         </Card>
         <Card title="Plan/Ist">
@@ -143,7 +146,7 @@ function FilterBar({
 }) {
   const site = v?.sites.find((s) => s.id === (fixedProject ?? filters.project));
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-semibold tracking-tight whitespace-nowrap text-foreground">{site ? `Baustelle ${site.code} · ${site.name}` : "Alle Baustellen"}</h1>
@@ -215,7 +218,7 @@ function FilterBar({
             aria-controls={`panel-${id}`}
             onClick={() => onTab(id)}
             className={cn(
-              "-mb-px border-b-2 px-3 pb-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              "-mb-px border-b-2 px-3 pb-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
               tab === id ? "border-foreground font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >

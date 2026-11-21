@@ -9,7 +9,7 @@
 // C Pasing: the Fassade has no quantities and no report for two days.
 // Plan vs. Ist: Elektro 85/72, Sanitär 60/64, Trockenbau 45/40, Estrich 55/38.
 // Plus daily reports per team for 16 Werktage (with gaps) and check-ins.
-import { addCalendarDays, berlinDay, berlinTime, DEFAULT_HOLIDAY_REGION, isWerktag, subWerktage, addWerktage } from "@/lib/deadlines";
+import { addCalendarDays, berlinTime, DEFAULT_HOLIDAY_REGION, isWerktag, subWerktage, addWerktage, demoDay } from "@/lib/deadlines";
 import { IDS, seedId } from "@/lib/ids";
 import type { AppEvent, DailyReport, ProgressEntry, ScheduleItem, Team, Trade } from "@/lib/types";
 import type { SeedData } from "./store";
@@ -23,7 +23,7 @@ const MISSING: Record<string, number[]> = {
 
 export function withDashboardHistory(seed: SeedData, now: Date): SeedData {
   const region = DEFAULT_HOLIDAY_REGION;
-  const today = berlinDay(now);
+  const today = demoDay(now, region);
   const wt = (n: number) => (n === 0 ? today : n > 0 ? addWerktage(today, n, region) : subWerktage(today, -n, region));
   const yesterday = wt(-1);
   let k = 0;

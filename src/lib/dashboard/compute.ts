@@ -89,7 +89,7 @@ export type ActionItem = {
 };
 
 /** A site on the map: worst status, open cases, forecast delay days. */
-export type SiteSummary = { id: string; code: string; name: string; short: string; lat: number; lng: number; status: CellStatus; open: number; delay: number };
+export type SiteSummary = { id: string; code: string; name: string; short: string; lat: number; lng: number; status: CellStatus; open: number; delay: number; selected: boolean };
 
 export type DashboardView = {
   now: string;
@@ -639,8 +639,17 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
     }
   }
   for (const c of cases.filter((x) => OPEN_STATUSES.has(x.status)).sort((a, b) => b.created_at.localeCompare(a.created_at))) {
-    const text = c.doc_type === "mehrkostenanzeige" ? "Mehrkostenanzeige · vor Ausführung senden" : `${docTitle(c.doc_type)} · ${c.status === "bereit" ? "prüfen" : "ergänzen"}`;
-    actions.push({ id: `l-${c.id}`, kind: "letter", status: "amber", severity: c.doc_type === "mehrkostenanzeige" ? 52 : 50, text, href: `/admin/case/${c.id}`, detail: `${c.reference} · ${short(c.project_id)}` });
+    // Every line names the letter, the trade and the site; what to do is in the tooltip.
+    const parent = c.parent_case_id ? all.cases.find((x) => x.id === c.parent_case_id) : undefined;
+    const trade =
+      caseTrade(c) ??
+      (parent ? caseTrade(parent) : null) ??
+      all.trades.find((t) => t.team_id && t.team_id === c.team_id)?.name ??
+      (all.teams.find((t) => t.id === c.team_id)?.name.replace(/^Team\s+/, "") ?? null);
+    const doc = SHORT_DOC[c.doc_type] ?? docTitle(c.doc_type);
+    const text = [doc, trade, short(c.project_id)].filter(Boolean).join(" · ");
+    const todo = c.doc_type === "mehrkostenanzeige" ? "vor Ausführung senden" : c.status === "bereit" ? "prüfen und freigeben" : "ergänzen";
+    actions.push({ id: `l-${c.id}`, kind: "letter", status: "amber", severity: c.doc_type === "mehrkostenanzeige" ? 52 : 50, text, href: `/admin/case/${c.id}`, detail: `${c.reference}: ${todo}` });
   }
   actions.sort((a, b) => b.severity - a.severity || a.text.localeCompare(b.text));
   const ok = rows.flatMap((r) => r.cells.filter((c) => c.status === "green").map((c) => `${c.trade} · ${short(r.project_id)}`));
@@ -660,6 +669,7 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
       status: status === "none" ? "green" : status,
       open: cases.filter((c) => c.project_id === p.id && OPEN_STATUSES.has(c.status)).length,
       delay: [...now$.cells.entries()].filter(([k]) => k.startsWith(`${p.id}|`)).reduce((n, [, d]) => n + d, 0),
+      selected: !!filters.project && p.id === filters.project,
     };
   });
   void cellOf;
@@ -682,9 +692,28 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
     pipeline: { steps, title: pipeTitle },
     feed,
     actions: { items: actions, ok },
-    site_map: siteMap,
+    // The map always shows every site; with a site (or team) filter, the others come from the unfiltered view.
+    site_map:
+      filters.project || filters.team
+        ? computeDashboard(all, now, { ...filters, project: null, team: null }, region, defaultSite).site_map.map((x) => ({ ...x, selected: projectIds.has(x.id) }))
+        : siteMap,
   };
 }
+
+/** Short letter names for one-line cards. */
+const SHORT_DOC: Record<string, string> = {
+  behinderungsanzeige: "Behinderungsanzeige",
+  behinderung_ende: "Behinderungsende",
+  mehrkostenanzeige: "Mehrkostenanzeige",
+  anordnung_bestaetigung: "Anordnung",
+  ergaenzung: "Ergänzende Angaben",
+  stellungnahme_zurueckweisung: "Stellungnahme",
+  meldung: "Meldung",
+  verzug_nu: "Verzug NU",
+  maengelanzeige: "Mängelanzeige",
+  bedenken: "Bedenken",
+  info_folgegewerk: "Info Folgegewerk",
+};
 
 /** Routine check-ins of the same half-day become one line ("4 Check-ins"). */
 function groupCheckins(items: FeedItem[]): FeedItem[] {

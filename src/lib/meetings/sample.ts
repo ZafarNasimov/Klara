@@ -3,7 +3,7 @@
 // real pipeline; SAMPLE_RESULT is only the offline fallback (LLM unreachable).
 // Names follow the demo project, Baustelle B "Wohnanlage Riem, Haus 2" (seed.ts). The
 // sample is multilingual: German, Russian, Polish and Serbian.
-import { berlinDay, berlinTime, subWerktage, DEFAULT_HOLIDAY_REGION } from "@/lib/deadlines";
+import { berlinTime, subWerktage, DEFAULT_HOLIDAY_REGION, demoDay } from "@/lib/deadlines";
 import { IDS } from "@/lib/ids";
 import type { Meeting } from "@/lib/types";
 import { verifyItems } from "./items";
@@ -167,7 +167,7 @@ const SEED_NOTICE = "Protokoll aus der Demo-Historie: Vorlagen sind hier nur fes
  */
 export function buildSeedMeetings(now: Date): Meeting[] {
   const region = DEFAULT_HOLIDAY_REGION;
-  const today = berlinDay(now);
+  const today = demoDay(now, region);
   const kw47Day = subWerktage(today, 1, region);
   const kw46Day = subWerktage(today, 6, region);
   const participants = SAMPLE_PARTICIPANTS.map((p) =>

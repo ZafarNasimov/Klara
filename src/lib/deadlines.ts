@@ -128,6 +128,16 @@ export function subWerktage(day: string, n: number, region = DEFAULT_HOLIDAY_REG
 
 export const nextWerktag = (day: string, region = DEFAULT_HOLIDAY_REGION) => addWerktage(day, 1, region);
 
+/**
+ * The demo's working day: today, or the next Werktag on a Sunday or holiday,
+ * so seeded schedules ("ends in 2 Werktagen", "yesterday's report") read the
+ * same whatever day the demo is reset on.
+ */
+export const demoDay = (now: Date, region = DEFAULT_HOLIDAY_REGION) => {
+  const day = berlinDay(now);
+  return isWerktag(day, region) ? day : nextWerktag(day, region);
+};
+
 /** Werktage strictly after `from`, up to and including `to`. */
 export function werktageBetween(from: string, to: string, region = DEFAULT_HOLIDAY_REGION): number {
   let n = 0;

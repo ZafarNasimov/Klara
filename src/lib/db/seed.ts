@@ -5,7 +5,7 @@
 // A Neubau Bürogebäude Schwabing (IDS.projectRiem, ids kept) and C Schule
 // Pasing (IDS.projectSchwabing, BGB) add teams in TR, EN, DE and RO. Past activity (letters,
 // replies, daily reports) comes from `demo-history.ts` on "Demo zurücksetzen".
-import { addWerktage, berlinDay, subWerktage, DEFAULT_HOLIDAY_REGION } from "@/lib/deadlines";
+import { addWerktage, subWerktage, DEFAULT_HOLIDAY_REGION, demoDay } from "@/lib/deadlines";
 import { IDS } from "@/lib/ids";
 import { buildSeedMeetings } from "@/lib/meetings/sample";
 import type { SeedData } from "./store";
@@ -18,7 +18,7 @@ export const DEFAULT_VAD = { silence_ms: 800, min_speech_ms: 400, positive_thres
 
 export function buildSeed(now: Date = new Date()): SeedData {
   const region = DEFAULT_HOLIDAY_REGION;
-  const today = berlinDay(now);
+  const today = demoDay(now, region);
   const wt = (n: number) => (n >= 0 ? addWerktage(today, n, region) : subWerktage(today, -n, region));
   const sched = (
     id: string,

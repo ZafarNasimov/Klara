@@ -6,7 +6,7 @@
 // templates; ids are stable (seedId), dates are relative to the seed day.
 import { createHash } from "node:crypto";
 import type { ProjectContext } from "@/lib/db/repo";
-import { addWerktage, berlinDay, berlinTime, DEFAULT_HOLIDAY_REGION, subWerktage } from "@/lib/deadlines";
+import { addWerktage, berlinDay, berlinTime, DEFAULT_HOLIDAY_REGION, subWerktage, demoDay } from "@/lib/deadlines";
 import { requireDocType } from "@/lib/doctypes";
 import { buildBody, toMarkdown } from "@/lib/documents/build";
 import { dateDe } from "@/lib/documents/templates/kit";
@@ -45,7 +45,7 @@ const REJECTION_HINT_DE = "Eine Zurückweisung macht die Behinderungsanzeige nic
 
 export function withDemoHistory(seed: SeedData, now: Date): SeedData {
   const region = DEFAULT_HOLIDAY_REGION;
-  const today = berlinDay(now);
+  const today = demoDay(now, region);
   const wt = (n: number) => (n >= 0 ? addWerktage(today, n, region) : subWerktage(today, -n, region));
   const at = (d: number, hhmm: string) => {
     const [hh, mm] = hhmm.split(":").map(Number);

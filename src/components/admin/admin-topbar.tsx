@@ -35,16 +35,29 @@ export function AdminTopbar() {
       <div className="ml-auto flex items-center gap-4">
         {data ? (
           <p className="hidden text-sm text-muted-foreground lg:block" title="Uhrzeit der Demo-Uhr">
-            {data.project.name}
-            <span className="mx-2 text-border" aria-hidden>
-              |
-            </span>
+            {/* The chosen site only where the page is about it (not on the dashboards, which name their own). */}
+            <Suspense fallback={null}>
+              <SiteName name={data.project.name} />
+            </Suspense>
             <span className="font-mono text-foreground">{fmtDateTime(data.now)}</span>
           </p>
         ) : null}
         <RoleSwitcher />
       </div>
     </header>
+  );
+}
+
+function SiteName({ name }: { name: string }) {
+  const path = usePathname();
+  if (path === "/admin" || path.startsWith("/admin/project/")) return null;
+  return (
+    <>
+      {name}
+      <span className="mx-2 text-border" aria-hidden>
+        |
+      </span>
+    </>
   );
 }
 
