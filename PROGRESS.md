@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-21 (demo data: three sites, six languages, three weeks of history) · branch `claude/project-thread-jrqak8`, not yet on `main`
+Last update: 2026-11-21, 23:15 (Vasily's dashboards and meeting notes merged and checked; deploy of `main`) · branch `main`
 
 ## Milestones (SPEC §11)
 
@@ -16,6 +16,7 @@ Last update: 2026-11-21 (demo data: three sites, six languages, three weeks of h
 | M4 | E-mail: composer, send, inbound reply analysis | ✅ real round trip verified 2026-11-21 (Gmail): sent KL-2026-0043, Zafar's reply matched by the thread (In-Reply-To), classified rejection by the live model with the verbatim quote, "Übermittlung" green, Stellungnahme KL-2026-0044 drafted. Question and change-request replies still to try live |
 | M5 | Realtime, polish, fallbacks ("Antwort simulieren") | ✅ done (open: screen to assign unmatched replies) |
 | M6 | Eval set (`eval/utterances.json`, ≥30) and `eval/run.ts` | 🟡 eval done: 38 utterances, live model 100 % doc type, 100 % sphere (2026-11-21); 5 rehearsals on phone + projector pending (Zafar) |
+| Should | Meeting notes (`/admin/meetings`), dashboards (`/admin`, `/admin/project/[id]`) | ✅ built by Vasily, merged 2026-11-21 (see the sections below) |
 
 ### Done so far
 
@@ -57,7 +58,7 @@ Last update: 2026-11-21 (demo data: three sites, six languages, three weeks of h
 - **Pitch Scene 5** renders the real `DashboardBody` from `/api/dashboard/demo` (the reset demo computed on the server, no database); the step adds the call's KL-2026-0042 (same function), so the KPI and A × Elektro change on stage.
 - **Supabase:** no migration (new rows only, `settings.site_code` in JSON); after a deploy, "Demo zurücksetzen" loads sites, history and dashboard data.
 
-### Besprechungen / meeting notes (branch `meetings`, not merged)
+### Besprechungen / meeting notes (merged into `main` 2026-11-21)
 
 Record a meeting → transcript → summary → only the evidenced letters → visible changes. Admin tab "Besprechungen" (`/admin/meetings`, `/admin/meetings/[id]`). Code: `src/lib/meetings/*`, `src/components/meetings/*`, `src/app/api/meetings/**`.
 
@@ -141,6 +142,30 @@ Earlier cloud test (2026-11-20, 23:20 UTC, HTTP only): STT exact and 1.15 s, TTS
 
 Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-0039..0041 so the board is not empty before the demo case.
 
+## Merge of Vasily's work into `main` (2026-11-21, 22:55, checked by Claude)
+
+`main` = 64c69ca (`pitch-letter`, `dashboards` and the meeting notes on top of the three-site demo data). 24 commits, 61 files, +5,679 lines; nothing of the build branch was lost (its last commit f30395e is an ancestor).
+
+- **What changed for everyone:**
+  - `/admin` is now the portfolio dashboard "Alle Baustellen";
+  - the case board moved to `/admin/vorgaenge` (nav: Übersicht, Vorgänge, Besprechungen, Demo);
+  - `/admin/project/[id]` is the dashboard of one site;
+  - "Besprechungen" is built: record or upload in any language, get a German protocol, and only the evidenced letters are drafted.
+  - New doc types from meetings only: `maengelanzeige`, `bedenken`.
+- **Data:**
+  - `withDashboardHistory` (`src/lib/db/dashboard-history.ts`) runs after `withDemoHistory` on "Demo zurücksetzen" and on the memory store's first start. It adds daily quantities for every started item, check-in daily reports for 16 Werktage with gaps, and Elektro 2.OG quantities (900 m, 85 % pace).
+  - `buildSeed` now includes the two meetings MT-2026-0006/0007, and the sites carry `settings.site_code` A/B/C.
+- **Checked:**
+  - typecheck clean (after `npx next typegen`, see below), lint clean apart from the old `mock.ts` warning, **189 tests** (35 new), production build;
+  - in a browser on a fresh memory store: `/admin`, `/admin/vorgaenge`, `/admin/project/<Riem>`, `/admin/meetings` and a Schwabing case page, no console errors; the site switcher of the case board still works;
+  - Supabase compatibility of the new reset rows: meetings use only the existing `meeting` columns (details in `transcript`/`protocol` JSON); daily-report statuses `eingereicht`/`entwurf` have no constraint; no migration needed;
+  - `maxDuration = 300` on the meeting routes is fine on this Vercel plan (the realtime route has used 300 since the first deploy).
+- **Open points (for Vasily / Zafar):**
+  1. The seeded meeting MT-2026-0007 (yesterday) says it updated **KL-2026-0042** and created drafts **KL-2026-0043/0044**. After a reset none of these cases exist: KL-2026-0042 is created by the live demo call today, and the next letter (e.g. the Stellungnahme after "Antwort simulieren") becomes KL-2026-0043. The links don't resolve (by design, see the meeting section), but the texts can confuse on stage. Use references that don't collide, or present the meeting after the call.
+  2. `/admin/meetings` lists the meetings of the Bürogebäude only, also when another site is selected in the top bar.
+  3. After pulling new routes, run `npx next typegen` before `npx tsc` (`next build` does it by itself), otherwise `PageProps<"/admin/…">` fails with "does not satisfy the constraint 'AppRoutes'".
+- **Deploy:** Vasily's pushes don't start Vercel builds (see Known issues); this PROGRESS commit by Zafar's account deploys `main`. On the live site, click "Demo zurücksetzen" once to load the dashboards' data and the meetings.
+
 ## Real e-mail through a mailbox (decided by Zafar, 2026-11-21)
 
 Instead of Postmark, Klara can use a normal mailbox: `src/lib/mail/mailbox.ts` sends over SMTP (nodemailer, Klara sets the Message-ID, letter PDF attached) and reads answers over IMAP (imapflow + mailparser): unread mails of the last 7 days that reply to a Klara e-mail or carry "KL-…" in the subject go through `receiveReply` and are marked read. The case page calls `POST /api/email/poll` every 10 s while it shows "Wartet auf Antwort" ("Jetzt prüfen" link; "Antwort simulieren" after 60 s instead of 15 s). `delivery.ts` picks the mailbox first, then Postmark, else the test send. SPEC §13 lists Gmail/Outlook (OAuth) as out of scope; this uses an app password, and Zafar chose it.
@@ -172,7 +197,7 @@ Found in a live Russian call (slang, a "meteorite", broken site toilets, 7 idle)
 
 ## Branches
 
-- **`main` is the main branch** (decided by Zafar, 2026-11-21). On 2026-11-21 it was fast-forwarded to `0940df7`, which holds all work so far: M0–M6, the mailbox e-mail loop, the photo button and the merged pitch deck. No history was rewritten.
+- **`main` is the main branch** (decided by Zafar, 2026-11-21). On 2026-11-21 it was fast-forwarded to `0940df7`, which holds all work so far: M0–M6, the mailbox e-mail loop, the photo button and the merged pitch deck. No history was rewritten. Since 2026-11-21, 22:55 it also holds Vasily's dashboards, meeting notes and pitch letter scenes (see "Merge of Vasily's work").
 - `claude/project-thread-jrqak8`: the build branch these sessions worked on; identical to `main` at `0940df7`.
 - `pitchflow`: the pitch deck branch; fully merged into `main`. Before continuing there, merge `main` into it first.
 - `claude/project-thread-n3tjiq`: stale; its only extra commit is a PROGRESS note of the first cloud voice test (9–11 s per turn), summarised under "Call latency work".
