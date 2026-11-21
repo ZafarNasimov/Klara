@@ -3,7 +3,7 @@
 // real pipeline; SAMPLE_RESULT is only the offline fallback (LLM unreachable).
 // Names follow the demo project, Baustelle B "Wohnanlage Riem, Haus 2" (seed.ts). The
 // sample is multilingual: German, Russian, Polish and Serbian.
-import { berlinDay, berlinTime, subWerktage, werktageBetween, addWerktage, DEFAULT_HOLIDAY_REGION } from "@/lib/deadlines";
+import { berlinDay, berlinTime, subWerktage, DEFAULT_HOLIDAY_REGION } from "@/lib/deadlines";
 import { IDS } from "@/lib/ids";
 import type { Meeting } from "@/lib/types";
 import { verifyItems } from "./items";
@@ -158,7 +158,7 @@ export const PREVIOUS_RESULT: { summary: string[]; items: RawItem[] } = {
 // ── Seed rows (pure; buildSeed calls this) ───────────────────────────────
 
 
-const SEED_NOTICE = "Demodaten: Diese Änderungen sind hier nur protokolliert. „Meeting starten“ → „Beispielaufnahme verwenden“ wertet dieselbe Besprechung echt aus und führt sie aus.";
+const SEED_NOTICE = "Protokoll aus der Demo-Historie: Vorlagen sind hier nur festgehalten, es wurden keine Vorgänge angelegt. „Meeting starten“ → „Beispielaufnahme verwenden“ wertet dieselbe Besprechung echt aus und legt die Vorgänge an.";
 
 /**
  * MT-2026-0006 (last week) and MT-2026-0007 (yesterday). Their results are
@@ -174,29 +174,15 @@ export function buildSeedMeetings(now: Date): Meeting[] {
     p.name === "Dr. Petra Lang" ? { ...p, contact_id: IDS.contactBauherr } : p.name === "Thomas Weber" ? { ...p, contact_id: IDS.contactArchitekt } : p,
   );
 
-  // MT-2026-0007: the sample meeting with its stored result.
+  // MT-2026-0007: the sample meeting with its stored result, as history only.
+  // It names no case numbers and changed nothing: on a fresh demo the live
+  // call creates KL-…-0042 today, and a seeded meeting from yesterday must
+  // not claim to have updated it.
   let n = 0;
   const items = verifyItems(SAMPLE_RESULT.items, SAMPLE_SEGMENTS, { meetingId: IDS.meetingKw47, baseDay: kw47Day, newId: () => `${IDS.meetingKw47}-i${++n}` }).map((i) =>
-    i.kind === "behinderung"
-      ? { ...i, updated_case_id: null, case_ref: "KL-2026-0042", case_action: "updated" as const, case_doc_type: "behinderungsanzeige" }
-      : i.kind === "anordnung"
-        ? { ...i, case_ref: "KL-2026-0043", case_action: "created" as const, case_doc_type: "anordnung_bestaetigung" }
-        : i.kind === "mehrkosten"
-          ? { ...i, case_ref: "KL-2026-0044", case_action: "created" as const, case_doc_type: "mehrkostenanzeige" }
-          : i,
+    i.kind === "termin" ? { ...i, case_action: "noop" as const } : i,
   );
-  const friday = items.find((i) => i.kind === "termin")?.new_date ?? addWerktage(kw47Day, 2, region);
-  const elektroEnd = subWerktage(today, 2, region); // seed.ts: schedElektro2 end = wt(-2)
-  const delay = Math.max(1, werktageBetween(elektroEnd, friday, region));
-  const days = `+${delay} ${delay === 1 ? "Arbeitstag" : "Arbeitstage"}`;
-  const changes: MeetingChange[] = [
-    { kind: "case_updated", text_de: "KL-2026-0042 aktualisiert: voraussichtliches Ende Freitag", case_id: null, case_ref: "KL-2026-0042", case_doc_type: "behinderungsanzeige" },
-    { kind: "case_created", text_de: "Neuer Entwurf KL-2026-0043: Bestätigung mündlicher Anordnung", case_id: null, case_ref: "KL-2026-0043", case_doc_type: "anordnung_bestaetigung" },
-    { kind: "case_created", text_de: "Neuer Entwurf KL-2026-0044: Mehrkostenanzeige", case_id: null, case_ref: "KL-2026-0044", case_doc_type: "mehrkostenanzeige" },
-    { kind: "schedule_updated", text_de: `Termin Elektro 2. OG: ${days}`, case_id: null, case_ref: null },
-    { kind: "schedule_updated", text_de: `Termin Estrich 2. OG: ${days}`, case_id: null, case_ref: null },
-    { kind: "tasks_created", text_de: "4 Aufgaben angelegt", case_id: null, case_ref: null },
-  ];
+  const changes: MeetingChange[] = [{ kind: "tasks_created", text_de: `${items.filter((i) => i.kind === "task").length} Aufgaben angelegt`, case_id: null, case_ref: null }];
   const kw47Start = berlinTime(kw47Day, 9, 0);
   const kw47: MeetingProtocol = {
     ref: "MT-2026-0007",
