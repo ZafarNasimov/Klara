@@ -1,13 +1,9 @@
 import type { Metadata } from "next";
+import { MeetingsList } from "@/components/meetings/meetings-list";
 
 export const metadata: Metadata = { title: "Besprechungen" };
 
-/** Meeting upload → protocol (SPEC §8, Should). */
+/** Project meetings: record → transcript → protocol, tasks and evidenced drafts. */
 export default function MeetingsPage() {
-  return (
-    <main className="mx-auto w-full max-w-3xl px-6 py-8">
-      <h1 className="text-lg font-semibold text-foreground">Besprechungen</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Audio einer Baubesprechung hochladen, Klara erstellt das Protokoll.</p>
-    </main>
-  );
+  return <MeetingsList />;
 }
