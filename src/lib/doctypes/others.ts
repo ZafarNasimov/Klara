@@ -65,6 +65,71 @@ export const ergaenzung: DocTypeDef = {
   readback_fields: ["answers"],
 };
 
+/**
+ * The default case: a site report Klara could not place in any letter type
+ * (or only with low confidence). Nothing gets lost; the site manager reads
+ * the report and the transcript and decides (internal, never sent).
+ */
+export const meldung: DocTypeDef = {
+  id: "meldung",
+  title_de: "Meldung zur Prüfung",
+  legal_basis: "Interne Meldung – Einordnung durch die Bauleitung",
+  tier: "A",
+  build_priority: "must",
+  recipient: "internal",
+  // A report nobody could place should be looked at the same day.
+  deadline: { kind: "unverzueglich" },
+  event_time_field: "",
+  checks: ["required_fields", "confidence"],
+  max_questions: 3,
+  fields: [
+    {
+      key: "report",
+      label_de: "Meldung",
+      type: "text",
+      required: true,
+      question_hint: "What exactly happened on site?",
+      ask: {
+        en: "What exactly happened on site?",
+        de: "Was genau ist auf der Baustelle passiert?",
+        ru: "Что именно произошло на объекте?",
+      },
+      extract_hint: "German, factual, in the user's words.",
+    },
+    {
+      key: "area",
+      label_de: "Bereich",
+      type: "text",
+      required: false,
+      ask_if_missing: true,
+      unknown_value_de: "nicht angegeben",
+      question_hint: "Where exactly on site?",
+      ask: {
+        en: "Where exactly on site, which floor or area?",
+        de: "Wo genau auf der Baustelle, welches Geschoss oder welcher Bereich?",
+        ru: "Где именно на объекте, какой этаж или участок?",
+      },
+      extract_hint: "German, e.g. '2.OG', 'Küche Haus B'.",
+    },
+    {
+      key: "impact",
+      label_de: "Auswirkung",
+      type: "text",
+      required: false,
+      ask_if_missing: true,
+      unknown_value_de: "nicht angegeben",
+      question_hint: "Can your crew keep working? How many people are affected?",
+      ask: {
+        en: "Can your crew keep working? How many people are affected?",
+        de: "Kann Ihre Kolonne weiterarbeiten? Wie viele Leute sind betroffen?",
+        ru: "Может ли бригада продолжать работу? Сколько человек затронуто?",
+      },
+      extract_hint: "German, e.g. '7 Arbeitskräfte können nicht arbeiten' or 'Arbeit läuft weiter'.",
+    },
+  ],
+  readback_fields: ["report", "area", "impact"],
+};
+
 export const bautagesbericht: DocTypeDef = {
   id: "bautagesbericht",
   title_de: "Bautagesbericht",

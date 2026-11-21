@@ -206,7 +206,7 @@ export function CaseDetailView({ id }: { id: string }) {
               Dokument
             </TabsTrigger>
             <TabsTrigger value="nachweise" className="px-3">
-              Nachweise <Count n={data.evidence.length} />
+              Nachweise <Count n={data.evidence.length + (data.live_transcript ? 1 : 0)} />
             </TabsTrigger>
             <TabsTrigger value="verlauf" className="px-3">
               Verlauf
@@ -230,7 +230,7 @@ export function CaseDetailView({ id }: { id: string }) {
           </TabsContent>
 
           <TabsContent value="nachweise" className="pt-5">
-            <EvidenceList evidence={data.evidence} author={c.author_name} />
+            <EvidenceList evidence={data.evidence} live={data.live_transcript} author={c.author_name} />
           </TabsContent>
 
           <TabsContent value="verlauf" className="pt-5">
@@ -696,8 +696,8 @@ function VersionBar({
 
 type TranscriptTurn = { role: "user" | "klara"; text: string; text_de: string | null; language: string | null; at: string };
 
-function EvidenceList({ evidence, author }: { evidence: Evidence[]; author: string | null }) {
-  if (!evidence.length) {
+function EvidenceList({ evidence, live, author }: { evidence: Evidence[]; live: CaseDetail["live_transcript"]; author: string | null }) {
+  if (!evidence.length && !live) {
     return (
       <Empty icon={<MessagesSquare className="size-5" aria-hidden />} title="Noch keine Nachweise">
         Gesprächsprotokoll und Wetterdaten werden beim Bestätigen durch den Polier angehängt.
@@ -708,6 +708,14 @@ function EvidenceList({ evidence, author }: { evidence: Evidence[]; author: stri
   const photos = evidence.filter((e) => e.kind === "photo").sort((a, b) => a.created_at.localeCompare(b.created_at));
   return (
     <div className="max-w-[760px] space-y-4">
+      {live ? (
+        <TranscriptSection
+          title={`Gesprächsprotokoll (${live.conversation_kind === "call" ? "Anruf" : "Chat"})`}
+          note="Stand des Gesprächs, vom Polier noch nicht bestätigt."
+          turns={live.turns as TranscriptTurn[]}
+          author={author}
+        />
+      ) : null}
       {[...evidence]
         .sort((a, b) => order[a.kind] - order[b.kind])
         // All photos show as one grid, where the first one sorts.
@@ -758,29 +766,54 @@ function Section({ title, at, icon, children }: { title: string; at?: string; ic
 function Transcript({ e, author }: { e: Evidence; author: string | null }) {
   const turns = Array.isArray(e.data.turns) ? (e.data.turns as TranscriptTurn[]) : [];
   const via = e.data.kind === "call" ? "Anruf" : "Chat";
+  return <TranscriptSection title={`Gesprächsprotokoll (${via})`} at={e.created_at} turns={turns} author={author} />;
+}
+
+/**
+ * What was said, for verification and documentation: each line in the original
+ * language (tagged when it is not German) with the German translation under it.
+ */
+function TranscriptSection({ title, at, note, turns, author }: { title: string; at?: string; note?: string; turns: TranscriptTurn[]; author: string | null }) {
+  const foreign = turns.some((t) => t.language && t.language !== "de");
   return (
-    <Section title={`Gesprächsprotokoll (${via})`} at={e.created_at} icon={<MessagesSquare className="size-4 text-muted-foreground" aria-hidden />}>
+    <Section title={title} at={at} icon={<MessagesSquare className="size-4 text-muted-foreground" aria-hidden />}>
+      {note || foreign ? (
+        <p className="mb-3 text-xs text-muted-foreground">
+          {[note, foreign ? "Original mit deutscher Übersetzung darunter." : null].filter(Boolean).join(" ")}
+        </p>
+      ) : null}
       <ol className="space-y-3">
-        {turns.map((t, i) => (
-          <li key={i} className="grid grid-cols-[48px_128px_minmax(0,1fr)] gap-3 text-sm">
-            <time dateTime={t.at} className="pt-px font-mono text-xs text-muted-foreground">
-              {fmtTime(t.at)}
-            </time>
-            <span className={cn("font-medium", t.role === "klara" ? "text-muted-foreground" : "text-foreground")}>
-              {t.role === "klara" ? "Klara" : (author ?? "Polier")}
-            </span>
-            <div className="min-w-0">
-              <p lang={t.language ?? undefined} className="text-foreground">
-                {t.text}
-              </p>
-              {t.text_de && t.text_de !== t.text ? (
-                <p lang="de" className="mt-0.5 text-muted-foreground">
-                  {t.text_de}
+        {turns.map((t, i) => {
+          const translated = !!t.text_de && t.text_de !== t.text;
+          return (
+            <li key={i} className="grid grid-cols-[48px_128px_minmax(0,1fr)] gap-3 text-sm">
+              <time dateTime={t.at} className="pt-px font-mono text-xs text-muted-foreground">
+                {fmtTime(t.at)}
+              </time>
+              <span className={cn("font-medium", t.role === "klara" ? "text-muted-foreground" : "text-foreground")}>
+                {t.role === "klara" ? "Klara" : (author ?? "Polier")}
+              </span>
+              <div className="min-w-0">
+                <p lang={t.language ?? undefined} className="text-foreground">
+                  {translated && t.language ? (
+                    <span className="mr-1.5 font-mono text-xs text-muted-foreground" aria-label={`Original, Sprache ${t.language.toUpperCase()}`}>
+                      {t.language.toUpperCase()}
+                    </span>
+                  ) : null}
+                  {t.text}
                 </p>
-              ) : null}
-            </div>
-          </li>
-        ))}
+                {translated ? (
+                  <p lang="de" className="mt-0.5 text-muted-foreground">
+                    <span className="mr-1.5 font-mono text-xs" aria-label="Deutsche Übersetzung">
+                      DE
+                    </span>
+                    {t.text_de}
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
       </ol>
     </Section>
   );

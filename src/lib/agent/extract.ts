@@ -25,7 +25,13 @@ export async function extract(text: string, ctx: ExtractContext): Promise<Extrac
       tool: RECORD_TURN_TOOL,
       cache: true,
     });
-    return { extraction: sanitizeExtraction(r.input, text, ctx), source: "live", model: r.model };
+    const extraction = sanitizeExtraction(r.input, text, ctx);
+    // Opt-in diagnosis of real conversations (contains what the user said; off by default).
+    if (process.env.KLARA_LOG_EXTRACT === "1") {
+      const brief = extraction.events.map((e) => ({ doc_type: e.doc_type, confidence: e.confidence, cause_kind: e.cause_kind, trade: e.trade_name_guess, facts: e.facts }));
+      console.log("[klara] extract", JSON.stringify({ intent: extraction.intent, events: brief, diary_note: extraction.diary_note }));
+    }
+    return { extraction, source: "live", model: r.model };
   } catch (err) {
     console.warn("[klara] extraction failed, using keyword fallback", err);
     return { extraction: mockExtract(text, ctx), source: "fallback", model: null };

@@ -3,7 +3,7 @@ import { anordnungBestaetigung } from "./anordnung-bestaetigung";
 import { behinderungEnde } from "./behinderung-ende";
 import { behinderungsanzeige } from "./behinderungsanzeige";
 import { mehrkostenanzeige } from "./mehrkostenanzeige";
-import { bautagesbericht, ergaenzung, infoFolgegewerk, stellungnahmeZurueckweisung, verzugNu } from "./others";
+import { bautagesbericht, ergaenzung, infoFolgegewerk, meldung, stellungnahmeZurueckweisung, verzugNu } from "./others";
 import type { DocTypeDef, DocTypeId, FieldDef } from "./types";
 
 export * from "./types";
@@ -15,6 +15,7 @@ export const REGISTRY: Record<DocTypeId, DocTypeDef> = {
   anordnung_bestaetigung: anordnungBestaetigung,
   stellungnahme_zurueckweisung: stellungnahmeZurueckweisung,
   ergaenzung,
+  meldung,
   bautagesbericht,
   verzug_nu: verzugNu,
   info_folgegewerk: infoFolgegewerk,

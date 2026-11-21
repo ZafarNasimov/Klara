@@ -36,7 +36,7 @@ Rules:
 - If Klara asked who hired a trade: hired_by = "client" (Bauherr/owner hired them), "us" (we hired them, our subcontractor) or "unknown" (the user does not know).
 - Events listed under "Already documented" are finished; never report them again. Only report what is new in this utterance.
 - Evening reports with quantities ("screed only 15 m²") → intent diary_answer with progress entries. "Everything according to plan" → intent diary_answer with diary_note.
-- confidence (0–1): how sure you are that the event type is right. Vague or emotional statements without a concrete site event → doc_type none with low confidence.
+- confidence (0–1): how sure you are that an event of this type happened as described. Not how plausible, unusual or complete it is: "we cannot work", "N people are waiting" or "X blocks us" is a hindrance (≥ 0.7) whatever the cause (also odd ones like broken site toilets or a falling object), with slang or mixed languages too. Vague or emotional statements without a concrete site event → doc_type none with low confidence.
 - reply_language: ISO 639-1 code of the language the user spoke. text_de: German translation of the utterance, or null if it is German.
 - Never decide legal outcomes, never promise money, never say a claim is valid or invalid, never mention paragraphs.
 

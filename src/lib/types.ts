@@ -112,6 +112,8 @@ export type ConversationState = {
   asked_sphere?: { case_id: string; trade: string | null } | null;
   /** Clarifying questions asked in a row (to avoid loops). */
   clarify_count?: number;
+  /** What the user reported that Klara could not place yet (German); two of them open the default case. */
+  unclear_de?: string[] | null;
   /** Low-confidence report kept for the next turn instead of opening a case (SPEC §6.2 step 3). */
   tentative?: { doc_type: string; trade_name_guess: string | null; cause_kind: string; facts: Record<string, unknown> } | null;
   /** Answers to "Who hired the <trade>?", keyed by lower-case canonical trade name. */
@@ -386,6 +388,11 @@ export type CaseDetail = {
   validation_blocker: string | null;
   /** Fields the office can ask the Polier about, missing ones first. */
   askable_fields: { key: string; label: string; missing: boolean }[];
+  /**
+   * The conversation as it stands (original + German), while no confirmed
+   * Gesprächsprotokoll is attached: drafts, unclear reports, open chats.
+   */
+  live_transcript: { conversation_kind: string; turns: { role: string; text: string; text_de: string | null; language: string | null; at: string }[] } | null;
   /** The linked letters, oldest first (this case included). */
   chain: { id: string; reference: string; doc_type: string }[];
   /** Events of the whole chain, newest first ("Verlauf"). */

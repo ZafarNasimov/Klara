@@ -17,6 +17,7 @@ type Utterance = { id: string; lang: string; team: "estrich" | "ausbau"; time?: 
 type Row = { id: string; lang: string; doc_types: string[]; doc_ok: boolean; sphere: string | null; sphere_ok: boolean | null; missing: string[] | null; missing_ok: boolean | null; reply: string; ms: number; error?: string };
 
 const HINDRANCE = new Set(["behinderungsanzeige", "verzug_nu"]);
+// The board shows every case; the eval scores the first turn of a fresh chat.
 const same = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
 const pct = (ok: number, n: number) => (n ? `${Math.round((ok / n) * 1000) / 10} %` : "–");
 

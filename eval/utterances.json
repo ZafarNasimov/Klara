@@ -28,7 +28,7 @@
     { "id": "de-bedenken", "lang": "de", "team": "estrich", "text": "Der Untergrund im 3.OG ist viel zu feucht, da können wir keinen Estrich einbringen, ich habe Bedenken.", "expect": { "doc_types": ["bedenkenanzeige"] } },
     { "id": "de-ende", "lang": "de", "team": "estrich", "text": "Die Elektriker sind fertig, wir arbeiten seit 10 Uhr wieder im 2.OG.", "expect": { "doc_types": ["behinderung_ende"] } },
     { "id": "de-evening", "lang": "de", "team": "estrich", "time": "16:30", "text": "Estrich 2.OG heute nur 15 m²", "expect": { "doc_types": ["info_folgegewerk"] } },
-    { "id": "de-own-crew", "lang": "de", "team": "estrich", "text": "Unser Estrichmischer ist kaputt, wir konnten erst ab Mittag arbeiten.", "expect": { "doc_types": [] } },
+    { "id": "de-own-crew", "lang": "de", "team": "estrich", "text": "Unser Estrichmischer ist kaputt, wir konnten erst ab Mittag arbeiten.", "expect": { "doc_types": ["meldung"] } },
 
     { "id": "tr-elektro", "lang": "tr", "team": "estrich", "text": "Elektrikçiler ikinci katı bitirmedi, dört kişi sabah yediden beri bekliyor.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "client" } },
     { "id": "tr-storm", "lang": "tr", "team": "estrich", "text": "Fırtına var, vinç bütün gün çalışmadı.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "weather" } },
@@ -42,6 +42,11 @@
     { "id": "en-noshow", "lang": "en", "team": "ausbau", "text": "The drywall guys didn't show up today.", "expect": { "doc_types": ["verzug_nu"], "sphere": "own_sub" } },
     { "id": "en-storm", "lang": "en", "team": "estrich", "text": "Heavy storm, the crane was down all day.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "weather" } },
     { "id": "en-diary", "lang": "en", "team": "estrich", "text": "All according to plan today, nothing special.", "expect": { "doc_types": [] } },
+
+    { "id": "ru-meteor-slang", "lang": "ru", "team": "ausbau", "text": "Привет, короче дропнулся метеорит, на констракшен мы не можем работать", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "unclear" } },
+    { "id": "ru-toilets", "lang": "ru", "team": "ausbau", "text": "Семь человек сейчас не могут работать, ждут новые туалеты.", "expect": { "doc_types": ["behinderungsanzeige"] } },
+    { "id": "de-toilets", "lang": "de", "team": "estrich", "text": "Die Baustellen-WCs sind kaputt, meine Leute können nicht weiterarbeiten.", "expect": { "doc_types": ["behinderungsanzeige"] } },
+    { "id": "pl-slang-noshow", "lang": "pl", "team": "ausbau", "text": "Siema, te typy od regipsów znowu olały robotę, nie ma ich.", "expect": { "doc_types": ["verzug_nu"], "sphere": "own_sub" } },
 
     { "id": "ro-elektro", "lang": "ro", "team": "estrich", "text": "Electricienii nu au eliberat etajul doi, patru oameni așteaptă de la ora șapte.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "client" } }
   ]

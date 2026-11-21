@@ -10,6 +10,7 @@ export type DocTypeId =
   | "anordnung_bestaetigung"
   | "stellungnahme_zurueckweisung"
   | "ergaenzung"
+  | "meldung"
   | "bautagesbericht"
   | "verzug_nu"
   | "info_folgegewerk";

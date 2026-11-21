@@ -33,7 +33,6 @@ import { fmtNumber } from "@/lib/labels";
 import {
   canonicalTradeName,
   computeSphere,
-  CONFIDENCE_THRESHOLD,
   dependents,
   evaluateCase,
   eventTime,
@@ -144,6 +143,15 @@ export async function hangUp(conversationId: string, now?: Date): Promise<{ conv
 }
 
 type NewEvent = Parameters<typeof addEvent>[0];
+
+/**
+ * A concrete report at or above this confidence opens its case; below 0.6 the
+ * "Erkennung" check stays amber ("unsicher erkannt – bitte prüfen") for the
+ * site manager. Lower ones are kept as tentative; a second unclear message
+ * opens the default case ("Meldung zur Prüfung"), so no report is lost.
+ */
+const OPEN_THRESHOLD = 0.3;
+const DEFAULT_DOC = "meldung";
 
 class TurnRun {
   private readonly today: string;
@@ -349,6 +357,7 @@ class TurnRun {
     ];
     if (!results.some(Boolean)) return this.noProgress(ex);
     this.state.clarify_count = 0;
+    this.state.unclear_de = null;
     await this.next();
   }
 
@@ -432,17 +441,41 @@ class TurnRun {
       this.parts.push({ kind: "line", key: "smalltalk" });
       return;
     }
-    // SPEC §6.2 step 3: low confidence → clarifying question, no case. After two tries, note it for the office.
-    if (misses >= 3) {
-      const note = this.userTextDe ?? this.userText;
-      await addDiaryEntry(this.team.id, this.today, { kind: "note", text: `Unklare Meldung: ${note}`, at: this.now.toISOString() });
-      this.queueEvent({ project_id: this.ctx.project.id, case_id: null, kind: "diary_entry", payload: { text: `Unklare Meldung: ${note}`, team_id: this.team.id } });
+    // SPEC §6.2 step 3: an unclear report gets one clarifying question, no case. A second unclear
+    // message opens the default case with everything said, and Klara goes on with its questions.
+    this.state.unclear_de = [...(this.state.unclear_de ?? []), this.userTextDe ?? this.userText];
+    if (this.state.unclear_de.length >= 2) {
+      await this.openDefaultCase();
       this.state.clarify_count = 0;
-      this.state.tentative = null;
-      this.parts.push({ kind: "line", key: "clarifyGiveUp" });
-      return;
+      this.parts.push({ kind: "line", key: "defaultCase" });
+      return this.next();
     }
     this.parts.push({ kind: "line", key: "clarify" });
+  }
+
+  /**
+   * The case for a report Klara could not place: the likely type when there was one
+   * (low confidence, amber "Erkennung"), else "Meldung zur Prüfung" with the user's words.
+   */
+  private async openDefaultCase(): Promise<Case | null> {
+    const said = (this.state.unclear_de ?? []).join(" ").trim();
+    const t = this.state.tentative;
+    this.state.unclear_de = null;
+    this.state.tentative = null;
+    if (t && getDocType(t.doc_type)) {
+      const before = new Set(this.pending.map((c) => c.id));
+      await this.openEvent({
+        doc_type: t.doc_type as ExtractedEvent["doc_type"],
+        trade_name_guess: t.trade_name_guess,
+        cause_kind: t.cause_kind as CauseKind,
+        facts: { ...t.facts },
+        confidence: typeof t.facts._confidence === "number" ? t.facts._confidence : 0.25,
+      });
+      const opened = this.pending.find((c) => !before.has(c.id) || c.doc_type === t.doc_type);
+      if (opened) return opened;
+    }
+    if (!said) return null;
+    return this.upsertCase(DEFAULT_DOC, { report: said, _confidence: 0.2 }, {});
   }
 
   /** Site weather at each hindrance's event time (SPEC §5.2 computed `weather`); lookups shared per instant. */
@@ -542,9 +575,19 @@ class TurnRun {
   }
 
   private async endCall(): Promise<void> {
+    // A report still unclear at the end is kept as the default case, not dropped.
+    if (this.state.unclear_de?.length || this.state.tentative) await this.openDefaultCase();
     if (this.pending.length) {
+      const turns = await (this.userTurn ?? Promise.resolve()).then(() => listTurns(this.conv.id));
+      const transcript = turns.map((t) => ({ role: t.role, text: t.text_original, text_de: t.text_de, language: t.language, at: t.created_at }));
       for (const c of this.pending) {
-        await this.save(c, { status: "unvollstaendig", flags: [...c.flags, "unconfirmed"] });
+        await this.save(c, { status: "unvollstaendig", flags: unique([...c.flags, "unconfirmed"]) });
+        this.later(
+          addEvidence(
+            { case_id: c.id, kind: "transcript", ref: this.conv.id, data: { conversation_id: this.conv.id, kind: this.conv.kind, turns: transcript } },
+            this.now,
+          ),
+        );
       }
       this.parts.push({ kind: "line", key: "unconfirmedSaved" });
     }
@@ -611,7 +654,7 @@ class TurnRun {
 
   private async applyEvents(ex: Extraction): Promise<boolean> {
     const real = ex.events.filter((e) => e.doc_type !== "none");
-    const strong = real.filter((e) => e.confidence >= CONFIDENCE_THRESHOLD);
+    const strong = real.filter((e) => e.confidence >= OPEN_THRESHOLD);
     if (!strong.length) return false;
 
     // A low-confidence report from the turn before completes the first matching event.
@@ -812,9 +855,8 @@ class TurnRun {
       case "ask_sphere":
         return;
       case "diary":
-        // Own crew: internal note only; the draft stays unused.
-        this.dropPending(c.id);
-        await this.noteOwnTeam(facts, tradeName);
+        // Own crew: no letter; the draft becomes the internal "Meldung zur Prüfung".
+        await this.noteOwnTeam(facts, tradeName, c);
         return;
       case "letter":
         if (route.doc_type === "verzug_nu") {
@@ -851,11 +893,33 @@ class TurnRun {
     }
   }
 
-  private async noteOwnTeam(facts: Record<string, unknown>, tradeName: string | null) {
+  /**
+   * Own crew, equipment or material (SPEC §5.2: no letter to the client). Still one case like
+   * every complaint: the internal "Meldung zur Prüfung" with the risk note, asked on and read back.
+   */
+  private async noteOwnTeam(facts: Record<string, unknown>, tradeName: string | null, draft?: Case) {
     const what = [facts.cause, facts.area].filter((x) => typeof x === "string" && x).join(", ") || this.userTextDe || this.userText;
     const reason = `Hinweis: vermutlich eigene Sphäre (eigene Kolonne${tradeName ? `, ${tradeName}` : ""}) – interner Vermerk, bitte prüfen`;
     await addDiaryEntry(this.team.id, this.today, { kind: "incident", text: what, internal_risk: true, at: this.now.toISOString() });
-    this.queueEvent({ project_id: this.ctx.project.id, case_id: null, kind: "risk_flag", payload: { reason_de: `${reason}: ${what}`, team_id: this.team.id } });
+    const report = (typeof facts.cause === "string" && facts.cause) || this.userTextDe || this.userText;
+    const idle = typeof facts.idle_staff === "number" ? `${facts.idle_staff} Arbeitskräfte ohne Einsatz` : null;
+    const noteFacts: Record<string, unknown> = {
+      report,
+      ...(typeof facts.area === "string" && facts.area ? { area: facts.area } : {}),
+      ...(idle ? { impact: idle } : {}),
+      _risk_de: reason,
+      ...(typeof facts._confidence === "number" ? { _confidence: facts._confidence } : {}),
+    };
+    const c = draft
+      ? await this.save(draft, { doc_type: DEFAULT_DOC, sphere: "own_team", facts: noteFacts, asked_fields: [], declined_fields: [] })
+      : await this.upsertCase(DEFAULT_DOC, noteFacts, { sphere: "own_team" });
+    const saved = c ? await this.save(c, { flags: unique([...c.flags, "internal_risk"]) }) : null;
+    this.queueEvent({
+      project_id: this.ctx.project.id,
+      case_id: saved?.id ?? null,
+      kind: "risk_flag",
+      payload: { reference: saved?.reference ?? null, reason_de: `${reason}: ${what}`, team_id: this.team.id },
+    });
     this.parts.push({ kind: "line", key: "ownTeamNoted" });
   }
 
@@ -889,10 +953,25 @@ class TurnRun {
     const existing = this.pending.find((c) => c.doc_type === docType);
     if (existing) {
       const conf = Math.max(Number(existing.facts._confidence ?? 0), Number(facts._confidence ?? 0));
+      // A second cause in the same report adds to the first instead of replacing it.
+      const cause = combinedText(existing.facts.cause, facts.cause);
       return this.save(existing, {
-        facts: { ...existing.facts, ...facts, _confidence: conf },
+        facts: { ...existing.facts, ...facts, ...(cause ? { cause } : {}), _confidence: conf },
         sphere: opts.sphere ?? existing.sphere,
         parent_case_id: existing.parent_case_id ?? opts.parent ?? null,
+      });
+    }
+    // One complaint, one case: the default case becomes the type the user's report turned out to be.
+    const fallback = docType !== DEFAULT_DOC ? this.pending.find((c) => c.doc_type === DEFAULT_DOC) : undefined;
+    if (fallback) {
+      const note = typeof fallback.facts.report === "string" ? fallback.facts.report : null;
+      return this.save(fallback, {
+        doc_type: docType,
+        sphere: opts.sphere ?? null,
+        parent_case_id: opts.parent ?? null,
+        asked_fields: [],
+        declined_fields: [],
+        facts: { report: undefined, impact: undefined, ...facts, ...(note ? { _note_de: note } : {}) },
       });
     }
     const c = await this.createCase(docType, facts, { status: "entwurf", sphere: opts.sphere ?? null, parent: opts.parent ?? null, flags: [] });
@@ -968,7 +1047,7 @@ class TurnRun {
       },
       this.ctx,
     );
-    const kept = c.flags.filter((f) => !EVALUATED_FLAGS.has(f) || (f === "internal_risk" && c.doc_type === "verzug_nu"));
+    const kept = c.flags.filter((f) => !EVALUATED_FLAGS.has(f) || (f === "internal_risk" && (c.doc_type === "verzug_nu" || c.doc_type === DEFAULT_DOC)));
     return {
       missing_fields: ev.missing_fields,
       checks: ev.checks,
@@ -1055,6 +1134,20 @@ function mergeTentative(prev: ConversationState["tentative"], events: ExtractedE
     doc_type: base.doc_type,
     trade_name_guess: first.trade_name_guess ?? base.trade_name_guess,
     cause_kind: first.cause_kind !== "unknown" ? first.cause_kind : base.cause_kind,
-    facts: { ...base.facts, ...first.facts },
+    facts: { ...base.facts, ...first.facts, _confidence: first.confidence },
   };
+}
+
+/**
+ * "A; B" when B says something new, else null (B replaces A as before). New = at least two of B's
+ * content words (5+ letters, so short filler counts little) are not in A, and they are ≥ 40 % of B's.
+ */
+export function combinedText(a: unknown, b: unknown): string | null {
+  if (typeof a !== "string" || !a.trim() || typeof b !== "string" || !b.trim()) return null;
+  const words = (s: string) => new Set(s.toLowerCase().match(/[\p{L}\p{N}]{5,}/gu) ?? []);
+  const wa = words(a);
+  const wb = [...words(b)];
+  const fresh = wb.filter((w) => !wa.has(w)).length;
+  if (fresh < 2 || fresh / wb.length < 0.4) return null;
+  return `${a.trim().replace(/[.;\s]+$/, "")}; ${b.trim()}`;
 }
