@@ -28,7 +28,7 @@ export const IDS = {
   schedBodenbelag2: id(505),
   progressEstrich2: id(601),
 
-  // Wohnanlage Riem, Haus B (VOB/B)
+  // A Neubau Bürogebäude Schwabing (VOB/B); ids keep their first name "Riem"
   projectRiem: id(11),
   contactRiemBauherr: id(111),
   contactRiemSteuerung: id(112),
@@ -49,7 +49,7 @@ export const IDS = {
   schedRiemWdvs: id(515),
   schedRiemHeizung: id(516),
 
-  // Sanierung Wohnhaus Schwabing (BGB)
+  // C Schule Pasing (BGB); ids keep their first name "Schw"
   projectSchwabing: id(12),
   contactSchwBauherr: id(121),
   contactSchwArchitekt: id(122),

@@ -1,8 +1,9 @@
 // Fictional seed data (SPEC §9). Schedule dates are relative to the seed day so
 // the demo always plays "today". Fixed UUIDs keep links stable across resets.
-// Three sites of Muster Bau GmbH; the first one (Bürogebäude, Team Estrich RU,
-// Team Ausbau PL) is the demo story and what the tests use. The other two add
-// teams in TR, EN, DE and RO and a BGB contract. Past activity (letters,
+// Three sites of Muster Bau GmbH; the first one (B Wohnanlage Riem, Haus 2:
+// Team Estrich RU, Team Ausbau PL) is the demo story and what the tests use.
+// A Neubau Bürogebäude Schwabing (IDS.projectRiem, ids kept) and C Schule
+// Pasing (IDS.projectSchwabing, BGB) add teams in TR, EN, DE and RO. Past activity (letters,
 // replies, daily reports) comes from `demo-history.ts` on "Demo zurücksetzen".
 import { addWerktage, berlinDay, subWerktage, DEFAULT_HOLIDAY_REGION } from "@/lib/deadlines";
 import { IDS } from "@/lib/ids";
@@ -43,7 +44,7 @@ export function buildSeed(now: Date = new Date()): SeedData {
     }));
   const demoMailbox = process.env.DEMO_CLIENT_MAILBOX?.trim() || null;
   // A real send in the demo always lands in the demo mailbox, whichever site it is for.
-  const clientMailbox = demoMailbox ?? "petra.lang@immobilien-isar.example";
+  const clientMailbox = demoMailbox ?? "petra.lang@wohnbau-riem.example";
   const settings = {
     fiktive_abnahme_excluded: false,
     holiday_region: region,
@@ -75,36 +76,36 @@ export function buildSeed(now: Date = new Date()): SeedData {
       {
         id: IDS.project,
         company_id: IDS.company,
-        name: "Neubau Bürogebäude München",
-        address: "Hanauer Straße, 80992 München",
-        lat: 48.1773,
-        lng: 11.5357,
+        name: "Wohnanlage Riem, Haus 2",
+        address: "Riemer Straße 12, 81829 München",
+        lat: 48.1339,
+        lng: 11.6929,
         contract_type: "VOB_B",
-        contract_no: "MB-2026-117",
+        contract_no: "WR-2026-114",
         contract_date: "2026-03-02",
-        settings: { ...settings, site_code: "A" },
+        settings: { ...settings, site_code: "B" },
       },
       {
         id: IDS.projectRiem,
         company_id: IDS.company,
-        name: "Wohnanlage Riem, Haus B",
-        address: "Astrid-Lindgren-Straße 12, 81829 München",
-        lat: 48.1318,
-        lng: 11.6904,
+        name: "Neubau Bürogebäude Schwabing",
+        address: "Leopoldstraße 210, 80807 München",
+        lat: 48.1705,
+        lng: 11.586,
         contract_type: "VOB_B",
-        contract_no: "MB-2026-089",
+        contract_no: "BS-2026-089",
         contract_date: "2026-01-19",
-        settings: { ...settings, site_code: "B" },
+        settings: { ...settings, site_code: "A" },
       },
       {
         id: IDS.projectSchwabing,
         company_id: IDS.company,
-        name: "Sanierung Wohnhaus Schwabing",
-        address: "Hohenzollernstraße 58, 80801 München",
-        lat: 48.1623,
-        lng: 11.5754,
+        name: "Schule Pasing",
+        address: "Am Knie 6, 81241 München",
+        lat: 48.1452,
+        lng: 11.4612,
         contract_type: "BGB",
-        contract_no: "MB-2026-102",
+        contract_no: "SP-2026-102",
         contract_date: "2026-02-10",
         settings: { ...settings, site_code: "C" },
       },
@@ -114,11 +115,11 @@ export function buildSeed(now: Date = new Date()): SeedData {
         id: IDS.contactBauherr,
         project_id: IDS.project,
         name: "Dr. Petra Lang",
-        organisation: "Immobilien Isar GmbH",
+        organisation: "Wohnbau Riem GmbH",
         role: "bauherr",
         email: clientMailbox,
         has_authority: true,
-        address: "Maximiliansplatz 9, 80333 München",
+        address: "Willy-Brandt-Allee 10, 81829 München",
       },
       {
         id: IDS.contactArchitekt,
@@ -155,9 +156,9 @@ export function buildSeed(now: Date = new Date()): SeedData {
         id: IDS.contactRiemBauherr,
         project_id: IDS.projectRiem,
         name: "Stefan Maier",
-        organisation: "Wohnbau Riem GmbH & Co. KG",
+        organisation: "Schwabing Office Campus GmbH",
         role: "bauherr",
-        email: demoMailbox ?? "s.maier@wohnbau-riem.example",
+        email: demoMailbox ?? "s.maier@schwabing-office.example",
         has_authority: true,
         address: "Leopoldstraße 236, 80807 München",
       },
@@ -181,16 +182,16 @@ export function buildSeed(now: Date = new Date()): SeedData {
         has_authority: true,
         address: "Truderinger Straße 290, 81825 München",
       },
-      // Sanierung Schwabing (BGB, Eigentümergemeinschaft)
+      // C Schule Pasing (ids: …Schw…) (BGB, Eigentümergemeinschaft)
       {
         id: IDS.contactSchwBauherr,
         project_id: IDS.projectSchwabing,
         name: "Dr. Claudia Ritter",
-        organisation: "Eigentümergemeinschaft Hohenzollernstraße 58",
+        organisation: "Bildungswerk Pasing gGmbH",
         role: "bauherr",
-        email: demoMailbox ?? "c.ritter@weg-hohenzollern58.example",
+        email: demoMailbox ?? "c.ritter@bildungswerk-pasing.example",
         has_authority: true,
-        address: "Hohenzollernstraße 58, 80801 München",
+        address: "Landsberger Straße 480, 81241 München",
       },
       {
         id: IDS.contactSchwArchitekt,
@@ -252,7 +253,7 @@ export function buildSeed(now: Date = new Date()): SeedData {
         id: IDS.schedElektro2,
         project_id: IDS.project,
         trade_id: IDS.tradeElektro,
-        activity: "Elektroinstallation (Leerrohre, Bodentanks)",
+        activity: "Elektroinstallation (Leerrohre, Unterverteilungen)",
         area: "2.OG",
         start_date: wt(-10),
         end_date: wt(-2),
@@ -265,7 +266,7 @@ export function buildSeed(now: Date = new Date()): SeedData {
         id: IDS.schedElektro3,
         project_id: IDS.project,
         trade_id: IDS.tradeElektro,
-        activity: "Elektroinstallation (Leerrohre, Bodentanks)",
+        activity: "Elektroinstallation (Leerrohre, Unterverteilungen)",
         area: "3.OG",
         start_date: wt(-1),
         end_date: wt(7),
@@ -313,18 +314,18 @@ export function buildSeed(now: Date = new Date()): SeedData {
         planned_per_day: 40,
         depends_on: [IDS.schedEstrich2],
       },
-      // Wohnanlage Riem, Haus B
-      sched(IDS.schedRiemMauerwerk, IDS.projectRiem, IDS.tradeRiemRohbau, "Mauerwerk Innenwände KS 17,5 cm", "Haus B, 2.OG", wt(-16), wt(-6), 310, "m²", 31, []),
-      sched(IDS.schedRiemDecke, IDS.projectRiem, IDS.tradeRiemRohbau, "Stahlbetondecke über 3.OG, d = 22 cm", "Haus B, 3.OG", wt(-6), wt(2), 240, "m²", 30, [IDS.schedRiemMauerwerk]),
-      sched(IDS.schedRiemGeruest, IDS.projectRiem, IDS.tradeRiemGeruest, "Fassadengerüst Nord- und Ostseite", "Haus B", wt(-13), wt(-10), null, null, null, []),
-      sched(IDS.schedRiemFenster, IDS.projectRiem, IDS.tradeRiemFenster, "Fenstermontage 1.–3.OG", "Haus B, Nordseite", wt(-9), wt(-4), null, null, null, [IDS.schedRiemGeruest]),
-      sched(IDS.schedRiemWdvs, IDS.projectRiem, IDS.tradeRiemFassade, "WDVS Mineralwolle 160 mm, kleben und dübeln", "Haus B, Nordseite", wt(-4), wt(8), 420, "m²", 35, [IDS.schedRiemFenster]),
-      sched(IDS.schedRiemHeizung, IDS.projectRiem, IDS.tradeRiemHeizung, "Fußbodenheizung, Verteiler und Rohre", "Haus B, 1.OG", wt(3), wt(9), null, null, null, []),
-      // Sanierung Schwabing
-      sched(IDS.schedSchwRueckbau, IDS.projectSchwabing, IDS.tradeSchwAbbruch, "Rückbau Bäder und Estrich", "2.OG, Wohnungen 5 und 6", wt(-13), wt(-5), 160, "m²", 20, []),
-      sched(IDS.schedSchwElektro, IDS.projectSchwabing, IDS.tradeSchwElektro, "Rückbau Altinstallation, neue Leitungsführung", "2.OG, Wohnungen 5 und 6", wt(-6), wt(-2), null, null, null, [IDS.schedSchwRueckbau]),
-      sched(IDS.schedSchwVorsatz, IDS.projectSchwabing, IDS.tradeSchwInnenausbau, "GK-Vorsatzschalen und Installationswände", "2.OG, Bäder", wt(-1), wt(7), 140, "m²", 18, [IDS.schedSchwElektro]),
-      sched(IDS.schedSchwSanitaer, IDS.projectSchwabing, IDS.tradeSchwSanitaer, "Vorwandinstallation Bäder", "2.OG, Bäder", wt(5), wt(11), null, null, null, [IDS.schedSchwVorsatz]),
+      // A Neubau Bürogebäude Schwabing (ids: …Riem…)
+      sched(IDS.schedRiemMauerwerk, IDS.projectRiem, IDS.tradeRiemRohbau, "Mauerwerk Innenwände KS 17,5 cm", "Bauteil B, 2.OG", wt(-16), wt(-6), 310, "m²", 31, []),
+      sched(IDS.schedRiemDecke, IDS.projectRiem, IDS.tradeRiemRohbau, "Stahlbetondecke über 3.OG, d = 22 cm", "Bauteil B, 3.OG", wt(-6), wt(2), 240, "m²", 30, [IDS.schedRiemMauerwerk]),
+      sched(IDS.schedRiemGeruest, IDS.projectRiem, IDS.tradeRiemGeruest, "Fassadengerüst Nord- und Ostseite", "Bauteil B", wt(-13), wt(-10), null, null, null, []),
+      sched(IDS.schedRiemFenster, IDS.projectRiem, IDS.tradeRiemFenster, "Fenstermontage 1.–3.OG", "Bauteil B, Nordseite", wt(-9), wt(-4), null, null, null, [IDS.schedRiemGeruest]),
+      sched(IDS.schedRiemWdvs, IDS.projectRiem, IDS.tradeRiemFassade, "WDVS Mineralwolle 160 mm, kleben und dübeln", "Bauteil B, Nordseite", wt(-4), wt(8), 420, "m²", 35, [IDS.schedRiemFenster]),
+      sched(IDS.schedRiemHeizung, IDS.projectRiem, IDS.tradeRiemHeizung, "Fußbodenheizung, Verteiler und Rohre", "Bauteil B, 1.OG", wt(3), wt(9), null, null, null, []),
+      // C Schule Pasing (ids: …Schw…)
+      sched(IDS.schedSchwRueckbau, IDS.projectSchwabing, IDS.tradeSchwAbbruch, "Rückbau WC-Anlagen und Estrich", "2.OG, WC-Anlagen", wt(-13), wt(-5), 160, "m²", 20, []),
+      sched(IDS.schedSchwElektro, IDS.projectSchwabing, IDS.tradeSchwElektro, "Rückbau Altinstallation, neue Leitungsführung", "2.OG, WC-Anlagen", wt(-6), wt(-2), null, null, null, [IDS.schedSchwRueckbau]),
+      sched(IDS.schedSchwVorsatz, IDS.projectSchwabing, IDS.tradeSchwInnenausbau, "GK-Vorsatzschalen und Installationswände", "2.OG, WC-Anlagen", wt(-1), wt(7), 140, "m²", 18, [IDS.schedSchwElektro]),
+      sched(IDS.schedSchwSanitaer, IDS.projectSchwabing, IDS.tradeSchwSanitaer, "Vorwandinstallation WC-Anlagen", "2.OG, WC-Anlagen", wt(5), wt(11), null, null, null, [IDS.schedSchwVorsatz]),
       sched(IDS.schedSchwMaler, IDS.projectSchwabing, IDS.tradeSchwMaler, "Spachtelarbeiten Q3 und Anstrich", "Treppenhaus", wt(12), wt(20), 380, "m²", 48, []),
     ],
     progress_entry: [

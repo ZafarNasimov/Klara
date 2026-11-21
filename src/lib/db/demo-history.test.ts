@@ -20,7 +20,7 @@ beforeEach(async () => {
 describe("demo data", () => {
   it("has three sites with teams in six languages Klara speaks", async () => {
     const projects = await store().list("project");
-    expect(projects.map((p) => p.name).sort()).toEqual(["Neubau Bürogebäude München", "Sanierung Wohnhaus Schwabing", "Wohnanlage Riem, Haus B"]);
+    expect(projects.map((p) => p.name).sort()).toEqual(["Neubau Bürogebäude Schwabing", "Schule Pasing", "Wohnanlage Riem, Haus 2"]);
     expect(projects.find((p) => p.id === IDS.projectSchwabing)?.contract_type).toBe("BGB");
     const users = await store().list("app_user");
     const langs = new Set<string>();
