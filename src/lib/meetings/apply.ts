@@ -131,7 +131,7 @@ async function draftOnce(
   const title = TEMPLATE_DE[item.kind as keyof typeof TEMPLATE_DE]?.title ?? docType;
   if (existing) {
     changes.push({ kind: "case_updated", text_de: `${existing.reference} bereits vorhanden: ${title}`, case_id: existing.id, case_ref: existing.reference });
-    return { ...item, updated_case_id: existing.id, case_ref: existing.reference };
+    return { ...item, updated_case_id: existing.id, case_ref: existing.reference, case_action: "existing" };
   }
   const full = { ...clean(facts), _meeting_id: c.m.id, _meeting_ref: c.m.ref, _meeting_quote: item.quote, _confidence: 0.9 };
   const ev = evaluate(docType, full, sphere, c);
@@ -157,7 +157,7 @@ async function draftOnce(
   await evidence(c, created.id, item);
   await event(c, created, "meeting_case_created", `Neuer Entwurf ${created.reference}: ${title}`);
   changes.push({ kind: "case_created", text_de: `Neuer Entwurf ${created.reference}: ${title}`, case_id: created.id, case_ref: created.reference });
-  return { ...item, created_case_id: created.id, case_ref: created.reference };
+  return { ...item, created_case_id: created.id, case_ref: created.reference, case_action: "created" };
 }
 
 /** Hindrance: update the open Behinderungsanzeige for the same trade and area, else draft one. */
@@ -186,7 +186,7 @@ async function hindrance(c: Ctx, item: MeetingItem, changes: MeetingChange[]): P
     await evidence(c, match.id, item);
     await event(c, match, "meeting_case_updated", text);
     changes.push({ kind: "case_updated", text_de: text, case_id: match.id, case_ref: match.reference });
-    return { ...item, updated_case_id: match.id, case_ref: match.reference };
+    return { ...item, updated_case_id: match.id, case_ref: match.reference, case_action: "updated" };
   }
 
   return draftOnce(

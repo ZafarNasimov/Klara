@@ -15,8 +15,8 @@ const TOOL: Anthropic.Tool = {
     properties: {
       speakers: {
         type: "array",
-        description: "Only if segments are labelled 'Sprecher …': who said each segment, using the participant names.",
-        items: { type: "object", properties: { segment: { type: "integer" }, speaker: { type: "string" } }, required: ["segment", "speaker"] },
+        description: "Only if speakers are labelled 'Sprecher A', 'Sprecher B' …: who each label is. Use a participant name, or a person addressed or named in the conversation (e.g. the one asked 'Herr Berger, wie sieht es …' and answering). Omit a label if unsure.",
+        items: { type: "object", properties: { label: { type: "string" }, name: { type: "string" } }, required: ["label", "name"] },
       },
       summary: { type: "array", items: { type: "string" }, maxItems: 5, description: "At most 5 short German bullets, only facts said in the meeting." },
       items: {
@@ -60,7 +60,7 @@ Rules:
 - summary: at most 5 German bullets, plain facts.
 - Output German text values. Respond only by calling record_meeting.`;
 
-export type LlmExtraction = { summary: string[]; items: RawItem[]; speakers: { segment: number; speaker: string }[] };
+export type LlmExtraction = { summary: string[]; items: RawItem[]; speakers: { label: string; name: string }[] };
 
 export async function extractWithLlm(m: MeetingView, segments: Segment[], ctx: ProjectContext): Promise<LlmExtraction> {
   const header = [

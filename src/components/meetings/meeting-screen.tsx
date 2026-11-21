@@ -68,7 +68,6 @@ function Recorder({ m, onChanged }: { m: MeetingView; onChanged: () => void }) {
   const seq = useRef(0);
   const uploads = useRef<Promise<unknown>>(Promise.resolve());
   const clock = useRef({ startedAt: 0, pausedAt: 0, pausedMs: 0 });
-  const tried = useRef(false);
 
   const cleanup = useCallback(() => {
     stream.current?.getTracks().forEach((t) => t.stop());
@@ -89,6 +88,7 @@ function Recorder({ m, onChanged }: { m: MeetingView; onChanged: () => void }) {
   }, [phase]);
 
   const start = useCallback(async () => {
+    if (rec.current && rec.current.state !== "inactive") return;
     setError(null);
     try {
       const s = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
@@ -132,10 +132,12 @@ function Recorder({ m, onChanged }: { m: MeetingView; onChanged: () => void }) {
     }
   }, [m.id]);
 
+  // Started from "Meeting starten": begin right away. A timer the cleanup
+  // cancels, so React's dev double mount starts the recorder exactly once.
   useEffect(() => {
-    if (!autostart || tried.current) return;
-    tried.current = true;
-    void start();
+    if (!autostart) return;
+    const t = window.setTimeout(() => void start(), 0);
+    return () => window.clearTimeout(t);
   }, [autostart, start]);
 
   function togglePause() {

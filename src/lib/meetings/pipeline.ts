@@ -5,7 +5,7 @@ import { getProjectContext, uid } from "@/lib/db/repo";
 import { berlinDay } from "@/lib/deadlines";
 import { readFile, saveFile } from "@/lib/files";
 import { llmMode } from "@/lib/runtime";
-import { transcribeSegments } from "@/lib/voice/openai";
+import { diarize, transcribeSegments } from "@/lib/voice/openai";
 import { applyItems } from "./apply";
 import { extractWithLlm } from "./extract";
 import { ruleExtract, ruleSummary, verifyItems } from "./items";
@@ -61,9 +61,10 @@ export async function processMeeting(id: string, at: Date, opts: { sample?: bool
     if (!segments.length) {
       const audio = await assembleAudio(id, row.protocol as MeetingProtocol);
       if (!audio) throw new Error("Es wurde keine Aufnahme hochgeladen.");
-      const raw = await transcribeSegments(audio.blob, audio.name, "de");
+      // Words from Whisper, speaker turns from the diarizer (in parallel).
+      const [raw, turns] = await Promise.all([transcribeSegments(audio.blob, audio.name, "de"), diarize(audio.blob, audio.name)]);
       if (!raw.length) throw new Error("In der Aufnahme wurde keine Sprache erkannt.");
-      segments = raw.map((s) => ({ speaker: "Sprecher", start_sec: Math.round(s.start), text: s.text }));
+      segments = raw.map((s) => ({ speaker: speakerTurn(s, turns), start_sec: Math.round(s.start), text: s.text }));
     }
     await mark("transcription", {}, { transcript: segments });
 
@@ -74,11 +75,14 @@ export async function processMeeting(id: string, at: Date, opts: { sample?: bool
     if (llmMode() === "live") {
       try {
         const r = await extractWithLlm(m, segments, ctx);
-        if (r.speakers.length && segments.every((s) => s.speaker === "Sprecher")) {
+        if (r.speakers.length && segments.every((s) => s.speaker.startsWith("Sprecher"))) {
+          // Only names with evidence: a participant, or a person named in the transcript itself.
           const names = new Set(m.participants.map((p) => p.name));
-          segments = segments.map((s, i) => {
-            const who = r.speakers.find((x) => x.segment === i)?.speaker;
-            return who && names.has(who) ? { ...s, speaker: who } : s;
+          const said = segments.map((s) => s.text).join(" ");
+          const named = (who: string) => names.has(who) || (who.length > 3 && said.includes(who.replace(/^(Herr|Frau)\s+/, "")));
+          segments = segments.map((s) => {
+            const who = r.speakers.find((x) => x.label === s.speaker)?.name?.trim();
+            return who && named(who) ? { ...s, speaker: who } : s;
           });
         }
         summary = r.summary;
@@ -112,4 +116,22 @@ export async function processMeeting(id: string, at: Date, opts: { sample?: bool
     console.error("[meetings] processing failed:", err);
     await patchMeeting(id, { status: "failed", error: err instanceof Error ? err.message : "Auswertung fehlgeschlagen." }).catch(() => {});
   }
+}
+
+/** The diarized speaker ("Sprecher A") that overlaps a Whisper segment most; "Sprecher" without turns. */
+function speakerTurn(seg: { start: number; end: number }, turns: { start: number; end: number; speaker: string }[]): string {
+  let best: string | null = null;
+  let most = 0;
+  const totals = new Map<string, number>();
+  for (const t of turns) {
+    const overlap = Math.min(seg.end || seg.start, t.end) - Math.max(seg.start, t.start);
+    if (overlap <= 0) continue;
+    const sum = (totals.get(t.speaker) ?? 0) + overlap;
+    totals.set(t.speaker, sum);
+    if (sum > most) {
+      most = sum;
+      best = t.speaker;
+    }
+  }
+  return best ? `Sprecher ${best}` : "Sprecher";
 }

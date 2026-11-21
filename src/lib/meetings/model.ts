@@ -54,6 +54,8 @@ export type MeetingItem = {
   updated_case_id: string | null;
   /** KL-… of the case this item created or updated (stays readable if the case is gone). */
   case_ref: string | null;
+  /** What happened to the case: drafted, updated, or it already existed (re-run). */
+  case_action?: "created" | "updated" | "existing";
   status: "offen" | "erledigt";
 };
 

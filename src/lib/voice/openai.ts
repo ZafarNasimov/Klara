@@ -52,7 +52,7 @@ export async function transcribe(audio: Blob, filename: string, language: string
  * segments with start times; if that fails, the plain transcript comes back
  * as one segment so nothing is lost.
  */
-export async function transcribeSegments(audio: Blob, filename: string, language: string | null): Promise<{ start: number; text: string }[]> {
+export async function transcribeSegments(audio: Blob, filename: string, language: string | null): Promise<{ start: number; end: number; text: string }[]> {
   const form = new FormData();
   form.append("file", audio, filename);
   form.append("model", "whisper-1");
@@ -68,14 +68,39 @@ export async function transcribeSegments(audio: Blob, filename: string, language
       signal: AbortSignal.timeout(120_000),
     });
     if (!res.ok) throw new VoiceError(`Spracherkennung fehlgeschlagen (${res.status})`);
-    const json = (await res.json()) as { segments?: { start: number; text: string }[]; text?: string };
-    const segs = (json.segments ?? []).map((x) => ({ start: x.start, text: x.text.trim() })).filter((x) => x.text);
+    const json = (await res.json()) as { segments?: { start: number; end: number; text: string }[]; text?: string };
+    const segs = (json.segments ?? []).map((x) => ({ start: x.start, end: x.end, text: x.text.trim() })).filter((x) => x.text);
     if (segs.length) return segs;
-    return json.text?.trim() ? [{ start: 0, text: json.text.trim() }] : [];
+    return json.text?.trim() ? [{ start: 0, end: 0, text: json.text.trim() }] : [];
   } catch (err) {
     if (err instanceof VoiceError && err.status === 503) throw err;
     const text = await transcribe(audio, filename, language);
-    return text ? [{ start: 0, text }] : [];
+    return text ? [{ start: 0, end: 0, text }] : [];
+  }
+}
+
+/**
+ * Who speaks when (speaker turns "A", "B", …), for meeting recordings. Only the
+ * timing is used; the words come from transcribeSegments. Empty on failure.
+ */
+export async function diarize(audio: Blob, filename: string): Promise<{ start: number; end: number; speaker: string }[]> {
+  try {
+    const form = new FormData();
+    form.append("file", audio, filename);
+    form.append("model", "gpt-4o-transcribe-diarize");
+    form.append("response_format", "diarized_json");
+    form.append("chunking_strategy", "auto");
+    const res = await fetch(`${BASE}/audio/transcriptions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key()}` },
+      body: form,
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { segments?: { start: number; end: number; speaker: string }[] };
+    return (json.segments ?? []).filter((s) => typeof s.speaker === "string");
+  } catch {
+    return [];
   }
 }
 
