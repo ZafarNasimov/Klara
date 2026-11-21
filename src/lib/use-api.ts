@@ -69,7 +69,11 @@ export class ApiError extends Error {
 }
 
 export async function postJson<T>(url: string, body: unknown): Promise<T> {
-  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  return sendJson<T>("POST", url, body);
+}
+
+export async function sendJson<T>(method: "POST" | "PATCH", url: string, body: unknown): Promise<T> {
+  const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const out = await r.json().catch(() => null);
   if (!r.ok) throw new ApiError(out?.error ?? `Fehler ${r.status}`, r.status);
   return out as T;

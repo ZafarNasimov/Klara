@@ -8,7 +8,7 @@ import { fmtDateTime } from "@/lib/labels";
 import { postJson, useApi } from "@/lib/use-api";
 import type { VadSettings } from "@/lib/voice/types";
 
-type ProjectResponse = ProjectContext & { now: string; llm_mode: "live" | "mock"; backend: "memory" | "supabase" };
+type ProjectResponse = ProjectContext & { now: string; llm_mode: "live" | "mock"; backend: "memory" | "supabase"; mail: "postmark" | "simulated" };
 
 export function DemoControls() {
   const { data, reload } = useApi<ProjectResponse>("/api/project");
@@ -60,6 +60,16 @@ export function DemoControls() {
         </div>
       </section>
 
+      <section className="rounded-xl border border-border bg-background p-5">
+        <h2 className="text-sm font-medium text-foreground">Antwort des Auftraggebers</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Spielt die Zurückweisung der zuletzt versendeten Behinderungsanzeige ein, als käme sie per E-Mail. Für den Fall, dass die echte Antwort nicht ankommt.
+        </p>
+        <Button variant="outline" className="mt-3 h-10 px-4" disabled={busy !== null} onClick={() => run("reply", "/api/demo/reply", {}, "Antwort eingespielt")}>
+          {busy === "reply" ? "Wird eingespielt…" : "Antwort simulieren"}
+        </Button>
+      </section>
+
       {data ? <VadSettingsForm key={JSON.stringify(data.project.settings.vad ?? null)} initial={data.project.settings.vad ?? DEFAULT_VAD} onSaved={reload} /> : null}
 
       {data ? (
@@ -70,6 +80,8 @@ export function DemoControls() {
             <dd className="text-foreground">{data.backend === "supabase" ? "Supabase" : "Lokal (ohne Supabase)"}</dd>
             <dt className="text-muted-foreground">Sprachmodell</dt>
             <dd className="text-foreground">{data.llm_mode === "live" ? "Claude (live)" : "Testmodus ohne KI-Modell"}</dd>
+            <dt className="text-muted-foreground">E-Mail-Versand</dt>
+            <dd className="text-foreground">{data.mail === "postmark" ? "Postmark (echte E-Mails)" : "Testversand ohne E-Mail-Server"}</dd>
           </dl>
         </section>
       ) : null}

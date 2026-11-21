@@ -6,9 +6,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, MessageSquare, Mic } from "lucide-react";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { formatFact } from "@/components/admin/format-fact";
-import { LetterPreview } from "@/components/documents/letter-preview";
+import { LetterThumb } from "@/components/documents/letter-thumb";
 import { DeadlineBadge } from "@/components/klara/deadline-badge";
 import { CheckList, LightDot } from "@/components/klara/traffic-light";
 import { BTN_OUTLINE, BTN_PRIMARY } from "@/components/mobile/buttons";
@@ -24,8 +24,6 @@ import { ApiError, postJson, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 
 const SENT = new Set<CaseStatus>(["versendet", "beantwortet", "abgeschlossen"]);
-/** Width of the HTML letter before it is scaled into the thumbnail. */
-const PAGE_W = 720;
 
 export function MobileCaseView({ id }: { id: string }) {
   const { data, error, reload } = useApi<CaseDetail>(`/api/cases/${id}`);
@@ -135,7 +133,7 @@ export function MobileCaseView({ id }: { id: string }) {
           </h2>
           {latest && pdfHref ? (
             <>
-              <LetterThumb body={latest.body as DocBody} href={pdfHref} />
+              <LetterThumb body={latest.body as DocBody} href={pdfHref} className="mt-2 h-[236px]" />
               <p className="mt-2 text-sm text-muted-foreground">
                 Version <span className="font-mono">{latest.version}</span> vom <span className="font-mono">{fmtDateTime(latest.created_at)}</span> Uhr
                 {latest.validated_at && (c.status === "validiert" || sent) ? ", von der Bauleitung freigegeben" : null}
@@ -184,37 +182,6 @@ export function MobileCaseView({ id }: { id: string }) {
         ) : null}
       </div>
     </>
-  );
-}
-
-/** Page 1 of the letter, scaled to the column and cut below the subject. Tapping opens the PDF. */
-function LetterThumb({ body, href }: { body: DocBody; href: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState<number | null>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([e]) => setScale(e.contentRect.width / PAGE_W));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      tabIndex={-1}
-      aria-hidden
-      className="mt-2 block h-[236px] overflow-hidden rounded-xl border border-border bg-surface px-5 pt-5"
-    >
-      <div ref={ref}>
-        {scale ? (
-          <div style={{ width: PAGE_W, transform: `scale(${scale})`, transformOrigin: "top left" }}>
-            <LetterPreview body={body} className="max-w-none" />
-          </div>
-        ) : null}
-      </div>
-    </a>
   );
 }
 

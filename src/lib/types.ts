@@ -333,6 +333,46 @@ export type CaseView = Case & {
   author_name: string | null;
 };
 
+/** The e-mail composer (GET /api/mail/[id], SPEC §8 /admin/mail/[draftId]). */
+export type MailDraftView = {
+  draft: EmailOut;
+  case: CaseView;
+  /** The letter version the e-mail carries. */
+  version: DocumentVersion | null;
+  validated_by_name: string | null;
+  /** The contact the letter is addressed to; the e-mail must go to them. */
+  addressee: { email: string; name: string; organisation: string } | null;
+  /** Who the e-mail is from (the letter's signatory). */
+  sender: { name: string; role: string; company: string };
+  /** Project contacts behind the addresses (names and Vollmacht in the composer). */
+  contacts: { email: string; name: string; organisation: string; role: Contact["role"]; has_authority: boolean }[];
+  recipient_check: CheckResult;
+  attachments: { name: string; url: string; kind: "pdf" | "docx" }[];
+  /** Why "Senden" is not possible (null when it is). */
+  send_blocker: string | null;
+  /** The part of it that edits cannot fix: case status, letter version, addressee. */
+  state_blocker: string | null;
+  /** The letter is not validated yet (the Bauleiter can validate and send in one step). */
+  needs_validation: boolean;
+  /** Why validating and sending in one step is not possible (missing facts, red checks …). */
+  validation_blocker: string | null;
+  /** postmark = real e-mail; simulated = no mail server configured, nothing leaves the app. */
+  delivery: "postmark" | "simulated";
+  from: string | null;
+};
+
+/** Classified reply of the client (SPEC §6.4), stored in `email_in.classification`. */
+export type ReplyKind = "acceptance" | "rejection" | "request_info" | "counter_instruction" | "change_request" | "other";
+export type ReplyClassification = {
+  kind: ReplyKind;
+  summary_de: string;
+  key_points: string[];
+  requested_items: string[];
+  /** The client's own sentence that carries the main point, verbatim; null when none matches. */
+  quote?: string | null;
+  source: "live" | "mock" | "fallback";
+};
+
 /** One case with everything the office case view shows (GET /api/cases/[id]). */
 export type CaseDetail = {
   case: CaseView;
@@ -346,6 +386,10 @@ export type CaseDetail = {
   validation_blocker: string | null;
   /** Fields the office can ask the Polier about, missing ones first. */
   askable_fields: { key: string; label: string; missing: boolean }[];
+  /** E-mails for this case's letter (draft or sent). */
+  emails: EmailOut[];
+  /** Replies matched to this case, newest first. */
+  replies: EmailIn[];
 };
 
 /** Structured readback waiting for the user's yes (shown as a card in the chat). */

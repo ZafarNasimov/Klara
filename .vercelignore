@@ -1,0 +1,9 @@
+# Never upload local secrets or data; Vercel gets its env vars from the project settings.
+.env*
+!.env.example
+.data
+.next
+node_modules
+.impeccable
+.claude
+coverage

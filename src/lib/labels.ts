@@ -1,5 +1,5 @@
 // German UI labels and formatters (client-safe).
-import type { CaseStatus, Sphere } from "@/lib/types";
+import type { CaseStatus, Contact, ReplyKind, Sphere } from "@/lib/types";
 
 export const CASE_STATUS_DE: Record<CaseStatus, string> = {
   entwurf: "Entwurf",
@@ -17,6 +17,24 @@ export const SPHERE_DE: Record<Sphere, string> = {
   own_team: "eigene Kolonne",
   weather: "Witterung",
   unclear: "unklar",
+};
+
+/** What a client's reply means (SPEC §6.4). */
+export const REPLY_KIND_DE: Record<ReplyKind, string> = {
+  acceptance: "Zustimmung",
+  rejection: "Zurückweisung",
+  request_info: "Rückfrage",
+  counter_instruction: "Gegenanweisung",
+  change_request: "Änderungswunsch",
+  other: "Sonstiges",
+};
+
+/** "Antwort des Bauherrn": the sender's role in the genitive. */
+export const ROLE_GENITIVE_DE: Record<Contact["role"], string> = {
+  bauherr: "des Bauherrn",
+  architekt: "des Architekten",
+  nu: "des Nachunternehmers",
+  intern: "intern",
 };
 
 /** Timeline wording for event kinds. Kinds without a label stay out of the timeline. */
