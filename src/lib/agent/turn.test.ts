@@ -5,6 +5,7 @@ import { createConversation, getDailyReport, listCases, listEvents, listEvidence
 import { buildSeed, IDS } from "@/lib/db/seed";
 import { berlinTime } from "@/lib/deadlines";
 import type { Case } from "@/lib/types";
+import { caseDetail } from "@/lib/cases/detail";
 import { hangUp, runTurn } from "./turn";
 
 // Friday 20.11.2026, 09:30 in Munich: a normal Werktag.
@@ -297,5 +298,90 @@ describe("corrections and ending", () => {
     const [c] = await listCases(IDS.project);
     expect(c.status).toBe("unvollstaendig");
     expect(c.flags).toContain("unconfirmed");
+  });
+});
+
+describe("unclear reports: one complaint, one case", () => {
+  it("opens the default case on the second unclear message, asks on and closes with the readback", async () => {
+    const say = await chat();
+    const r1 = await say("es ist irgendwie blöd heute");
+    expect(r1.reply).toMatch(/\?$/);
+    expect(await listCases(IDS.project)).toHaveLength(0);
+
+    const r2 = await say("hier stimmt einfach gar nichts");
+    const [c] = await listCases(IDS.project);
+    expect(c).toMatchObject({ doc_type: "meldung", status: "entwurf" });
+    expect(String(c.facts.report)).toBe("es ist irgendwie blöd heute hier stimmt einfach gar nichts");
+    expect(check(c, "confidence")).toMatchObject({ light: "yellow", reason_de: expect.stringMatching(/unsicher erkannt/) });
+    expect(r2.reply).toContain("Meldung zur Prüfung");
+    expect(r2.reply).toMatch(/Wo genau .*\?$/);
+    // The site manager sees the conversation before anything is confirmed.
+    const live = (await caseDetail(c.id)).live_transcript!;
+    expect(live.conversation_kind).toBe("chat");
+    expect(live.turns.map((t) => t.role)).toEqual(["user", "klara", "user", "klara"]);
+    expect(live.turns[0]).toMatchObject({ text: "es ist irgendwie blöd heute", text_de: "es ist irgendwie blöd heute" });
+
+    await say("Küche Haus B");
+    const r4 = await say("Weiß ich nicht.");
+    expect(r4.awaiting_confirm).toBe(true);
+    await say("Ja.");
+    const [done] = await listCases(IDS.project);
+    expect(done).toMatchObject({ id: c.id, status: "bereit", facts: expect.objectContaining({ area: "Küche Haus B" }) });
+    expect(await listCases(IDS.project)).toHaveLength(1);
+    const transcript = (await listEvidence(c.id)).find((e) => e.kind === "transcript");
+    expect((transcript?.data.turns as unknown[]).length).toBeGreaterThanOrEqual(8);
+  });
+
+  it("turns the default case into the letter once the report is clear", async () => {
+    const say = await chat();
+    await say("es ist irgendwie blöd heute");
+    await say("hier stimmt einfach gar nichts");
+    const [draft] = await listCases(IDS.project);
+    await say("Die Elektriker haben das 2.OG nicht freigegeben, 4 Leute stehen seit 7 Uhr.");
+    const all = await listCases(IDS.project);
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ id: draft.id, reference: draft.reference, doc_type: "behinderungsanzeige", sphere: "client" });
+    expect(all[0].facts._note_de).toBe("es ist irgendwie blöd heute hier stimmt einfach gar nichts");
+    expect(all[0].facts.report).toBeUndefined();
+  });
+
+  it("keeps an unclear report with the transcript when the caller hangs up", async () => {
+    const conv = await createConversation({ team_id: IDS.teamEstrich, user_id: IDS.userPolierEstrich, kind: "call" }, clock);
+    await runTurn({ conversationId: conv.id, text: "Сегодня как-то всё не так на объекте", now: tick() });
+    expect(await listCases(IDS.project)).toHaveLength(0);
+    await hangUp(conv.id, tick());
+    const [c] = await listCases(IDS.project);
+    expect(c).toMatchObject({ doc_type: "meldung", status: "unvollstaendig" });
+    expect(c.flags).toContain("unconfirmed");
+    const [t] = (await listEvidence(c.id)).filter((e) => e.kind === "transcript");
+    const turns = t.data.turns as { role: string; text: string; language: string | null }[];
+    expect(turns.map((x) => x.role)).toEqual(["user", "klara"]);
+    expect(turns[0]).toMatchObject({ text: "Сегодня как-то всё не так на объекте", language: "ru" });
+  });
+});
+
+describe("two causes in one report", () => {
+  it("adds a new cause and ignores a repeat", async () => {
+    const { combinedText } = await import("./turn");
+    expect(
+      combinedText(
+        "Ein Meteorit ist eingeschlagen; auf der Baustelle kann nicht gearbeitet werden.",
+        "Die Toiletten in der Küche sind defekt; es kann nicht gearbeitet werden.",
+      ),
+    ).toBe("Ein Meteorit ist eingeschlagen; auf der Baustelle kann nicht gearbeitet werden; Die Toiletten in der Küche sind defekt; es kann nicht gearbeitet werden.");
+    expect(combinedText("Ein Meteorit ist auf die Baustelle gefallen.", "Ein Meteorit ist eingeschlagen auf der Baustelle.")).toBeNull();
+  });
+});
+
+describe("own crew", () => {
+  it("files an internal report with the risk note, no letter, and asks on", async () => {
+    const say = await chat();
+    const r = await say("Unser Estrichmischer ist kaputt, 4 Leute stehen seit 7 Uhr im 2.OG.");
+    const cases = await listCases(IDS.project);
+    expect(cases.map((c) => c.doc_type)).toEqual(["meldung"]);
+    expect(cases[0]).toMatchObject({ sphere: "own_team", facts: expect.objectContaining({ impact: "4 Arbeitskräfte ohne Einsatz" }) });
+    expect(cases[0].flags).toContain("internal_risk");
+    expect(String(cases[0].facts._risk_de)).toMatch(/^Hinweis: vermutlich eigene Sphäre/);
+    expect(r.reply).toContain("kein Schreiben an den Bauherrn");
   });
 });

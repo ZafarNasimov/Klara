@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-21 (local session: photo button, M5, other reply types, M6 eval; merged `pitchflow`; `main` brought up to date) · branch `main`
+Last update: 2026-11-21 (local session: unclear reports → one case each, transcript on every case) · branch `claude/project-thread-jrqak8`, not yet on `main`
 
 ## Milestones (SPEC §11)
 
@@ -127,6 +127,17 @@ Instead of Postmark, Klara can use a normal mailbox: `src/lib/mail/mailbox.ts` s
 - Live site (2026-11-21): `SITE_PASSWORD`, `DEMO_CLIENT_MAILBOX` and `MAIL_FROM_NAME` are set on Vercel and deployed; the login works, pages without it redirect, the API answers 401. Demo data reset there (Bauherr contact = the client mailbox, no cases).
 - 2026-11-21: Gmail login works (the address had a typo in `.env.local`); `MAIL_USER` + `MAIL_PASSWORD` set on Vercel and deployed. Live site reports mail mode `smtp`; an inbox check from Vercel takes ~2 s and leaves non-Klara mail unread. Next: the real round trip (send → client replies → Klara analyses).
 
+## Unclear reports: one complaint, one case (decided by Zafar, 2026-11-21)
+
+Found in a live Russian call (slang, a "meteorite", broken site toilets, 7 idle): Klara asked the same "what happened and where?" three times, kept only a diary line and dropped two reports; the office saw no case. Changed:
+
+- **Prompt:** confidence means "did such an event happen", not "is it plausible or complete"; "we cannot work", "N people are waiting" is a hindrance whatever the cause, slang and mixed languages included.
+- **Every complaint becomes one case** (`src/lib/agent/turn.ts`): a concrete report opens its case from 30 % confidence (`OPEN_THRESHOLD`); below 60 % the "Erkennung" check stays amber ("unsicher erkannt – bitte prüfen"). An unclear message gets one clarifying question; the second unclear one opens the **default case** `meldung` ("Meldung zur Prüfung", internal, never sent; fields: report, area, impact) with everything said, and Klara goes on with its questions, readback and confirm. When the report becomes clear later, the same case (same KL number) turns into the right letter (`_note_de` keeps the first words). Own crew / own equipment (SPEC §5.2: no letter) is now also this internal case, with the risk note and flag `internal_risk`, instead of a diary line only.
+- **Nothing is lost at the end:** hang-up or "that's all" with an unclear report still open saves it as the default case; every unconfirmed case gets the conversation as Gesprächsprotokoll. A second cause in the same report is added to the first ("A; B") instead of replacing it.
+- **Transcript for the site manager on every case** (`caseDetail().live_transcript`): "Nachweise" shows the conversation as it stands until a confirmed Gesprächsprotokoll exists; each line in the original language (tagged RU/PL/…) with the German translation under it.
+- `KLARA_LOG_EXTRACT=1` logs the model's decision per turn (off by default; contains what the user said).
+- Checked: the Russian call now gives one Behinderungsanzeige (both causes, 7 idle) and ends with the readback; a truly unclear Russian call gives "Meldung zur Prüfung" (asks where and the impact, readback, "Да" → Bereit). Eval 42 items (4 new: slang meteorite, toilets RU/DE, Polish slang no-show; own crew now expects `meldung`): live 42/42 doc type, 20/20 sphere. 145 tests.
+
 ## Branches
 
 - **`main` is the main branch** (decided by Zafar, 2026-11-21). On 2026-11-21 it was fast-forwarded to `0940df7`, which holds all work so far: M0–M6, the mailbox e-mail loop, the photo button and the merged pitch deck. No history was rewritten.
@@ -203,7 +214,6 @@ Status (2026-11-20, checked from a separate session): all 18 tables exist and th
 - Hands-free was verified only with a simulated mic (Playwright `--use-file-for-fake-audio-capture` with synthetic speech) and a stubbed `/api/voice`.
 - Open-Meteo's free tier rate-limits shared cloud IPs ("Daily API request limit exceeded"); then no weather is attached.
 - All letter texts are prototype drafts: **TODO legal review** (SPEC D8). Weather "unusual" thresholds are a heuristic.
-- Photo upload is not built yet.
 - **Dev server reload loop:** twice in this session `next dev` (Turbopack) reloaded every page endlessly ("HMR hash mismatch" in the HMR socket, "✓ Compiled in 2ms" in the log) after many file edits. A restart helped once, not the second time; `npm run build && npm start` was fine. Not diagnosed (maybe OneDrive touching synced files in this folder). If pages keep reloading, restart `npm run dev` or use the production server.
 - The rebuttal letter lists weather only for weather hindrances (next to a trade's hindrance it would invite "it was the weather"). Decision taken in the M4 critique; tell Zafar if he wants it always.
 - Next.js 16 here differs from older versions: read `node_modules/next/dist/docs/` first (AGENTS.md). With `cacheComponents`, async page work goes inside `<Suspense>`, GET handlers call `await connection()`, and run `npx next typegen` after adding routes (for `RouteContext` / `PageProps`).

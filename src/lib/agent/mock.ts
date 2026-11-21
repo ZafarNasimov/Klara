@@ -144,6 +144,8 @@ const EXTRA = /(additional|extra|more|zusätzlich|weitere|mehr|дополнит�
 const ALL_GOOD = /(alles nach plan|alles läuft|läuft nach plan|all according to plan|everything (is )?(on|according to) (plan|schedule)|all good|всё по плану|все по плану|wszystko zgodnie z planem|wszystko w porządku|her şey plana göre|totul conform planului)/i;
 const QTY = /(\d+(?:[.,]\d+)?)\s*(m²|m2|qm|quadratmeter|square met\w*|sq\.? ?m|кв\.?\s?м|м²|m kw|metr\w* kw|metrekare|mp)(?![\p{L}\p{N}_])/iu;
 const OWN_CREW = /(our |unsere?|wir |we |наша|наши|мы |nasza|nasi|my |bizim|biz |echipa noastră|noi )/i;
+/** "Unser Mischer ist kaputt": our own machine or material, not another trade. */
+const OWN_BROKEN = /(our|unser\w*|наш\w*|nasz\w*|bizim|nostru|noastră)\s.{0,40}(kaputt|defekt|ausgefallen|broken|broke down|сломал\w*|не работает|zepsu\w*|bozuldu|stricat)/iu;
 const RESOLVED = /(cleared|finished now|can (work|continue) again|wieder frei|freigegeben|fertig geworden|können wieder|weiter arbeiten|освободили|закончили|можем работать|zwolnili|możemy pracować|boşalttı|bitti|au eliberat|putem lucra)/i;
 
 const DOOR = /(brandschutztür|fire door|противопожарн\S* двер|drzwi przeciwpożar|yangın kapı|uși antifoc)/i;
@@ -245,6 +247,16 @@ function eventsFrom(segment: string, ctx: ExtractContext, today: string): Extrac
     if (people !== null) facts.idle_staff = people;
     if (affected) facts.affected_works = affected;
     return [{ doc_type: "behinderungsanzeige", trade_name_guess: tradeWord, cause_kind: "trade", facts, confidence: 0.9 }];
+  }
+
+  // Our own machine or material failed: own sphere (internal report, no letter).
+  if (OWN_BROKEN.test(segment)) {
+    const facts: Record<string, unknown> = { cause: guessLanguage(segment) === "de" ? segment.trim().replace(/[.\s]+$/, "") : "Eigenes Gerät oder Material defekt" };
+    if (area) facts.area = area;
+    if (startAt) facts.start_at = startAt;
+    if (people !== null) facts.idle_staff = people;
+    if (affected) facts.affected_works = affected;
+    return [{ doc_type: "behinderungsanzeige", trade_name_guess: null, cause_kind: "own", facts, confidence: 0.8 }];
   }
 
   // Our own people were idle, cause given in another segment.
@@ -391,6 +403,7 @@ export function mockExtract(text: string, ctx: ExtractContext): Extraction {
   }
 
   if (ctx.awaitingConfirm && t.split(/\s+/).length <= 3) return { ...base, intent: "confirm" };
-  if (/^(hi|hello|hallo|guten (morgen|tag)|привет|здравствуйте|cześć|dzień dobry|merhaba|bună)/i.test(t)) return { ...base, intent: "smalltalk" };
+  // A whole greeting word ("hier stimmt nichts" is not "hi").
+  if (/^(hi|hello|hallo|guten (morgen|tag)|привет|здравствуйте|cześć|dzień dobry|merhaba|bună)(?![\p{L}\p{N}])/iu.test(t)) return { ...base, intent: "smalltalk" };
   return { ...base, intent: "report_event", events: [{ doc_type: "none", trade_name_guess: null, cause_kind: "unknown", facts: {}, confidence: 0.3 }] };
 }

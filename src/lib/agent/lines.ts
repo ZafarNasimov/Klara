@@ -21,6 +21,7 @@ export type LineKey =
   | "progressNoted"
   | "deviationNote"
   | "unconfirmedSaved"
+  | "defaultCase"
   | "photoSaved"
   | "returnedFor"
   | "correctAsk"
@@ -50,6 +51,7 @@ export const LINES: Record<string, Table> = {
     progressNoted: "Noted: {item}, {qty} today, that is {pct}\u00a0% of the plan.",
     deviationNote: "At this rate we'll be about {days} working days late. I'm preparing a notice for {successor}.",
     unconfirmedSaved: "Okay. I've saved what we have; the site manager will follow up.",
+    defaultCase: "I'll note this as a report for the site manager to check.",
     photoSaved: "Photo saved with {ref}.",
     returnedFor: "The site manager needs more information for {doc} {ref}.",
     correctAsk: "{doc} {ref}: what should I correct?",
@@ -76,6 +78,7 @@ export const LINES: Record<string, Table> = {
     progressNoted: "Notiert: {item}, heute {qty}, das sind {pct}\u00a0% vom Plan.",
     deviationNote: "Bei diesem Tempo rechnen wir mit etwa {days} Arbeitstagen Verzug. Ich bereite eine Information an {successor} vor.",
     unconfirmedSaved: "In Ordnung. Ich habe das Bisherige gespeichert, die Bauleitung meldet sich.",
+    defaultCase: "Ich lege das als Meldung zur Prüfung für die Bauleitung an.",
     photoSaved: "Foto abgelegt bei {ref}.",
     returnedFor: "Die Bauleitung braucht noch eine Angabe zu {doc} {ref}.",
     correctAsk: "{doc} {ref}: Was soll ich korrigieren?",
@@ -102,6 +105,7 @@ export const LINES: Record<string, Table> = {
     progressNoted: "Записала: {item}, сегодня {qty}, это {pct}\u00a0% от плана.",
     deviationNote: "При таком темпе отставание около {days} рабочих дней. Готовлю уведомление для {successor}.",
     unconfirmedSaved: "Хорошо. Я сохранила то, что есть, руководитель свяжется с вами.",
+    defaultCase: "Я оформлю это как сообщение для руководителя на проверку.",
     photoSaved: "Фото сохранено в {ref}.",
     returnedFor: "Руководителю нужно уточнение по документу «{doc}» {ref}.",
     correctAsk: "{doc} {ref}: что мне исправить?",
@@ -128,6 +132,7 @@ export const LINES: Record<string, Table> = {
     progressNoted: "Zanotowane: {item}, dziś {qty}, to {pct}\u00a0% planu.",
     deviationNote: "W tym tempie opóźnienie wyniesie około {days} dni roboczych. Przygotowuję informację dla {successor}.",
     unconfirmedSaved: "Dobrze. Zapisałam to, co mamy, kierownik się odezwie.",
+    defaultCase: "Zapiszę to jako zgłoszenie do sprawdzenia przez kierownika.",
     photoSaved: "Zdjęcie zapisane w {ref}.",
     returnedFor: "Kierownik budowy potrzebuje jeszcze informacji do dokumentu „{doc}” {ref}.",
     correctAsk: "{doc} {ref}: co mam poprawić?",
@@ -154,6 +159,7 @@ export const LINES: Record<string, Table> = {
     progressNoted: "Not edildi: {item}, bugün {qty}, planın %{pct}'i.",
     deviationNote: "Bu hızla yaklaşık {days} iş günü gecikme olacak. {successor} için bir bilgilendirme hazırlıyorum.",
     unconfirmedSaved: "Tamam. Elimizdekini kaydettim, şantiye şefi sizinle iletişime geçecek.",
+    defaultCase: "Bunu şantiye şefinin kontrolü için bir bildirim olarak kaydediyorum.",
     photoSaved: "Fotoğraf {ref} kaydına eklendi.",
     returnedFor: "Şantiye şefinin {doc} {ref} için bir bilgiye daha ihtiyacı var.",
     correctAsk: "{doc} {ref}: neyi düzelteyim?",
@@ -180,6 +186,7 @@ export const LINES: Record<string, Table> = {
     progressNoted: "Notat: {item}, azi {qty}, adică {pct}\u00a0% din plan.",
     deviationNote: "În acest ritm vom avea o întârziere de circa {days} zile lucrătoare. Pregătesc o informare pentru {successor}.",
     unconfirmedSaved: "Bine. Am salvat ce avem, șeful de șantier revine.",
+    defaultCase: "Înregistrez asta ca o sesizare pentru verificare de către șeful de șantier.",
     photoSaved: "Fotografia a fost salvată la {ref}.",
     returnedFor: "Șeful de șantier mai are nevoie de o informație pentru {doc} {ref}.",
     correctAsk: "{doc} {ref}: ce să corectez?",
@@ -200,6 +207,7 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     anordnung_bestaetigung: "Confirmation of the verbal instruction",
     verzug_nu: "Request to remedy to the subcontractor",
     ergaenzung: "Additional information for the client",
+    meldung: "Report for the site manager to check",
   },
   de: {
     behinderungsanzeige: "Behinderungsanzeige",
@@ -208,6 +216,7 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     anordnung_bestaetigung: "Bestätigung der mündlichen Anordnung",
     verzug_nu: "Abhilfeaufforderung an den Nachunternehmer",
     ergaenzung: "Ergänzende Angaben für den Bauherrn",
+    meldung: "Meldung zur Prüfung für die Bauleitung",
   },
   ru: {
     behinderungsanzeige: "Уведомление о препятствии",
@@ -216,6 +225,7 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     anordnung_bestaetigung: "Подтверждение устного указания",
     verzug_nu: "Требование к субподрядчику",
     ergaenzung: "Дополнительные сведения для заказчика",
+    meldung: "Сообщение руководителю на проверку",
   },
   pl: {
     behinderungsanzeige: "Zgłoszenie przeszkody",
@@ -224,6 +234,7 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     anordnung_bestaetigung: "Potwierdzenie ustnego polecenia",
     verzug_nu: "Wezwanie podwykonawcy do usunięcia",
     ergaenzung: "Dodatkowe informacje dla inwestora",
+    meldung: "Zgłoszenie do sprawdzenia przez kierownika",
   },
   tr: {
     behinderungsanzeige: "Engel bildirimi",
@@ -232,6 +243,7 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     anordnung_bestaetigung: "Sözlü talimatın teyidi",
     verzug_nu: "Taşerona giderme talebi",
     ergaenzung: "İşverene ek bilgiler",
+    meldung: "Şantiye şefinin kontrolü için bildirim",
   },
   ro: {
     behinderungsanzeige: "Notificare de impediment",
@@ -240,6 +252,7 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     anordnung_bestaetigung: "Confirmarea dispoziției verbale",
     verzug_nu: "Somație către subantreprenor",
     ergaenzung: "Informații suplimentare pentru beneficiar",
+    meldung: "Sesizare pentru verificare de către șeful de șantier",
   },
 };
 
@@ -248,6 +261,8 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
   en: {
     start_at: "since",
     area: "area",
+    report: "report",
+    impact: "impact",
     cause: "cause",
     affected_works: "affected",
     idle_staff: "idle workers",
@@ -273,6 +288,8 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
   de: {
     start_at: "seit",
     area: "Bereich",
+    report: "Meldung",
+    impact: "Auswirkung",
     cause: "Ursache",
     affected_works: "betroffen",
     idle_staff: "Arbeitskräfte ohne Einsatz",
@@ -298,6 +315,8 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
   ru: {
     start_at: "с",
     area: "участок",
+    report: "сообщение",
+    impact: "последствия",
     cause: "причина",
     affected_works: "затронуто",
     idle_staff: "простаивают",
@@ -323,6 +342,8 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
   pl: {
     start_at: "od",
     area: "miejsce",
+    report: "zgłoszenie",
+    impact: "skutki",
     cause: "przyczyna",
     affected_works: "dotyczy",
     idle_staff: "pracownicy bez pracy",
@@ -348,6 +369,8 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
   tr: {
     start_at: "başlangıç",
     area: "alan",
+    report: "bildirim",
+    impact: "etkisi",
     cause: "sebep",
     affected_works: "etkilenen",
     idle_staff: "boşta bekleyen işçi",
@@ -373,6 +396,8 @@ export const READBACK_LABELS: Record<string, Record<string, string>> = {
   ro: {
     start_at: "de la",
     area: "zona",
+    report: "sesizare",
+    impact: "efect",
     cause: "cauza",
     affected_works: "afectat",
     idle_staff: "muncitori fără lucru",

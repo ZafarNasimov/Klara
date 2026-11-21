@@ -1,7 +1,7 @@
 // The office case page's data (GET /api/cases/[id]). Server only.
 import "server-only";
 import { store } from "@/lib/db";
-import { caseChain, getCase, listDocumentVersions, listEvents, listEvidence, requireCase, toCaseViews } from "@/lib/db/repo";
+import { caseChain, getCase, getConversation, listDocumentVersions, listEvents, listEvidence, listTurns, requireCase, toCaseViews } from "@/lib/db/repo";
 import type { CaseDetail } from "@/lib/types";
 import { askableFields, validationBlocker } from "./actions";
 
@@ -18,10 +18,15 @@ export async function caseDetail(id: string): Promise<CaseDetail> {
     store().list("email_in", { where: { case_id: id }, order: { column: "received_at", ascending: false } }),
     caseChain(c),
   ]);
+  // The site manager always sees what was said: the confirmed protocol, else the conversation as it stands.
+  const snapshot = evidence.some((e) => e.kind === "transcript");
+  const conversationId = !snapshot ? c.conversation_id : null;
   // "Verlauf" shows the whole chain (SPEC §1): this case's events are loaded, the linked letters' follow.
-  const [linkedEvents, [view, ...linked]] = await Promise.all([
+  const [linkedEvents, [view, ...linked], conv, turns] = await Promise.all([
     Promise.all(chain.filter((x) => x.id !== c.id).map((x) => listEvents({ caseId: x.id }))).then((x) => x.flat()),
     toCaseViews([c, ...(parent ? [parent] : []), ...children]),
+    conversationId ? getConversation(conversationId) : Promise.resolve(null),
+    conversationId ? listTurns(conversationId) : Promise.resolve([]),
   ]);
   return {
     case: view,
@@ -32,6 +37,13 @@ export async function caseDetail(id: string): Promise<CaseDetail> {
     events,
     validation_blocker: c.status === "validiert" ? null : validationBlocker(c),
     askable_fields: askableFields(c),
+    live_transcript:
+      conv && turns.length
+        ? {
+            conversation_kind: conv.kind,
+            turns: turns.map((t) => ({ role: t.role, text: t.text_original, text_de: t.text_de, language: t.language, at: t.created_at })),
+          }
+        : null,
     chain: chain.map((x) => ({ id: x.id, reference: x.reference, doc_type: x.doc_type })),
     chain_events: [...events, ...linkedEvents].sort((a, b) => b.created_at.localeCompare(a.created_at)),
     emails,
