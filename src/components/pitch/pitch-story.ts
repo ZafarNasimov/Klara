@@ -93,29 +93,8 @@ export const CLARIFY_MESSAGE_EN =
   "Please add: expected duration of the hindrance and a photo of the blocked area (2nd floor).";
 
 /** Scene 5 seed data. Table rows add up to the KPI row. */
-export const KPIS = [
-  { label: "Open cases", value: 7 },
-  { label: "Missing reports today", value: 3 },
-  { label: "Notices sent this week", value: 5 },
-  { label: "Delay days at risk", value: 6 },
-] as const;
+// Scene 5 renders the real dashboard (src/lib/dashboard), computed from the seed.
 
-export const TRADE_PROGRESS = [
-  { trade: "Elektro", plan: 85, actual: 72, highlight: true },
-  { trade: "Sanitär", plan: 60, actual: 64, highlight: false },
-  { trade: "Trockenbau", plan: 45, actual: 40, highlight: false },
-  { trade: "Estrich", plan: 55, actual: 38, highlight: false },
-] as const;
-
-export const TEAM_ROWS = [
-  { site: "A", siteName: "Schwabing", team: "Rohbau", open: 1, missing: 0, delay: 0 },
-  { site: "A", siteName: "Schwabing", team: "Ausbau", open: 1, missing: 1, delay: 1 },
-  { site: "B", siteName: "Riem", team: "Estrich", open: 2, missing: 0, delay: 3, highlight: true },
-  { site: "B", siteName: "Riem", team: "Trockenbau", open: 1, missing: 1, delay: 1 },
-  { site: "B", siteName: "Riem", team: "Haustechnik", open: 0, missing: 0, delay: 0 },
-  { site: "C", siteName: "Pasing", team: "Rohbau", open: 1, missing: 1, delay: 1 },
-  { site: "C", siteName: "Pasing", team: "Fassade", open: 1, missing: 0, delay: 0 },
-] as const;
 
 export const ECOSYSTEM = {
   inputs: ["Calls in any language", "Morning & evening check-ins", "Meetings", "Emails", "Photos"],

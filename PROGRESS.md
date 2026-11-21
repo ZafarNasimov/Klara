@@ -49,6 +49,14 @@ Last update: 2026-11-21 (local session: unclear reports → one case each, trans
 - ✅ `/app/case/[id]` mobile case page with "Per Sprache korrigieren" (critique notes in `.impeccable/critique/`).
 - ✅ `/admin/case/[id]` office case page (`src/app/admin/case/[id]/case-detail.tsx`): header with status, deadline, **Validieren** (shows why it is blocked), **Zurück zur Ergänzung** dialog, **E-Mail vorbereiten** once validated (M4 composer still a shell); tabs Dokument (HTML letter preview from the same DocBody, version switch, SHA-256, PDF/Word download), Nachweise (transcript, weather), Verlauf, Hinweise; right rail with checks and facts. Critiqued (29/40) and the findings fixed.
 
+### Dashboards (`/admin`, `/admin/project/[id]`; case board moved to `/admin/vorgaenge`)
+
+- **Sites:** the seed has three Baustellen: A Neubau Bürogebäude Schwabing, B Wohnanlage Riem (the app's project, `IDS.project`, client Wohnbau Riem GmbH) and C Schule Pasing (`src/lib/db/seed-portfolio.ts`), with 14 Werktage of history: progress per schedule item from a pace per item, daily reports with the story's gaps, 16 letters KL-…-0026…0041 on A/C with real document versions, events. B starts without cases: the golden-path call is still KL-…-0042.
+- **One computation** (`src/lib/dashboard/compute.ts`, pure): the API (`/api/dashboard?site=&team=&trade=&days=`, `load.ts`) and pitch Scene 5 (`from-seed.ts`) use the same function. KPIs: Offene Vorgänge (unvollständig/bereit), Fehlende Tagesberichte heute (teams with planned work today, no `daily_report`), Anzeigen diese Woche (`document_version.sent_at` since Monday), Verzugstage im Risiko (sum of forecast delays per site × trade), Anspruchsgrundlage (Σ `estimate_eur`, vorläufig). Each with a daily history (sparkline) and change vs. last week. Forecast per schedule item: remaining qty ÷ actual per day from the last report → forecast end vs. planned end; successors inherit a late predecessor's delay. Heatmap: red = open Behinderungsanzeige of that trade or > 2 days, amber = 1–2 days or no quantities for 2 Werktage.
+- **Live:** every widget refetches on each event (realtime-client). Verified: golden-path chat on the open dashboard → "Offene Vorgänge" 6 → 7 (blue-50 flash) and Elektro × B amber → red within ~0.5 s of the last turn, no reload.
+- **Pitch Scene 5** renders the real `DashboardBody` from the seed (offline); the step adds the call's KL-2026-0042 (same function), so the KPI and the cell change on stage.
+- **Supabase:** no migration (new rows only, `settings.site_code` in JSON), but the live DB needs "Demo zurücksetzen" to get sites A/C and the history; that replaces its demo data.
+
 ### Besprechungen / meeting notes (branch `meetings`, not merged)
 
 Record a meeting → transcript → summary → only the evidenced letters → visible changes. Admin tab "Besprechungen" (`/admin/meetings`, `/admin/meetings/[id]`). Code: `src/lib/meetings/*`, `src/components/meetings/*`, `src/app/api/meetings/**`.
