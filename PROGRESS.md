@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-21, 23:15 (Vasily's dashboards and meeting notes merged and checked; deploy of `main`) · branch `main`
+Last update: 2026-11-21, 23:55 (Vasily's dashboard-v2 and fixes checked; deploy of `main`) · branch `main`
 
 ## Milestones (SPEC §11)
 
@@ -166,6 +166,7 @@ Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-003
   1. ~~Resolved (dashboard-v2): MT-2026-0007 now names no case numbers and changed nothing.~~ The seeded meeting MT-2026-0007 (yesterday) said it updated **KL-2026-0042** and created drafts **KL-2026-0043/0044**. After a reset none of these cases exist: KL-2026-0042 is created by the live demo call today, and the next letter (e.g. the Stellungnahme after "Antwort simulieren") becomes KL-2026-0043. The links don't resolve (by design, see the meeting section), but the texts can confuse on stage. Use references that don't collide, or present the meeting after the call.
   2. ~~Resolved (dashboard-v2): `/admin/meetings` follows the site chosen in the office.~~ It listed the meetings of the demo site only.
   3. After pulling new routes, run `npx next typegen` before `npx tsc` (`next build` does it by itself), otherwise `PageProps<"/admin/…">` fails with "does not satisfy the constraint 'AppRoutes'".
+- **Update 23:55 (dashboard-v2, c6e3d4a):** open points 1 and 2 fixed by Vasily (seeded MT-2026-0007 names no cases; the meetings list follows the chosen site). Dashboard v2 (Überblick with KPIs, Munich map, Handlungsbedarf, heatmap, Plan und Ist; Details tab). **Sites renamed to the pitch story** (ids unchanged): A = "Wohnanlage Riem, Haus 2" (the demo site, formerly Neubau Bürogebäude München), B = "Neubau Bürogebäude Schwabing", C = "Schule Pasing"; older sections of this file still use the old names. Checked: typecheck, lint, 189 tests, build. The live database keeps the old names until "Demo zurücksetzen".
 - **Deploy:** Vasily's pushes don't start Vercel builds (see Known issues); this PROGRESS commit by Zafar's account deploys `main`. On the live site, click "Demo zurücksetzen" once to load the dashboards' data and the meetings.
 
 ## Real e-mail through a mailbox (decided by Zafar, 2026-11-21)
