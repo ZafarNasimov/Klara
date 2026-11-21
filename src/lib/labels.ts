@@ -29,6 +29,14 @@ export const REPLY_KIND_DE: Record<ReplyKind, string> = {
   other: "Sonstiges",
 };
 
+/** A contact's role, e.g. "Dr. Petra Lang (Bauherr)". */
+export const ROLE_DE: Record<Contact["role"], string> = {
+  bauherr: "Bauherr",
+  architekt: "Architekt",
+  nu: "Nachunternehmer",
+  intern: "intern",
+};
+
 /** "Antwort des Bauherrn": the sender's role in the genitive. */
 export const ROLE_GENITIVE_DE: Record<Contact["role"], string> = {
   bauherr: "des Bauherrn",

@@ -4,9 +4,11 @@
 import "server-only";
 import { BadRequestError } from "@/lib/api";
 import { store } from "@/lib/db";
+import { returnForCompletion } from "@/lib/cases/actions";
 import {
   addEvent,
   addEvidence,
+  caseChain,
   createCase,
   DEFAULT_PROJECT_ID,
   getProjectContext,
@@ -18,13 +20,13 @@ import {
   type ProjectContext,
 } from "@/lib/db/repo";
 import { berlinDay } from "@/lib/deadlines";
-import { docTitle, requireDocType } from "@/lib/doctypes";
+import { docTitle, requireDocType, type DocTypeId } from "@/lib/doctypes";
 import { generateDocument } from "@/lib/documents/generate";
 import { dateDe, dateTimeDe } from "@/lib/documents/templates/kit";
 import type { DocBody } from "@/lib/documents/types";
-import { fmtNumber, REPLY_KIND_DE, ROLE_GENITIVE_DE } from "@/lib/labels";
+import { fmtNumber, REPLY_KIND_DE, ROLE_DE, ROLE_GENITIVE_DE } from "@/lib/labels";
 import { canonicalTradeName, evaluateCase } from "@/lib/rules";
-import type { Case, EmailIn, Evidence, ReplyClassification } from "@/lib/types";
+import type { Case, Contact, EmailIn, Evidence, ReplyClassification } from "@/lib/types";
 import { classifyReply, replySentences } from "./classify";
 
 /** The parts of Postmark's inbound JSON Klara uses. */
@@ -45,8 +47,10 @@ export type InboundResult = {
   email: EmailIn;
   case: Case | null;
   classification: ReplyClassification;
-  /** The follow-up letter Klara drafted (rejection of a Behinderungsanzeige). */
+  /** The first follow-up letter Klara drafted (see `followups`). */
   followup: Case | null;
+  /** All follow-ups (SPEC §6.4): Stellungnahme, Ergänzende Angaben, or Mehrkosten + Anordnungsbestätigung. */
+  followups?: Case[];
   /** Postmark delivered the same message again; nothing new was stored. */
   duplicate: boolean;
 };
@@ -142,7 +146,16 @@ export async function receiveReply(p: InboundPayload, at: Date): Promise<Inbound
   }
 
   const ctx = await getProjectContext(c.project_id);
-  const followup = classification.kind === "rejection" && c.doc_type === "behinderungsanzeige" ? await draftRebuttal(c, email, quote, ctx, at) : null;
+  // SPEC §6.4 step 4: the proposal depends on the kind of answer (acceptance and "other": none).
+  const followups =
+    classification.kind === "rejection" && c.doc_type === "behinderungsanzeige"
+      ? [await draftRebuttal(c, email, quote, ctx, at, 1)]
+      : classification.kind === "request_info"
+        ? [await draftSupplement(c, email, classification, quote, ctx, at, 1)]
+        : classification.kind === "change_request" || classification.kind === "counter_instruction"
+          ? await draftChange(c, email, classification, quote, sender, ctx, at, 1)
+          : [];
+  const followup = followups[0] ?? null;
 
   // An answer to the letter proves it arrived ("Übermittlung" turns green).
   const checks = c.checks.map((x) =>
@@ -176,35 +189,35 @@ export async function receiveReply(p: InboundPayload, at: Date): Promise<Inbound
         summary_de: `Antwort ${who}: ${kindDe} – ${verbatim ? `„${verbatim}“` : classification.summary_de}`,
       },
     },
-    ...(followup
-      ? [
-          {
-            project_id: c.project_id,
-            case_id: c.id,
-            kind: "followup_proposed",
-            payload: {
-              reference: followup.reference,
-              doc_type: followup.doc_type,
-              case_id: followup.id,
-              hint_de: REJECTION_HINT_DE,
-              summary_de: `${docTitle(followup.doc_type)} ${followup.reference} mit Nachweisen vorbereitet`,
-            },
-          },
-        ]
-      : []),
+    ...followups.map((f) => ({
+      project_id: c.project_id,
+      case_id: c.id,
+      kind: "followup_proposed",
+      payload: {
+        reference: f.reference,
+        doc_type: f.doc_type,
+        case_id: f.id,
+        hint_de: typeof f.facts._hint_de === "string" ? f.facts._hint_de : null,
+        summary_de:
+          f.doc_type === "stellungnahme_zurueckweisung"
+            ? `${docTitle(f.doc_type)} ${f.reference} mit Nachweisen vorbereitet`
+            : `${docTitle(f.doc_type)} ${f.reference} vorbereitet`,
+      },
+    })),
     ...(classification.kind === "acceptance"
       ? [{ project_id: c.project_id, case_id: c.id, kind: "case_closed", payload: { reference: c.reference, summary_de: `${kindDe}: ${classification.summary_de}` } }]
       : []),
   ];
-  for (const [i, e] of events.entries()) await addEvent(e, new Date(at.getTime() + (i && followup ? i + 2 : i)));
-  return { email, case: await requireCase(c.id), classification, followup, duplicate: false };
+  // The reply at `at`, the follow-ups' own entries in their slots (3 ms each), the proposals after them.
+  for (const [i, e] of events.entries()) await addEvent(e, new Date(at.getTime() + (i ? i + 3 * followups.length : 0)));
+  return { email, case: await requireCase(c.id), classification, followup, followups, duplicate: false };
 }
 
 /**
  * SPEC §5.2 `stellungnahme_zurueckweisung`: reference to our notice, the core
  * of the rejection, and the evidence list; letter v1 is generated right away.
  */
-async function draftRebuttal(orig: Case, email: EmailIn, quote: string, ctx: ProjectContext, at: Date): Promise<Case> {
+async function draftRebuttal(orig: Case, email: EmailIn, quote: string, ctx: ProjectContext, at: Date, slot: number): Promise<Case> {
   const [versions, evidence] = await Promise.all([listDocumentVersions(orig.id), listEvidence(orig.id)]);
   const sent = versions.find((v) => v.sent_at) ?? versions[0] ?? null;
   const origDate = (sent?.body as DocBody | undefined)?.date ?? berlinDay(new Date(orig.created_at));
@@ -219,13 +232,30 @@ async function draftRebuttal(orig: Case, email: EmailIn, quote: string, ctx: Pro
     _reply_email_id: email.id,
     ...(typeof orig.facts._trade === "string" ? { _trade: orig.facts._trade } : {}),
   };
-  const def = requireDocType("stellungnahme_zurueckweisung");
+  return createFollowup(orig, "stellungnahme_zurueckweisung", facts, null, ctx, at, slot);
+}
+
+/**
+ * A follow-up letter to `orig` (SPEC §6.4 step 4) with letter v1. In the
+ * chain's history each follow-up takes three milliseconds after the reply:
+ * case (+slot), document (+slot+1), Klara's question to the Polier (+slot+2).
+ */
+async function createFollowup(
+  orig: Case,
+  docType: DocTypeId,
+  facts: Record<string, unknown>,
+  teamId: string | null,
+  ctx: ProjectContext,
+  at: Date,
+  slot: number,
+): Promise<Case> {
+  const def = requireDocType(docType);
+  const stamp = new Date(at.getTime() + slot);
   const ev = evaluateCase({ def, facts, sphere: orig.sphere, confidence: null, now: at }, ctx);
   const created = await createCase(
     {
       project_id: orig.project_id,
-      // Office correspondence: not shown in the Polier's channel.
-      team_id: null,
+      team_id: teamId,
       conversation_id: null,
       doc_type: def.id,
       status: ev.missing_fields.length ? "unvollstaendig" : "bereit",
@@ -240,17 +270,118 @@ async function draftRebuttal(orig: Case, email: EmailIn, quote: string, ctx: Pro
       asked_fields: [],
       declined_fields: [],
       flags: [],
-      created_at: at.toISOString(),
+      created_at: stamp.toISOString(),
     },
     at,
   );
-  // In the chain's history: reply (at) → case (+1 ms) → document (+2 ms) → proposal on the original (+3 ms).
-  await generateDocument(created.id, new Date(at.getTime() + 2), { ctx });
+  await generateDocument(created.id, new Date(stamp.getTime() + 1), { ctx });
   await addEvent(
     { project_id: created.project_id, case_id: created.id, kind: "case_created", payload: { reference: created.reference, doc_type: created.doc_type } },
-    new Date(at.getTime() + 1),
+    stamp,
   );
   return created;
+}
+
+/** The team whose Polier can answer for this letter: its own, else the first one up the chain (a Stellungnahme has none). */
+async function teamFor(orig: Case): Promise<string | null> {
+  return orig.team_id ?? (await caseChain(orig)).find((x) => x.team_id)?.team_id ?? null;
+}
+
+/** Date of our letter the client answered (the sent version's date). */
+async function letterDate(orig: Case): Promise<string> {
+  const versions = await listDocumentVersions(orig.id);
+  const sent = versions.find((v) => v.sent_at) ?? versions[0] ?? null;
+  return (sent?.body as DocBody | undefined)?.date ?? berlinDay(new Date(orig.created_at));
+}
+
+/** "Dr. Petra Lang (Bauherr)", or the address when the sender is not a project contact. */
+const senderDe = (sender: Contact | null, from: string) => (sender ? `${sender.name} (${ROLE_DE[sender.role]})` : from);
+
+/** § 650b Abs. 2 BGB: 30 days after the change request reached us, the client may order the change. */
+export const bgbAgreementUntil = (at: Date) => berlinDay(new Date(at.getTime() + 30 * 24 * 3600 * 1000));
+
+/**
+ * SPEC §6.4 `request_info`: "Ergänzende Angaben" with the client's questions;
+ * Klara asks the Polier in the team chat right away, the answer fills the letter.
+ */
+async function draftSupplement(
+  orig: Case,
+  email: EmailIn,
+  cls: ReplyClassification,
+  quote: string,
+  ctx: ProjectContext,
+  at: Date,
+  slot: number,
+): Promise<Case> {
+  const teamId = await teamFor(orig);
+  const lead = ctx.users.find((u) => u.id === ctx.teams.find((t) => t.id === teamId)?.lead_user_id) ?? null;
+  const items = cls.requested_items.length ? cls.requested_items : [quote];
+  const facts: Record<string, unknown> = {
+    reply_date: berlinDay(at),
+    orig_reference: orig.reference,
+    orig_date: await letterDate(orig),
+    requested_items: items,
+    _hint_de: teamId
+      ? `Der Auftraggeber bittet um ergänzende Angaben. Klara hat ${lead?.name ?? "den Polier"} im Team-Chat danach gefragt; die Antwort kommt direkt in das Schreiben.`
+      : "Der Auftraggeber bittet um ergänzende Angaben. Bitte die Angaben beim Polier erfragen.",
+    _reply_email_id: email.id,
+    _reply_quote: quote,
+  };
+  const created = await createFollowup(orig, "ergaenzung", facts, teamId, ctx, at, slot);
+  if (!teamId) return created;
+  try {
+    await returnForCompletion(
+      created.id,
+      { field: "answers", note_de: `Rückfrage des Auftraggebers zu ${docTitle(orig.doc_type)} ${orig.reference}: ${items.join("; ")}` },
+      new Date(at.getTime() + slot + 2),
+    );
+  } catch (err) {
+    console.error("[klara] asking the Polier for the supplement failed", created.reference, err);
+  }
+  return (await store().get("case", created.id)) ?? created;
+}
+
+/**
+ * SPEC §6.4 `change_request` / `counter_instruction`: Ankündigung Mehrvergütung
+ * (before work starts) and the Bestätigung of the written instruction; on a BGB
+ * contract the § 650b 30-day agreement period is shown.
+ */
+async function draftChange(
+  orig: Case,
+  email: EmailIn,
+  cls: ReplyClassification,
+  quote: string,
+  sender: Contact | null,
+  ctx: ProjectContext,
+  at: Date,
+  slot: number,
+): Promise<Case[]> {
+  const teamId = await teamFor(orig);
+  const bgb = ctx.project.contract_type === "BGB" ? bgbAgreementUntil(at) : null;
+  const what = cls.kind === "counter_instruction" ? "erteilt eine neue Anweisung" : "verlangt eine geänderte oder zusätzliche Leistung";
+  const hint = `Der Auftraggeber ${what}. Vorschlag: Mehrvergütung vor Beginn der Ausführung ankündigen und die Anordnung bestätigen.`;
+  const common: Record<string, unknown> = {
+    instruction_date: berlinDay(at),
+    instructed_by: senderDe(sender, email.from_addr),
+    _via: "email",
+    _hint_de: hint,
+    _reply_email_id: email.id,
+    _reply_date: berlinDay(at),
+    _reply_quote: quote,
+    ...(bgb ? { _bgb_650b_until: bgb } : {}),
+    ...(typeof orig.facts._trade === "string" ? { _trade: orig.facts._trade } : {}),
+  };
+  const mehrkosten = await createFollowup(orig, "mehrkostenanzeige", { ...common, description: quote, verbal: false }, teamId, ctx, at, slot);
+  const confirmation = await createFollowup(
+    orig,
+    "anordnung_bestaetigung",
+    { ...common, instruction_text: quote, _mehrkosten_case_id: mehrkosten.id },
+    teamId,
+    ctx,
+    at,
+    slot + 3,
+  );
+  return [mehrkosten, confirmation];
 }
 
 /** SPEC §5.2: timestamps, photos, weather, schedule vs actual, as plain German lines for the letter. */
@@ -296,7 +427,11 @@ export function rebuttalEvidence(orig: Case, evidence: Evidence[], ctx: ProjectC
  * "Antwort simulieren" (SPEC D5, §1 1:40): the client's scripted rejection of
  * the latest sent Behinderungsanzeige, through the same inbound path.
  */
-export async function simulateReply(caseId: string | null, at: Date): Promise<InboundResult> {
+/** The answers the demo can play in (SPEC D5 and §6.4). */
+export const SIMULATED_REPLIES = ["rejection", "request_info", "change_request"] as const;
+export type SimulatedReply = (typeof SIMULATED_REPLIES)[number];
+
+export async function simulateReply(caseId: string | null, at: Date, kind: SimulatedReply = "rejection"): Promise<InboundResult> {
   const sentMails = (await store().list("email_out")).filter((m) => m.status === "versendet" && m.message_id);
   let mail = caseId ? sentMails.find((m) => m.case_id === caseId) : null;
   if (!mail && !caseId) {
@@ -317,6 +452,13 @@ export async function simulateReply(caseId: string | null, at: Date): Promise<In
   const sent = (await listDocumentVersions(c.id)).find((v) => v.sent_at);
   const letterDate = (sent?.body as DocBody | undefined)?.date;
   const reason = c.doc_type === "behinderungsanzeige" ? (trade ? ` Die ${trade}arbeiten liegen im Zeitplan.` : " Die Vorleistungen liegen im Zeitplan.") : "";
+  const where = typeof c.facts.area === "string" && c.facts.area.trim() ? ` im ${c.facts.area.trim()}` : "";
+  const said =
+    kind === "request_info"
+      ? `bitte übersenden Sie uns zu Ihrer ${title}${letterDate ? ` vom ${dateDe(letterDate)}` : ""} die Namen der betroffenen Arbeitskräfte. Teilen Sie uns außerdem mit, ab wann${where} weitergearbeitet werden kann.`
+      : kind === "change_request"
+        ? `abweichend vom Leistungsverzeichnis ist${where} zusätzlich eine Trittschalldämmung unter dem Estrich einzubauen.`
+        : `wir weisen Ihre ${title}${letterDate ? ` vom ${dateDe(letterDate)}` : ""} zurück.${reason}`;
   const id = uid();
   return receiveReply(
     {
@@ -325,7 +467,7 @@ export async function simulateReply(caseId: string | null, at: Date): Promise<In
       Subject: `AW: ${mail.subject}`,
       TextBody: [
         "Sehr geehrte Damen und Herren,",
-        `wir weisen Ihre ${title}${letterDate ? ` vom ${dateDe(letterDate)}` : ""} zurück.${reason}`,
+        said,
         `Mit freundlichen Grüßen\n${contact?.name ?? ""}\n${contact?.organisation ?? ""}`.trim(),
       ].join("\n\n"),
       MessageID: id,

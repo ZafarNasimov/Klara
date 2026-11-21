@@ -25,6 +25,46 @@ export const stellungnahmeZurueckweisung: DocTypeDef = {
   readback_fields: [],
 };
 
+/**
+ * SPEC §6.4 `request_info`: the client asks for more information on one of
+ * our letters. The requested items come from the reply; the answers from the
+ * Polier, whom Klara asks in the team chat right away.
+ */
+export const ergaenzung: DocTypeDef = {
+  id: "ergaenzung",
+  title_de: "Ergänzende Angaben",
+  legal_basis: "Antwort auf Rückfrage des Auftraggebers",
+  tier: "A",
+  build_priority: "must",
+  recipient: "client_with_authority",
+  // Practice, as for the Stellungnahme: answer within 3 Werktage.
+  deadline: { kind: "working_days_after", days: 3, from: "reply" },
+  event_time_field: "reply_date",
+  checks: ["required_fields", "recipient", "channel"],
+  max_questions: 3,
+  fields: [
+    { key: "reply_date", label_de: "Datum der Rückfrage", type: "date", required: true, source: "computed", question_hint: "" },
+    { key: "orig_reference", label_de: "Unser Zeichen", type: "text", required: true, source: "computed", question_hint: "" },
+    { key: "orig_date", label_de: "Datum unseres Schreibens", type: "date", required: true, source: "computed", question_hint: "" },
+    { key: "requested_items", label_de: "Erbetene Angaben", type: "list", required: true, source: "computed", question_hint: "" },
+    {
+      key: "answers",
+      label_de: "Unsere Angaben",
+      type: "text",
+      required: true,
+      question_hint: "What should we answer to the client's questions?",
+      ask: {
+        en: "What should I answer?",
+        de: "Was soll ich antworten?",
+        ru: "Что мне ответить?",
+      },
+      extract_hint:
+        "German, factual, full sentences; answer each requested item in order, only with what the user said. No legal assessments.",
+    },
+  ],
+  readback_fields: ["answers"],
+};
+
 export const bautagesbericht: DocTypeDef = {
   id: "bautagesbericht",
   title_de: "Bautagesbericht",

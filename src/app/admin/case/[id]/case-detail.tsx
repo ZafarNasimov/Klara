@@ -189,7 +189,7 @@ export function CaseDetailView({ id }: { id: string }) {
 
         {!sentMail && typeof c.facts._hint_de === "string" && data.parent ? (
           <div className="px-8 pt-5">
-            <FollowupNote c={c} parent={data.parent} />
+            <FollowupNote c={c} parent={data.parent} now={ctx?.now ?? null} />
           </div>
         ) : null}
 
@@ -324,7 +324,7 @@ function MailStatus({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
           >
-            <ReplyCard reply={reply} data={data} contacts={contacts} />
+            <ReplyCard reply={reply} data={data} contacts={contacts} now={now} />
           </motion.div>
         ) : (
           <Waiting key="waiting" mail={mail} caseId={data.case.id} contacts={contacts} now={now} mode={mode} onChange={onChange} />
@@ -472,10 +472,50 @@ function Waiting({
   );
 }
 
+/** "Folgeschreiben öffnen" per letter type (SPEC §6.4 proposals). */
+const OPEN_FOLLOWUP_DE: Record<string, string> = {
+  stellungnahme_zurueckweisung: "Stellungnahme öffnen",
+  ergaenzung: "Ergänzung öffnen",
+  mehrkostenanzeige: "Mehrkostenanzeige öffnen",
+  anordnung_bestaetigung: "Bestätigung öffnen",
+};
+
+const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+
+/** Calendar days from the demo "now" to a YYYY-MM-DD date (Berlin day of `now`). */
+function daysUntil(day: string, now: string | null): number | null {
+  if (!now) return null;
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(new Date(now));
+  return Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+}
+
+/** § 650b Abs. 2 BGB: after 30 days without agreement the client may order the change. */
+function BgbPeriod({ until, now }: { until: string; now: string | null }) {
+  const left = daysUntil(until, now);
+  return (
+    <p className="mt-2 text-sm text-foreground">
+      <span className="text-muted-foreground">Einigungsfrist nach § 650b Abs. 2 BGB: </span>
+      30 Tage ab Zugang, bis <span className="font-mono">{fmtDate(`${until}T12:00:00Z`)}</span>
+      {left === null ? null : left > 1 ? (
+        <>
+          {" "}(noch <span className="font-mono">{left}</span> Tage)
+        </>
+      ) : left === 1 ? (
+        " (noch 1 Tag)"
+      ) : left === 0 ? (
+        " (endet heute)"
+      ) : (
+        " (abgelaufen)"
+      )}
+    </p>
+  );
+}
+
 /** On a follow-up letter: why it exists, before anything else (Klara's Hinweis and the client's words). */
-function FollowupNote({ c, parent }: { c: CaseView; parent: CaseView }) {
-  const quote = typeof c.facts.reply_quote === "string" ? c.facts.reply_quote : null;
-  const date = typeof c.facts.reply_date === "string" ? c.facts.reply_date : null;
+function FollowupNote({ c, parent, now }: { c: CaseView; parent: CaseView; now: string | null }) {
+  const quote = str(c.facts.reply_quote) ?? str(c.facts._reply_quote);
+  const date = str(c.facts.reply_date) ?? str(c.facts._reply_date);
+  const bgb = str(c.facts._bgb_650b_until);
   return (
     <section aria-label="Hinweis von Klara" className="flex max-w-[760px] items-start gap-3 rounded-xl border border-border bg-background px-5 py-4">
       <KlaraAvatar size={32} className="shrink-0" />
@@ -492,20 +532,24 @@ function FollowupNote({ c, parent }: { c: CaseView; parent: CaseView }) {
             auf <span className="font-mono">{parent.reference}</span>: „{quote}“
           </p>
         ) : null}
+        {bgb ? <BgbPeriod until={bgb} now={now} /> : null}
       </div>
     </section>
   );
 }
 
-function ReplyCard({ reply, data, contacts }: { reply: EmailIn; data: CaseDetail; contacts: Contacts }) {
+function ReplyCard({ reply, data, contacts, now }: { reply: EmailIn; data: CaseDetail; contacts: Contacts; now: string | null }) {
   const cls = reply.classification as ReplyClassification | null;
   const kind = cls?.kind ?? "other";
   const sender = contacts.find((x) => x.email?.toLowerCase() === reply.from_addr.toLowerCase()) ?? null;
   const who = sender ? ROLE_GENITIVE_DE[sender.role] : "des Absenders";
   // Quotation marks only around the client's own words; otherwise Klara's summary, labelled as such.
   const quote = cls ? (cls.quote === undefined ? (cls.key_points[0] ?? null) : cls.quote) : null;
-  const followup =
-    data.children.find((x) => x.facts._reply_email_id === reply.id) ?? data.children.find((x) => x.doc_type === "stellungnahme_zurueckweisung") ?? null;
+  // The letters Klara prepared for this answer: Stellungnahme, Ergänzung, or Mehrkosten + Bestätigung.
+  const ofReply = data.children.filter((x) => x.facts._reply_email_id === reply.id);
+  const followups = ofReply.length ? ofReply : data.children.filter((x) => x.doc_type === "stellungnahme_zurueckweisung").slice(0, 1);
+  const followup = followups[0] ?? null;
+  const bgb = str(followup?.facts._bgb_650b_until);
   const hint =
     typeof followup?.facts._hint_de === "string"
       ? followup.facts._hint_de
@@ -558,16 +602,25 @@ function ReplyCard({ reply, data, contacts }: { reply: EmailIn; data: CaseDetail
               <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground">Hinweis von Klara</p>
                 <p className="text-sm text-foreground">{hint}</p>
+                {bgb ? <BgbPeriod until={bgb} now={now} /> : null}
               </div>
             </div>
           ) : (
             <span />
           )}
-          {followup ? (
-            <Link href={`/admin/case/${followup.id}`} className={buttonVariants({ size: "lg", className: "shrink-0 px-4" })}>
-              Stellungnahme öffnen{" "}
-              <span className="font-mono">{followup.reference}</span>
-            </Link>
+          {followups.length ? (
+            <div className="flex shrink-0 flex-col items-stretch gap-2">
+              {followups.map((f, i) => (
+                <Link
+                  key={f.id}
+                  href={`/admin/case/${f.id}`}
+                  className={buttonVariants({ size: "lg", variant: i ? "outline" : "default", className: "justify-between gap-3 px-4" })}
+                >
+                  {OPEN_FOLLOWUP_DE[f.doc_type] ?? `${docTitle(f.doc_type)} öffnen`}
+                  <span className="font-mono">{f.reference}</span>
+                </Link>
+              ))}
+            </div>
           ) : null}
         </div>
       ) : null}

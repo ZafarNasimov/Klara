@@ -21,7 +21,10 @@ export const sha256 = (text: string) => createHash("sha256").update(text, "utf8"
 async function related(c: Case): Promise<{ parent: Case | null; mehrkosten: Case | null }> {
   const parent = c.parent_case_id ? await getCase(c.parent_case_id) : null;
   let mehrkosten: Case | null = null;
-  if (c.doc_type === "anordnung_bestaetigung" && c.conversation_id) {
+  // Drafted from the client's e-mail together with its Mehrkostenanzeige (SPEC §6.4).
+  if (c.doc_type === "anordnung_bestaetigung" && typeof c.facts._mehrkosten_case_id === "string") {
+    mehrkosten = await getCase(c.facts._mehrkosten_case_id);
+  } else if (c.doc_type === "anordnung_bestaetigung" && c.conversation_id) {
     const siblings = await store().list("case", { where: { conversation_id: c.conversation_id, doc_type: "mehrkostenanzeige" } });
     mehrkosten = siblings.find((s) => s.status !== "entwurf" || c.status === "entwurf") ?? null;
   }

@@ -33,15 +33,23 @@ export function replySentences(text: string): string[] {
     .split("\n")
     .filter((l) => !/^\s*>/.test(l) && !/^\s*(Sehr geehrte|Hallo|Guten Tag)\b/i.test(l))
     .join(" ");
-  return body
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.replace(/\s+/g, " ").trim())
-    .filter((s) => s.length > 3);
+  return (
+    body
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.replace(/\s+/g, " ").trim())
+      .filter((s) => s.length > 3)
+      // After "Sehr geehrte Damen und Herren," German letters go on in lower case; a quote stands alone.
+      .map((s) => s.charAt(0).toLocaleUpperCase("de-DE") + s.slice(1))
+  );
 }
 
 const RULES: { kind: ReplyKind; re: RegExp }[] = [
   { kind: "rejection", re: /zurückwei|zurückgewiesen|weisen\b.{0,80}\bzurück|lehnen\b.{0,80}\bab\b|abgelehnt|nicht anerkannt|erkennen\b.{0,60}\bnicht an|unbegründet|widersprechen/i },
-  { kind: "request_info", re: /\bbitte\b.{0,60}\b(um|senden|übersenden|übermitteln|nachreichen|vorlegen|ergänzen)\b|benötigen\b|fehlende? (unterlagen|angaben|nachweise)|rückfrage/i },
+  // No \b before the verbs: JavaScript's \b does not count "ü" as a letter ("bitte übersenden").
+  {
+    kind: "request_info",
+    re: /\bbitte\b.{0,60}(\bum\b|senden|übermitteln|nachreichen|vorlegen|ergänzen|nennen|mitteilen)|teilen sie\b.{0,50}\bmit\b|benötigen\b|fehlende? (unterlagen|angaben|nachweise)|rückfrage/i,
+  },
   { kind: "counter_instruction", re: /ordnen\b.{0,60}\ban\b|weisen\b.{0,40}\ban\b|anweisung|haben\b.{0,40}\bzu unterlassen/i },
   { kind: "change_request", re: /änderung|ändern|stattdessen|abweichend|zusätzlich/i },
   { kind: "acceptance", re: /eingang\b.{0,40}\bbestätig|bestätigen\b.{0,40}\beingang|zur kenntnis genommen|einverstanden|anerkannt|erkennen\b.{0,60}\ban\b|akzeptier|stimmen\b.{0,40}\bzu\b/i },

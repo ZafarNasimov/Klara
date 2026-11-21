@@ -2,7 +2,9 @@ import type { DocTypeDef } from "./types";
 
 export const anordnungBestaetigung: DocTypeDef = {
   id: "anordnung_bestaetigung",
-  title_de: "Bestätigung einer mündlichen Anordnung",
+  // Neutral: verbal instructions from site, and written ones from the client's e-mail (SPEC §6.4).
+  // The letter's own subject says which ("Bestätigung einer mündlichen Anordnung" / "Bestätigung Ihrer Anordnung").
+  title_de: "Bestätigung einer Anordnung",
   legal_basis: "VOB/B: Beweissicherung; BGB: § 650b Abs. 2 (Textform)",
   tier: "A",
   build_priority: "must",

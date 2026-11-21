@@ -3,8 +3,10 @@ import type { DocBlock } from "../types";
 import { bare, dateDe, fact, has, type Template } from "./kit";
 
 export const anordnungBestaetigung: Template = (t) => {
+  // An instruction that came in writing (the client's e-mail, SPEC §6.4) is not "mündlich" and not "auf der Baustelle".
+  const written = t.c.facts._via === "email";
   const time = has(t, "instruction_time") ? ` um ${bare(fact(t, "instruction_time")).replace(/\s*Uhr$/i, "")} Uhr` : "";
-  const place = has(t, "place") ? `auf der Baustelle (${bare(fact(t, "place"))})` : "auf der Baustelle";
+  const place = written ? "per E-Mail" : has(t, "place") ? `auf der Baustelle (${bare(fact(t, "place"))})` : "auf der Baustelle";
   const blocks: DocBlock[] = [
     {
       kind: "p",
@@ -26,5 +28,5 @@ export const anordnungBestaetigung: Template = (t) => {
       text: `Zu den Mehrkosten verweisen wir auf unsere gesonderte Anzeige vom ${dateDe(t.mehrkosten.created_at)} (Zeichen ${t.mehrkosten.reference}).`,
     });
   }
-  return { subject: "Bestätigung einer mündlichen Anordnung", blocks };
+  return { subject: written ? "Bestätigung Ihrer Anordnung" : "Bestätigung einer mündlichen Anordnung", blocks };
 };

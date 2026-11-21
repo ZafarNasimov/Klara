@@ -5,7 +5,7 @@ import { runTurn } from "@/lib/agent/turn";
 import { validateCase } from "@/lib/cases/actions";
 import { caseDetail } from "@/lib/cases/detail";
 import { store } from "@/lib/db";
-import { createConversation, listCases, listDocumentVersions, listEvents, listEvidence } from "@/lib/db/repo";
+import { createConversation, listCases, listConversations, listDocumentVersions, listEvents, listEvidence, listTurns } from "@/lib/db/repo";
 import { buildSeed, IDS } from "@/lib/db/seed";
 import { berlinTime } from "@/lib/deadlines";
 import { generateDocument } from "@/lib/documents/generate";
@@ -181,6 +181,99 @@ describe("scenario 7: rejection → Stellungnahme (SPEC §6.4, §10)", () => {
   });
 });
 
+describe("other answers (SPEC §6.4 step 4)", () => {
+  const PETRA = "petra.lang@immobilien-isar.example";
+  const body = (v: { body: unknown }) => JSON.stringify(v.body);
+
+  it("request_info: drafts Ergänzende Angaben and asks the Polier, whose answer fills the letter", async () => {
+    const c = await sentHindrance();
+    const r = await receiveReply(
+      {
+        From: PETRA,
+        Subject: "AW: Behinderungsanzeige – Zeichen KL-2026-0042",
+        TextBody:
+          "Sehr geehrte Damen und Herren,\nbitte übersenden Sie uns die Namen der betroffenen Arbeitskräfte.\nWir benötigen außerdem eine Angabe, ab wann im 2.OG weitergearbeitet werden kann.\nMit freundlichen Grüßen\nDr. Petra Lang",
+      },
+      tick(),
+    );
+    expect(r.classification.kind).toBe("request_info");
+    expect(r.followups).toHaveLength(1);
+    const f = r.followup!;
+    expect(f).toMatchObject({ doc_type: "ergaenzung", parent_case_id: c.id, team_id: IDS.teamEstrich, status: "unvollstaendig", missing_fields: ["answers"] });
+    expect(f.facts.requested_items).toEqual(r.classification.requested_items);
+    expect(f.facts.requested_items).toHaveLength(2);
+
+    // Klara asked in the team chat, in the Polier's language; the German text names the client's questions.
+    const chat = (await listConversations(IDS.teamEstrich)).find((x) => x.kind === "chat" && x.status === "open")!;
+    expect(chat.state.asked).toEqual({ case_id: f.id, field: "answers" });
+    const [ask] = (await listTurns(chat.id)).filter((t) => t.role === "klara").slice(-1);
+    expect(ask.text_de).toContain("Rückfrage des Auftraggebers zu Behinderungsanzeige KL-2026-0042");
+
+    await runTurn({ conversationId: chat.id, text: "Sergej Iwanow, Marek Nowak, Andrei Popescu und Ali Yilmaz. Ab Montag geht es im 2.OG weiter.", now: tick() });
+    await runTurn({ conversationId: chat.id, text: "Ja.", now: tick() });
+    const done = (await store().get("case", f.id))!;
+    expect(done.status).toBe("bereit");
+    expect(String(done.facts.answers)).toContain("Marek Nowak");
+    const [v] = await listDocumentVersions(f.id);
+    expect(v.version).toBe(2);
+    expect(body(v)).toContain("baten Sie um folgende Angaben");
+    expect(body(v)).toContain("Marek Nowak");
+  });
+
+  it("change_request (VOB/B): Mehrkostenanzeige and the Bestätigung of a written instruction", async () => {
+    const c = await sentHindrance();
+    const r = await receiveReply(
+      { From: PETRA, Subject: "Zeichen KL-2026-0042", TextBody: "Abweichend vom Leistungsverzeichnis ist im 2.OG ein Heizestrich statt Zementestrich einzubauen." },
+      tick(),
+    );
+    expect(r.classification.kind).toBe("change_request");
+    const [mk, ab] = r.followups!;
+    expect(mk).toMatchObject({ doc_type: "mehrkostenanzeige", parent_case_id: c.id, team_id: IDS.teamEstrich, status: "unvollstaendig" });
+    expect(mk.facts).toMatchObject({
+      instructed_by: "Dr. Petra Lang (Bauherr)",
+      instruction_date: DAY,
+      description: "Abweichend vom Leistungsverzeichnis ist im 2.OG ein Heizestrich statt Zementestrich einzubauen.",
+      verbal: false,
+    });
+    expect(mk.missing_fields).toEqual(expect.arrayContaining(["work_started", "planned_start"]));
+    expect(mk.facts._bgb_650b_until).toBeUndefined();
+
+    expect(ab).toMatchObject({ doc_type: "anordnung_bestaetigung", status: "bereit" });
+    const [letter] = await listDocumentVersions(ab.id);
+    expect((letter.body as { subject: string }).subject).toBe("Bestätigung Ihrer Anordnung");
+    expect(body(letter)).toContain("hat Dr. Petra Lang (Bauherr) per E-Mail folgende Anordnung erteilt");
+    expect(body(letter)).not.toContain("auf der Baustelle");
+    expect(body(letter)).toContain(`Zeichen ${mk.reference}`);
+
+    const proposed = (await listEvents({ caseId: c.id })).filter((e) => e.kind === "followup_proposed").map((e) => e.payload.reference);
+    expect(proposed.sort()).toEqual([mk.reference, ab.reference].sort());
+  });
+
+  it("the demo plays in each kind of answer", async () => {
+    await sentHindrance();
+    const ask = await simulateReply(null, tick(), "request_info");
+    expect(ask.classification.kind).toBe("request_info");
+    expect(ask.followup?.doc_type).toBe("ergaenzung");
+    await store().reset(buildSeed(clock));
+    await sentHindrance();
+    const change = await simulateReply(null, tick(), "change_request");
+    expect(change.classification.kind).toBe("change_request");
+    expect(change.followups?.map((f) => f.doc_type)).toEqual(["mehrkostenanzeige", "anordnung_bestaetigung"]);
+    expect(change.followup?.facts.description).toBe("Abweichend vom Leistungsverzeichnis ist im 2.OG zusätzlich eine Trittschalldämmung unter dem Estrich einzubauen.");
+  });
+
+  it("counter_instruction (BGB): shows the § 650b agreement period", async () => {
+    await store().update("project", IDS.project, { contract_type: "BGB" });
+    await sentHindrance();
+    const r = await receiveReply({ From: PETRA, Subject: "Zeichen KL-2026-0042", TextBody: "Wir ordnen hiermit an, die Kolonne ab Montag im 3.OG einzusetzen." }, tick());
+    expect(r.classification.kind).toBe("counter_instruction");
+    const [mk] = r.followups!;
+    expect(mk.facts._bgb_650b_until).toBe("2026-12-20");
+    const [v] = await listDocumentVersions(mk.id);
+    expect((v.body as { subject: string }).subject).toBe("Ankündigung eines Anspruchs auf Mehrvergütung");
+  });
+});
+
 describe("inbound webhook route", () => {
   it("shows the whole chain in the history of both letters", async () => {
     const c = await sentHindrance();
@@ -223,6 +316,12 @@ describe("keyword classifier", () => {
     expect(classifyByKeywords("", "Bitte senden Sie uns die Stundenzettel vom 19.11.").kind).toBe("request_info");
     expect(classifyByKeywords("AW: Behinderungsanzeige", "Wir haben Ihr Schreiben zur Kenntnis genommen.").kind).toBe("acceptance");
     expect(classifyByKeywords("", "Schönes Wochenende!").kind).toBe("other");
+  });
+
+  it("tells a question from a plain statement", () => {
+    expect(classifyByKeywords("AW", "Bitte übersenden Sie uns die Stundenzettel.").kind).toBe("request_info");
+    expect(classifyByKeywords("AW", "Teilen Sie uns bitte mit, wann Sie weiterarbeiten können.").kind).toBe("request_info");
+    expect(classifyByKeywords("AW", "Hiermit teilen wir Ihnen mit, dass wir den Eingang Ihres Schreibens bestätigen.").kind).toBe("acceptance");
   });
 
   it("quotes only the client's own sentence", () => {

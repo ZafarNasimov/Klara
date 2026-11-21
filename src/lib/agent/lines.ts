@@ -199,6 +199,7 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     mehrkostenanzeige: "Notice of extra costs",
     anordnung_bestaetigung: "Confirmation of the verbal instruction",
     verzug_nu: "Request to remedy to the subcontractor",
+    ergaenzung: "Additional information for the client",
   },
   de: {
     behinderungsanzeige: "Behinderungsanzeige",
@@ -206,6 +207,7 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     mehrkostenanzeige: "Ankündigung Mehrvergütung",
     anordnung_bestaetigung: "Bestätigung der mündlichen Anordnung",
     verzug_nu: "Abhilfeaufforderung an den Nachunternehmer",
+    ergaenzung: "Ergänzende Angaben für den Bauherrn",
   },
   ru: {
     behinderungsanzeige: "Уведомление о препятствии",
@@ -213,6 +215,7 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     mehrkostenanzeige: "Уведомление о дополнительных расходах",
     anordnung_bestaetigung: "Подтверждение устного указания",
     verzug_nu: "Требование к субподрядчику",
+    ergaenzung: "Дополнительные сведения для заказчика",
   },
   pl: {
     behinderungsanzeige: "Zgłoszenie przeszkody",
@@ -220,6 +223,7 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     mehrkostenanzeige: "Zgłoszenie kosztów dodatkowych",
     anordnung_bestaetigung: "Potwierdzenie ustnego polecenia",
     verzug_nu: "Wezwanie podwykonawcy do usunięcia",
+    ergaenzung: "Dodatkowe informacje dla inwestora",
   },
   tr: {
     behinderungsanzeige: "Engel bildirimi",
@@ -227,6 +231,7 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     mehrkostenanzeige: "Ek maliyet bildirimi",
     anordnung_bestaetigung: "Sözlü talimatın teyidi",
     verzug_nu: "Taşerona giderme talebi",
+    ergaenzung: "İşverene ek bilgiler",
   },
   ro: {
     behinderungsanzeige: "Notificare de impediment",
@@ -234,6 +239,7 @@ export const DOC_SPOKEN: Record<string, Record<string, string>> = {
     mehrkostenanzeige: "Notificare de costuri suplimentare",
     anordnung_bestaetigung: "Confirmarea dispoziției verbale",
     verzug_nu: "Somație către subantreprenor",
+    ergaenzung: "Informații suplimentare pentru beneficiar",
   },
 };
 

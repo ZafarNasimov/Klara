@@ -9,6 +9,7 @@ export type DocTypeId =
   | "mehrkostenanzeige"
   | "anordnung_bestaetigung"
   | "stellungnahme_zurueckweisung"
+  | "ergaenzung"
   | "bautagesbericht"
   | "verzug_nu"
   | "info_folgegewerk";

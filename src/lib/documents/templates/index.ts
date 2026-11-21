@@ -5,6 +5,7 @@ import { bautagesbericht } from "./bautagesbericht";
 import { behinderungEnde } from "./behinderung-ende";
 import { behinderungsanzeige } from "./behinderungsanzeige";
 import type { Template } from "./kit";
+import { ergaenzung } from "./ergaenzung";
 import { infoFolgegewerk } from "./info-folgegewerk";
 import { mehrkostenanzeige } from "./mehrkostenanzeige";
 import { stellungnahmeZurueckweisung } from "./stellungnahme-zurueckweisung";
@@ -16,6 +17,7 @@ export const TEMPLATES: Partial<Record<DocTypeId, Template>> = {
   mehrkostenanzeige,
   anordnung_bestaetigung: anordnungBestaetigung,
   stellungnahme_zurueckweisung: stellungnahmeZurueckweisung,
+  ergaenzung,
   verzug_nu: verzugNu,
   info_folgegewerk: infoFolgegewerk,
   bautagesbericht,

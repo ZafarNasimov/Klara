@@ -63,11 +63,28 @@ export function DemoControls() {
       <section className="rounded-xl border border-border bg-background p-5">
         <h2 className="text-sm font-medium text-foreground">Antwort des Auftraggebers</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Spielt die Zurückweisung der zuletzt versendeten Behinderungsanzeige ein, als käme sie per E-Mail. Für den Fall, dass die echte Antwort nicht ankommt.
+          Spielt eine Antwort auf die zuletzt versendete Behinderungsanzeige ein, als käme sie per E-Mail. Für den Fall, dass die echte Antwort nicht ankommt. Klara bereitet je nach Antwort die passenden Schreiben vor.
         </p>
-        <Button variant="outline" className="mt-3 h-10 px-4" disabled={busy !== null} onClick={() => run("reply", "/api/demo/reply", {}, "Antwort eingespielt")}>
-          {busy === "reply" ? "Wird eingespielt…" : "Antwort simulieren"}
-        </Button>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {(
+            [
+              ["rejection", "Zurückweisung", "Stellungnahme"],
+              ["request_info", "Rückfrage", "Ergänzende Angaben, Frage an den Polier"],
+              ["change_request", "Änderungswunsch", "Mehrvergütung und Bestätigung"],
+            ] as const
+          ).map(([kind, label, result]) => (
+            <Button
+              key={kind}
+              variant="outline"
+              className="h-10 px-4"
+              disabled={busy !== null}
+              title={`Klara bereitet vor: ${result}`}
+              onClick={() => run(`reply-${kind}`, "/api/demo/reply", { kind }, `Antwort eingespielt: ${label}`)}
+            >
+              {busy === `reply-${kind}` ? "Wird eingespielt…" : label}
+            </Button>
+          ))}
+        </div>
       </section>
 
       {data ? <VadSettingsForm key={JSON.stringify(data.project.settings.vad ?? null)} initial={data.project.settings.vad ?? DEFAULT_VAD} onSaved={reload} /> : null}
