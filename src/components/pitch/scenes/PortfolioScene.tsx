@@ -4,10 +4,8 @@ import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode }
 import { motion } from "motion/react";
 import { DashboardBody } from "@/components/dashboard/dashboard";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { dashboardFromSeed } from "@/lib/dashboard/from-seed";
-import { buildSeed } from "@/lib/db/seed";
-import { IDS } from "@/lib/ids";
-import type { Case } from "@/lib/types";
+import type { DashboardView } from "@/lib/dashboard/compute";
+import { useApi } from "@/lib/use-api";
 import { DOC_REFERENCE } from "../pitch-story";
 import { EASE_OUT, u } from "../stage";
 import { appScaleVars, LightScene, PitchHeadline, useBeat, type SceneProps } from "./scene-parts";
@@ -23,39 +21,10 @@ const NATIVE_W = 1600;
  */
 export function PortfolioScene({ phase, step, revealMode }: SceneProps) {
   const beat = useBeat(phase, step, revealMode, [2600]);
-  const [views] = useState(() => {
-    const now = new Date();
-    const seed = buildSeed(now);
-    // The case the Scene 2 call creates (same facts as the pitch's form).
-    const call: Case = {
-      id: "pitch-call-case",
-      project_id: IDS.project,
-      team_id: IDS.teamEstrich,
-      conversation_id: null,
-      doc_type: "behinderungsanzeige",
-      status: "bereit",
-      sphere: "client",
-      facts: { _trade: "Elektro", area: "2.OG", start_at: now.toISOString(), cause: "Elektroarbeiten im 2. OG nicht abgeschlossen", expected_duration: "ca. 2 Arbeitstage" },
-      missing_fields: [],
-      checks: [],
-      deadline_at: null,
-      deadline_rule: null,
-      parent_case_id: null,
-      reference: DOC_REFERENCE,
-      created_by: IDS.userPolierEstrich,
-      asked_fields: [],
-      declined_fields: [],
-      flags: [],
-      created_at: now.toISOString(),
-      updated_at: now.toISOString(),
-    };
-    return {
-      before: dashboardFromSeed(seed, now),
-      after: dashboardFromSeed({ ...seed, case: [...(seed.case ?? []), call] }, now),
-    };
-  });
-  const v = beat >= 1 ? views.after : views.before;
-  const cell = v.heatmap.rows.find((r) => r.code === "B")?.cells.find((c) => c.trade === "Elektro");
+  // The dashboard of a freshly reset demo, computed on the server from the seed (no database).
+  const { data: views } = useApi<{ before: DashboardView; after: DashboardView }>("/api/dashboard/demo", { live: false, pollMs: 0 });
+  const v = views ? (beat >= 1 ? views.after : views.before) : null;
+  const hot = v?.heatmap.rows.flatMap((r) => r.cells.map((c) => ({ r, c }))).find(({ c }) => c.hindrance?.reference === DOC_REFERENCE);
 
   return (
     <LightScene label="Scene 5 – portfolio" phase={phase}>
@@ -64,7 +33,7 @@ export function PortfolioScene({ phase, step, revealMode }: SceneProps) {
       <FitBox left={160} top={196} width={1600} height={752}>
         <TooltipProvider>
           <div inert aria-hidden className="pointer-events-none">
-            <DashboardBody v={v} linkable={false} />
+            {v ? <DashboardBody v={v} linkable={false} /> : null}
           </div>
         </TooltipProvider>
       </FitBox>
@@ -79,8 +48,8 @@ export function PortfolioScene({ phase, step, revealMode }: SceneProps) {
       >
         <span aria-hidden className="rounded-[2px] bg-light-red" style={{ width: u(14), height: u(14) }} />
         <span>
-          After the call: <span lang="de">{DOC_REFERENCE}</span> is on the dashboard, Elektro on site B turns red
-          {cell?.delay ? ` (+${cell.delay} days)` : ""}
+          After the call: <span lang="de">{DOC_REFERENCE}</span> is on the dashboard, {hot ? `${hot.c.trade} on site ${hot.r.code}` : "the trade"} turns red
+          {hot?.c.delay ? ` (+${hot.c.delay} days)` : ""}
         </span>
       </motion.p>
     </LightScene>

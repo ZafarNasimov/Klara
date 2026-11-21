@@ -6,6 +6,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { clockBase } from "@/lib/clock";
 import { TABLE_ORDER, type TableName } from "@/lib/types";
+import { withDashboardHistory } from "./dashboard-history";
+import { withDemoHistory } from "./demo-history";
 import { buildSeed } from "./seed";
 import { NotFoundError, type Row, type SeedData, type Store, type StoreChange } from "./store";
 
@@ -53,7 +55,8 @@ function load(s: MemoryState) {
       console.warn("[klara] .data/db.json unreadable, loading the demo seed", err);
     }
   }
-  fill(s, buildSeed(clockBase()));
+  const now = clockBase();
+  fill(s, withDashboardHistory(withDemoHistory(buildSeed(now), now), now));
   schedulePersist(s);
 }
 

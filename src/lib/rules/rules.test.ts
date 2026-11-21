@@ -10,12 +10,14 @@ import { canonicalTradeName, computeSphere, resolveTrade, routeHindrance } from 
 
 const NOW = berlinTime("2026-11-20", 9, 30);
 const seed = buildSeed(NOW);
+// The first site only, as getProjectContext loads it (the seed has three sites).
+const mine = <T extends { project_id: string }>(rows: T[]) => rows.filter((r) => r.project_id === IDS.project);
 const ctx: RulesCtx = {
   project: seed.project![0],
-  contacts: seed.contact!,
-  trades: seed.trade!,
-  teams: seed.team!,
-  schedule: seed.schedule_item!,
+  contacts: mine(seed.contact!),
+  trades: mine(seed.trade!),
+  teams: mine(seed.team!),
+  schedule: mine(seed.schedule_item!),
 };
 
 describe("sphere", () => {
@@ -25,9 +27,8 @@ describe("sphere", () => {
     expect(resolveTrade("elektrycy", ctx.trades)?.name).toBe("Elektro");
     expect(resolveTrade("Trockenbauer", ctx.trades)?.name).toBe("Trockenbau");
     expect(resolveTrade("suchej zabudowy", ctx.trades)?.name).toBe("Trockenbau");
-    expect(resolveTrade("painters", ctx.trades)).toBeNull(); // not in this project
-    expect(canonicalTradeName("painters")).toBe("Maler");
-    expect(resolveTrade("plumbers", ctx.trades)?.name).toBe("Sanitär");
+    expect(resolveTrade("plumbers", ctx.trades)).toBeNull(); // not in this project
+    expect(canonicalTradeName("plumbers")).toBe("Sanitär");
   });
 
   it("client-hired trade → client sphere → Behinderungsanzeige with cost reservation", () => {
@@ -59,10 +60,10 @@ describe("sphere", () => {
   });
 
   it("unknown trade → unclear, answered by who hired it", () => {
-    expect(computeSphere({ causeKind: "trade", tradeGuess: "painters" }, ctx)).toMatchObject({ sphere: "unclear", tradeName: "Maler" });
-    expect(routeHindrance("unclear", "Maler")).toEqual({ kind: "ask_sphere", trade: "Maler" });
-    expect(computeSphere({ causeKind: "trade", tradeGuess: "painters", hiredBy: "client" }, ctx).sphere).toBe("client");
-    expect(computeSphere({ causeKind: "trade", tradeGuess: "painters", hiredBy: "us" }, ctx).sphere).toBe("own_sub");
+    expect(computeSphere({ causeKind: "trade", tradeGuess: "plumbers" }, ctx)).toMatchObject({ sphere: "unclear", tradeName: "Sanitär" });
+    expect(routeHindrance("unclear", "Sanitär")).toEqual({ kind: "ask_sphere", trade: "Sanitär" });
+    expect(computeSphere({ causeKind: "trade", tradeGuess: "plumbers", hiredBy: "client" }, ctx).sphere).toBe("client");
+    expect(computeSphere({ causeKind: "trade", tradeGuess: "plumbers", hiredBy: "us" }, ctx).sphere).toBe("own_sub");
   });
 });
 

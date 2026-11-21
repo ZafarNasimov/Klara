@@ -2,6 +2,8 @@
 import "server-only";
 import { clockBase, withOffset } from "@/lib/clock";
 import { berlinDay, deadlineView, DEFAULT_HOLIDAY_REGION } from "@/lib/deadlines";
+import { getDocType } from "@/lib/doctypes";
+import { fmtDate } from "@/lib/labels";
 import type {
   AppEvent,
   AppUser,
@@ -21,6 +23,8 @@ import type {
   Turn,
 } from "@/lib/types";
 import { store } from "./index";
+import { withDashboardHistory } from "./dashboard-history";
+import { withDemoHistory } from "./demo-history";
 import { buildSeed, DEFAULT_PROJECT_ID } from "./seed";
 import { NotFoundError } from "./store";
 
@@ -173,15 +177,22 @@ export async function toCaseViews(cases: Case[], ctx?: ProjectContext): Promise<
   const now = withOffset(clockBase(), pctx.project.settings.demo_clock_offset_ms);
   const region = holidayRegion(pctx.project);
   const sentAt = new Map<string, string | null>();
+  const checkedAt = new Map<string, string | null>();
   for (const c of cases) {
     if (["versendet", "beantwortet", "abgeschlossen"].includes(c.status)) {
       const versions = await listDocumentVersions(c.id);
       sentAt.set(c.id, versions.find((v) => v.sent_at)?.sent_at ?? null);
+    } else if (c.status === "validiert" && getDocType(c.doc_type)?.recipient === "internal") {
+      // An internal report is finished once the site manager validated it (it is never sent).
+      const versions = await listDocumentVersions(c.id);
+      checkedAt.set(c.id, versions.find((v) => v.validated_at)?.validated_at ?? null);
     }
   }
   return cases.map((c) => ({
     ...c,
-    deadline: deadlineView(c, now, region, sentAt.get(c.id)),
+    deadline: checkedAt.has(c.id)
+      ? { due_at: c.deadline_at, status: "ok" as const, label_de: checkedAt.get(c.id) ? `geprüft am ${fmtDate(checkedAt.get(c.id)!)}` : "geprüft" }
+      : deadlineView(c, now, region, sentAt.get(c.id)),
     team_name: pctx.teams.find((t) => t.id === c.team_id)?.name ?? null,
     author_name: pctx.users.find((u) => u.id === c.created_by)?.name ?? null,
   }));
@@ -278,6 +289,8 @@ export async function upsertProgress(scheduleItemId: string, day: string, qty: n
 
 // ── Demo ──────────────────────────────────────────────────────────────
 
+/** "Demo zurücksetzen": the three sites plus three weeks of past letters, replies and daily reports. */
 export async function resetDemo(): Promise<void> {
-  await store().reset(buildSeed(clockBase()));
+  const now = clockBase();
+  await store().reset(withDashboardHistory(withDemoHistory(buildSeed(now), now), now));
 }

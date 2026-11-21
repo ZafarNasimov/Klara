@@ -43,7 +43,7 @@ describe("Behinderungsanzeige", () => {
     expect(v.version).toBe(1);
     expect(v.sha256).toBe(sha256(md));
     expect(body.subject).toBe("Behinderungsanzeige gemäß § 6 Abs. 1 VOB/B");
-    expect(body.addressee).toMatchObject({ name: "Dr. Petra Lang", organisation: "Wohnbau Riem GmbH" });
+    expect(body.addressee).toMatchObject({ name: "Dr. Petra Lang", organisation: "Immobilien Isar GmbH" });
     expect(body.missing).toEqual([]);
     expect(md).toContain("**Beginn der Behinderung:** 20.11.2026, 07:00 Uhr");
     expect(md).toContain("Derzeit sind 4 Arbeitskräfte ohne Einsatzmöglichkeit.");

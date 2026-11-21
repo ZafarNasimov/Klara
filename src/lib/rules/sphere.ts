@@ -13,6 +13,12 @@ const TRADE_ALIASES: Record<string, string[]> = {
   Heizung: ["heizung", "heating", "hvac", "отоплен", "ogrzewan", "ısıtma", "încălzire"],
   Fenster: ["fenster", "window", "окн", "okn", "pencere", "ferestre"],
   Maler: ["maler", "painter", "маляр", "malarz", "boyacı", "zugrav"],
+  // Not "лес" alone: it is also the start of "лестница" (stairs).
+  Gerüstbau: ["gerüst", "scaffold", "леса", "лесов", "rusztowa", "iskele", "schelă", "schela", "schele"],
+  Fassade: ["fassade", "facade", "façade", "wdvs", "фасад", "elewac", "cephe", "fațad", "fatad"],
+  Rohbau: ["rohbau", "shell work", "concrete", "бетонщик", "монолит", "betoniar", "kaba inşaat", "betoncu", "structur"],
+  Abbruch: ["abbruch", "rückbau", "demolition", "демонтаж", "снос", "rozbiór", "wyburz", "yıkım", "demolare"],
+  Innenausbau: ["innenausbau", "interior", "отделоч", "wykończeni", "iç mekan", "finisaj"],
 };
 
 /** Resolve a free-text trade guess ("electricians", "электрики") to a project trade. */

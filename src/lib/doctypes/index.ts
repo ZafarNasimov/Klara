@@ -77,3 +77,9 @@ export function hasValue(v: unknown): boolean {
   if (typeof v === "number") return Number.isFinite(v);
   return true;
 }
+
+/** Still to do in the office: not sent, and not an internal report (Bautagesbericht, Meldung) already validated. */
+export function isOpenCase(c: { status: string; doc_type: string }): boolean {
+  if (!["unvollstaendig", "bereit", "validiert"].includes(c.status)) return false;
+  return !(c.status === "validiert" && getDocType(c.doc_type)?.recipient === "internal");
+}

@@ -103,7 +103,7 @@ describe("seed meetings", async () => {
     expect(p47.changes.map((c) => c.text_de)).toContain("4 Aufgaben angelegt");
   });
 
-  it("buildSeed carries the meetings; Baustelle B starts without cases (history is on A and C)", async () => {
+  it("buildSeed carries the meetings; the demo site starts without cases (the call is KL-…-0042)", async () => {
     const seed = buildSeed(now);
     expect(seed.meeting).toHaveLength(2);
     const { IDS } = await import("@/lib/ids");

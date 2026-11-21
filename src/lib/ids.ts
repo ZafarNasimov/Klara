@@ -1,6 +1,8 @@
 // Fixed seed ids (client-safe). The seed and the role switcher share them.
-export const seedId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
-const id = seedId;
+const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+
+/** Stable ids for generated demo rows (history cases, versions, events …). */
+export const seedId = (n: number) => id(900000 + n);
 
 export const IDS = {
   company: id(1),
@@ -25,39 +27,48 @@ export const IDS = {
   schedTrockenbau2: id(504),
   schedBodenbelag2: id(505),
   progressEstrich2: id(601),
+
+  // Wohnanlage Riem, Haus B (VOB/B)
+  projectRiem: id(11),
+  contactRiemBauherr: id(111),
+  contactRiemSteuerung: id(112),
+  contactRiemGeruest: id(113),
+  tradeRiemRohbau: id(211),
+  tradeRiemFassade: id(212),
+  tradeRiemGeruest: id(213),
+  tradeRiemFenster: id(214),
+  tradeRiemHeizung: id(215),
+  teamRohbau: id(311),
+  teamFassade: id(312),
+  userPolierRohbau: id(405),
+  userPolierFassade: id(406),
+  schedRiemMauerwerk: id(511),
+  schedRiemDecke: id(512),
+  schedRiemGeruest: id(513),
+  schedRiemFenster: id(514),
+  schedRiemWdvs: id(515),
+  schedRiemHeizung: id(516),
+
+  // Sanierung Wohnhaus Schwabing (BGB)
+  projectSchwabing: id(12),
+  contactSchwBauherr: id(121),
+  contactSchwArchitekt: id(122),
+  contactSchwSanitaer: id(123),
+  contactSchwMaler: id(124),
+  tradeSchwAbbruch: id(221),
+  tradeSchwInnenausbau: id(222),
+  tradeSchwElektro: id(223),
+  tradeSchwSanitaer: id(224),
+  tradeSchwMaler: id(225),
+  teamAbbruch: id(321),
+  teamInnenausbau: id(322),
+  userPolierAbbruch: id(407),
+  userPolierInnenausbau: id(408),
+  schedSchwRueckbau: id(521),
+  schedSchwElektro: id(522),
+  schedSchwVorsatz: id(523),
+  schedSchwSanitaer: id(524),
+  schedSchwMaler: id(525),
   meetingKw46: id(701),
   meetingKw47: id(702),
-  // Portfolio: Baustellen A (Schwabing) and C (Pasing), more teams and trades on B.
-  projectA: id(11),
-  projectC: id(12),
-  contactBauherrA: id(111),
-  contactBauherrC: id(121),
-  contactSanitaerB: id(105),
-  teamHaustechnik: id(303),
-  teamRohbauA: id(311),
-  teamAusbauA: id(312),
-  teamRohbauC: id(321),
-  teamFassadeC: id(322),
-  tradeSanitaer: id(205),
-  tradeInnenputz: id(206),
-  tradeRohbauA: id(211),
-  tradeTrockenbauA: id(212),
-  tradeElektroA: id(213),
-  tradeSanitaerA: id(214),
-  tradeRohbauC: id(221),
-  tradeFassadeC: id(222),
-  tradeSanitaerC: id(223),
-  tradeElektroC: id(224),
-  schedEstrich1: id(506),
-  schedSanitaer3: id(507),
-  schedInnenputz3: id(508),
-  schedRohbauA: id(511),
-  schedTrockenbauA: id(512),
-  schedElektroA: id(513),
-  schedSanitaerA: id(514),
-  schedRohbauC: id(521),
-  schedFassadeC: id(522),
-  schedSanitaerC: id(523),
-  schedElektroC: id(524),
 } as const;
-

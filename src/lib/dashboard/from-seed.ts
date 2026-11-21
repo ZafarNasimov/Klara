@@ -1,8 +1,19 @@
-// The dashboard from seed rows (no store): the pitch renders this offline.
+// The dashboard from the demo seed (no store): what "Demo zurücksetzen" loads,
+// computed by the same function as /api/dashboard. Server-only (the demo
+// history hashes letters with node:crypto); the pitch fetches it from
+// /api/dashboard/demo, which needs no database.
+import "server-only";
+import { withDashboardHistory } from "@/lib/db/dashboard-history";
+import { withDemoHistory } from "@/lib/db/demo-history";
+import { buildSeed } from "@/lib/db/seed";
 import type { SeedData } from "@/lib/db/store";
-import { IDS } from "@/lib/ids";
 import { DEFAULT_HOLIDAY_REGION } from "@/lib/deadlines";
+import { IDS } from "@/lib/ids";
 import { computeDashboard, type DashboardData, type DashboardFilters, type DashboardView } from "./compute";
+
+export function demoSeed(now: Date): SeedData {
+  return withDashboardHistory(withDemoHistory(buildSeed(now), now), now);
+}
 
 export function dataFromSeed(seed: SeedData): DashboardData {
   return {

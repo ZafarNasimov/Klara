@@ -2,33 +2,33 @@
 // Office overview (SPEC §8 /admin): project tree left, case table center,
 // details right; deadlines today/tomorrow and red flags on top.
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowUpRight, Building2, Users, X } from "lucide-react";
 import { DeadlineBadge } from "@/components/klara/deadline-badge";
 import { CheckList, LightDot, LightSummary, overallLight } from "@/components/klara/traffic-light";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ProjectContext } from "@/lib/db/repo";
-import { docTitle, fieldLabel, getDocType, hasValue } from "@/lib/doctypes";
+import { docTitle, fieldLabel, getDocType, hasValue, isOpenCase } from "@/lib/doctypes";
 import { CASE_STATUS_DE, fmtShort, fmtTime, SPHERE_DE } from "@/lib/labels";
 import type { AppEvent, CaseView } from "@/lib/types";
+import { useProjectId } from "@/lib/project-choice";
 import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { eventDetail, eventTitle } from "./event-text";
 import { formatFact } from "./format-fact";
 
-type ProjectResponse = ProjectContext & { now: string };
+type ProjectResponse = ProjectContext & { now: string; projects: { id: string; name: string; contract_type: string; contract_no: string }[] };
 
-const OPEN = new Set(["unvollstaendig", "bereit", "validiert"]);
-
-type Site = { id: string; name: string; code: string; contract_no: string };
-
-export function CaseBoard({ projectId = null, trade = null }: { projectId?: string | null; trade?: string | null }) {
-  const q = projectId ? `project=${projectId}` : "";
-  const { data: ctx } = useApi<ProjectResponse>(projectId ? `/api/project?id=${projectId}` : "/api/project");
-  const { data: cases, error } = useApi<CaseView[]>(`/api/cases${q ? `?${q}` : ""}`);
-  const { data: events } = useApi<AppEvent[]>(`/api/events?limit=30${q ? `&${q}` : ""}`);
-  const { data: sites } = useApi<Site[]>("/api/projects", { live: false, pollMs: 0 });
+export function CaseBoard({ site = null, trade = null }: { site?: string | null; trade?: string | null }) {
+  const [projectId, setProjectId] = useProjectId();
+  // Opened from the dashboard (?site=): show that site.
+  useEffect(() => {
+    if (site) setProjectId(site);
+  }, [site, setProjectId]);
+  const { data: ctx } = useApi<ProjectResponse>(`/api/project?id=${projectId}`);
+  const { data: cases, error } = useApi<CaseView[]>(`/api/cases?project=${projectId}`);
+  const { data: events } = useApi<AppEvent[]>(`/api/events?limit=30&project=${projectId}`);
   // Trades a meeting put behind schedule ("at risk"), newest event per trade.
   const tradeDelays = new Map<string, { days: number; area: string }>();
   for (const e of events ?? []) {
@@ -38,6 +38,11 @@ export function CaseBoard({ projectId = null, trade = null }: { projectId?: stri
     }
   }
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
+  const pickProject = (id: string) => {
+    setTeamFilter(null);
+    setSelectedId(null);
+    setProjectId(id);
+  };
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scope, setScope] = useState<"open" | "all">("open");
 
@@ -48,18 +53,18 @@ export function CaseBoard({ projectId = null, trade = null }: { projectId?: stri
   );
   const rows = useMemo(
     () =>
-      visible.filter((c) => (teamFilter ? c.team_id === teamFilter : true)).filter((c) => (scope === "open" ? OPEN.has(c.status) : true)),
+      visible.filter((c) => (teamFilter ? c.team_id === teamFilter : true)).filter((c) => (scope === "open" ? isOpenCase(c) : true)),
     [visible, teamFilter, scope],
   );
   const selected = rows.find((c) => c.id === selectedId) ?? null;
 
-  const dueToday = visible.filter((c) => OPEN.has(c.status) && c.deadline && c.deadline.status !== "ok");
+  const dueToday = visible.filter((c) => isOpenCase(c) && c.deadline && c.deadline.status !== "ok");
   const tomorrow = ctx ? berlinDayOffset(ctx.now, 1) : null;
   const dueTomorrow = visible.filter(
-    (c) => OPEN.has(c.status) && c.deadline?.status === "ok" && c.deadline.due_at && berlinDayOffset(c.deadline.due_at, 0) === tomorrow,
+    (c) => isOpenCase(c) && c.deadline?.status === "ok" && c.deadline.due_at && berlinDayOffset(c.deadline.due_at, 0) === tomorrow,
   );
   const redFlags = visible.filter(
-    (c) => OPEN.has(c.status) && (overallLight(c.checks) === "red" || c.flags.includes("escalate") || c.flags.includes("internal_risk")),
+    (c) => isOpenCase(c) && (overallLight(c.checks) === "red" || c.flags.includes("escalate") || c.flags.includes("internal_risk")),
   );
 
   return (
@@ -72,27 +77,9 @@ export function CaseBoard({ projectId = null, trade = null }: { projectId?: stri
               <Building2 className="size-3.5" aria-hidden />
               {ctx.company.name}
             </p>
-            {sites && sites.length > 1 ? (
-              <nav aria-label="Baustellen" className="mt-2 flex gap-1 px-2">
-                {sites.map((s) => (
-                  <Link
-                    key={s.id}
-                    href={`/admin/vorgaenge?site=${s.id}${trade ? `&trade=${encodeURIComponent(trade)}` : ""}`}
-                    aria-current={s.id === ctx.project.id ? "page" : undefined}
-                    title={s.name}
-                    className={cn(
-                      "flex h-8 min-w-8 items-center justify-center rounded-md border px-2 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      s.id === ctx.project.id ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {s.code}
-                  </Link>
-                ))}
-              </nav>
-            ) : null}
             {trade ? (
               <Link
-                href={`/admin/vorgaenge?site=${ctx.project.id}`}
+                href="/admin/vorgaenge"
                 className="mx-2 mt-2 flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5 text-xs text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label={`Filter Gewerk ${trade} entfernen`}
               >
@@ -100,23 +87,30 @@ export function CaseBoard({ projectId = null, trade = null }: { projectId?: stri
                 <X className="size-3.5 text-muted-foreground" aria-hidden />
               </Link>
             ) : null}
-            <button
-              type="button"
-              onClick={() => setTeamFilter(null)}
-              aria-pressed={teamFilter === null}
-              className={cn(
-                "mt-2 w-full rounded-md px-2 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                teamFilter === null ? "bg-muted font-medium text-foreground" : "text-foreground hover:bg-muted",
-              )}
-            >
-              {ctx.project.name}
-              <span className="block text-xs font-normal text-muted-foreground">
-                {ctx.project.contract_type === "VOB_B" ? "VOB/B" : "BGB"}, <span className="font-mono">{ctx.project.contract_no}</span>
-              </span>
-            </button>
-            <ul className="mt-1 space-y-0.5 border-l border-border pl-2 ml-3">
+            <ul className="mt-2 space-y-1">
+              {(ctx.projects ?? [ctx.project]).map((p) => {
+                const current = p.id === ctx.project.id;
+                return (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => (current ? setTeamFilter(null) : pickProject(p.id))}
+                      aria-pressed={current && teamFilter === null}
+                      aria-current={current ? "true" : undefined}
+                      className={cn(
+                        "w-full rounded-md px-2 py-2 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        current && teamFilter === null ? "bg-muted font-medium text-foreground" : current ? "font-medium text-foreground hover:bg-muted" : "text-foreground hover:bg-muted",
+                      )}
+                    >
+                      {p.name}
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        {p.contract_type === "VOB_B" ? "VOB/B" : "BGB"}, <span className="font-mono">{p.contract_no}</span>
+                      </span>
+                    </button>
+                    {current ? (
+            <ul className="mt-1 mb-2 space-y-0.5 border-l border-border pl-2 ml-3">
               {ctx.teams.map((t) => {
-                const n = visible.filter((c) => c.team_id === t.id && OPEN.has(c.status)).length;
+                const n = visible.filter((c) => c.team_id === t.id && isOpenCase(c)).length;
                 return (
                   <li key={t.id}>
                     <button
@@ -132,6 +126,11 @@ export function CaseBoard({ projectId = null, trade = null }: { projectId?: stri
                       <span className="flex-1 truncate">{t.name}</span>
                       {n > 0 ? <span className="font-mono text-xs text-foreground">{n}</span> : null}
                     </button>
+                  </li>
+                );
+              })}
+            </ul>
+                    ) : null}
                   </li>
                 );
               })}

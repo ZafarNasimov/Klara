@@ -64,25 +64,23 @@ export function DashboardBody({ v, linkable }: { v: DashboardView; linkable: boo
       </div>
       <div className="mt-3 grid grid-cols-[minmax(0,1fr)_340px] gap-3">
         <div className="flex min-w-0 flex-col gap-3">
-          <div className="grid grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] gap-3">
-            <Card topic="Baustelle × Gewerk" title={v.heatmap.title}>
-              <Heatmap v={v} linkable={linkable} />
-            </Card>
+          <Card topic="Baustelle × Gewerk" title={v.heatmap.title}>
+            <Heatmap v={v} linkable={linkable} />
+          </Card>
+          <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-3">
             <Card topic="Plan und Ist je Gewerk" title={v.trade_bars.title}>
               <TradeBullets v={v} />
-            </Card>
-          </div>
-          <Card topic={`Bauablauf Baustelle ${v.schedule.code} · ${v.schedule.name}`} title={v.schedule.title}>
-            <MiniSchedule v={v} linkable={linkable} />
-          </Card>
-          <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-3">
-            <Card topic={`Tagesberichte, letzte ${v.filters.days} Tage`} title={v.completeness.title}>
-              <CompletenessGrid v={v} />
             </Card>
             <Card topic="Dokumenten-Pipeline" title={v.pipeline.title}>
               <Pipeline v={v} />
             </Card>
           </div>
+          <Card topic={`Bauablauf Baustelle ${v.schedule.code} · ${v.schedule.name}`} title={v.schedule.title}>
+            <MiniSchedule v={v} linkable={linkable} />
+          </Card>
+          <Card topic={`Tagesberichte, letzte ${v.filters.days} Tage`} title={v.completeness.title}>
+            <CompletenessGrid v={v} />
+          </Card>
         </div>
         <Card topic="Aktivitäten" title="Was zuletzt passiert ist" className="self-start">
           <ActivityFeed v={v} linkable={linkable} />

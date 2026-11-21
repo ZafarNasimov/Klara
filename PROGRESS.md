@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-21 (real e-mail round trip verified; crash on translated pages fixed) · branch `main`
+Last update: 2026-11-21 (demo data: three sites, six languages, three weeks of history) · branch `claude/project-thread-jrqak8`, not yet on `main`
 
 ## Milestones (SPEC §11)
 
@@ -51,11 +51,11 @@ Last update: 2026-11-21 (real e-mail round trip verified; crash on translated pa
 
 ### Dashboards (`/admin`, `/admin/project/[id]`; case board moved to `/admin/vorgaenge`)
 
-- **Sites:** the seed has three Baustellen: A Neubau Bürogebäude Schwabing, B Wohnanlage Riem (the app's project, `IDS.project`, client Wohnbau Riem GmbH) and C Schule Pasing (`src/lib/db/seed-portfolio.ts`), with 14 Werktage of history: progress per schedule item from a pace per item, daily reports with the story's gaps, 16 letters KL-…-0026…0041 on A/C with real document versions, events. B starts without cases: the golden-path call is still KL-…-0042.
+- **Sites:** the teammates' three sites (seed.ts, demo-history.ts) with site codes A Neubau Bürogebäude München (the demo site, golden path), B Wohnanlage Riem, Haus B, C Sanierung Wohnhaus Schwabing. `dashboard-history.ts` adds what the charts need on "Demo zurücksetzen" / first memory start: Elektro 2.OG quantities (planned end passed, ~2 Werktage late; the Estrich waits), daily quantities for started items without reports, daily reports per team for 16 Werktage with gaps (today: A Estrich, B Fassade, C Innenausbau), check-in events. The call is still KL-…-0042.
 - **One computation** (`src/lib/dashboard/compute.ts`, pure): the API (`/api/dashboard?site=&team=&trade=&days=`, `load.ts`) and pitch Scene 5 (`from-seed.ts`) use the same function. KPIs: Offene Vorgänge (unvollständig/bereit), Fehlende Tagesberichte heute (teams with planned work today, no `daily_report`), Anzeigen diese Woche (`document_version.sent_at` since Monday), Verzugstage im Risiko (sum of forecast delays per site × trade), Anspruchsgrundlage (Σ `estimate_eur`, vorläufig). Each with a daily history (sparkline) and change vs. last week. Forecast per schedule item: remaining qty ÷ actual per day from the last report → forecast end vs. planned end; successors inherit a late predecessor's delay. Heatmap: red = open Behinderungsanzeige of that trade or > 2 days, amber = 1–2 days or no quantities for 2 Werktage.
 - **Live:** every widget refetches on each event (realtime-client). Verified: golden-path chat on the open dashboard → "Offene Vorgänge" 6 → 7 (blue-50 flash) and Elektro × B amber → red within ~0.5 s of the last turn, no reload.
-- **Pitch Scene 5** renders the real `DashboardBody` from the seed (offline); the step adds the call's KL-2026-0042 (same function), so the KPI and the cell change on stage.
-- **Supabase:** no migration (new rows only, `settings.site_code` in JSON), but the live DB needs "Demo zurücksetzen" to get sites A/C and the history; that replaces its demo data.
+- **Pitch Scene 5** renders the real `DashboardBody` from `/api/dashboard/demo` (the reset demo computed on the server, no database); the step adds the call's KL-2026-0042 (same function), so the KPI and A × Elektro change on stage.
+- **Supabase:** no migration (new rows only, `settings.site_code` in JSON); after a deploy, "Demo zurücksetzen" loads sites, history and dashboard data.
 
 ### Besprechungen / meeting notes (branch `meetings`, not merged)
 
@@ -149,6 +149,15 @@ Instead of Postmark, Klara can use a normal mailbox: `src/lib/mail/mailbox.ts` s
 - Site password: `SITE_PASSWORD` → `src/proxy.ts` sends visitors without the cookie to `/login` (API: 401); `/api/email/inbound` stays open (own token).
 - Live site (2026-11-21): `SITE_PASSWORD`, `DEMO_CLIENT_MAILBOX` and `MAIL_FROM_NAME` are set on Vercel and deployed; the login works, pages without it redirect, the API answers 401. Demo data reset there (Bauherr contact = the client mailbox, no cases).
 - 2026-11-21: Gmail login works (the address had a typo in `.env.local`); `MAIL_USER` + `MAIL_PASSWORD` set on Vercel and deployed. Live site reports mail mode `smtp`; an inbox check from Vercel takes ~2 s and leaves non-Klara mail unread. Next: the real round trip (send → client replies → Klara analyses).
+
+## Demo data: three sites, six languages (2026-11-21)
+
+- **Sites** (`src/lib/db/seed.ts`, ids in `src/lib/ids.ts`): Neubau Bürogebäude München (VOB/B; Team Estrich RU, Team Ausbau PL; unchanged, the demo story and the tests), **Wohnanlage Riem, Haus B** (VOB/B; Team Rohbau TR Mehmet Yılmaz, Team Fassade EN Liam O'Connor; Fenster and Heizung hired by the client, Gerüstbau Schmid our NU) and **Sanierung Wohnhaus Schwabing** (BGB, Eigentümergemeinschaft; Team Abbruch DE Klaus Becker, Team Innenausbau RO Andrei Popescu; Elektro hired by the client, Gruber Haustechnik and Demir Malerbetrieb our NUs). Schedules and daily quantities relative to today; all Bauherr e-mails go to `DEMO_CLIENT_MAILBOX` when set. New trade aliases: Gerüstbau, Fassade, Rohbau, Abbruch, Innenausbau (six languages).
+- **History** (`src/lib/db/demo-history.ts`, `withDemoHistory`): KL-2026-0031..0041 over the last three weeks, built with the real templates: Mehrkosten + Anordnung (RU, accepted), Abhilfeaufforderung to Nowak (PL), storm hindrance (TR, weather), window hindrance (EN) → rejection → Stellungnahme → Wegfall to validate, Mehrkosten BGB (DE, accepted), Elektro hindrance (RO) → question → Ergänzende Angaben to validate, Meldung zur Prüfung (DE). Transcripts in the team's language with German, sent e-mails, replies, timeline events, six Bautagesberichte. Loaded by "Demo zurücksetzen" and the memory store's first start, not by the test seed. The live demo's first case stays **KL-2026-0042**.
+- **Screens:** the office tree lists every site (switch by click; top bar follows; `useProjectId` in `src/lib/project-choice.ts`, kept per browser); a case page uses its own site's data and switches the top bar to it; the Polier start page lists all sites with their team channels (`GET /api/projects`). Demo clock and hands-free settings apply to every site.
+- Validated internal reports (Bautagesbericht, Meldung) count as done: "geprüft am …", not under "Fristen heute" or "offen" (`isOpenCase`).
+- Checked with the live model: EN scaffolders → Abhilfeaufforderung to Gerüstbau Schmid; TR heating → Behinderungsanzeige (client); RO electricians → Behinderungsanzeige (client); DE painters → Abhilfeaufforderung to Demir; each reply in the team's language. 154 tests (4 new: demo data, every case page and PDF of it).
+- **Live site:** the new data appears after "Demo zurücksetzen" on `/admin/demo` (this deletes the test cases there).
 
 ## Unclear reports: one complaint, one case (decided by Zafar, 2026-11-21)
 

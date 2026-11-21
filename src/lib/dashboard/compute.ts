@@ -152,8 +152,8 @@ export type ItemForecast = {
 };
 
 /**
- * Delay forecast as of the end of `day`: remaining quantity / average actual
- * per day, counted from the last reported day → forecast end; the Werktage
+* Delay forecast as of the end of `day`: remaining quantity / average actual
+ * per reported Werktag (at least two reports), counted from the last report → forecast end; the Werktage
  * between the planned and the forecast end are the delay. An unfinished item
  * also inherits the delay of a late predecessor (depends_on).
  */
@@ -173,15 +173,17 @@ export function forecastItems(data: Pick<DashboardData, "schedule" | "progress" 
     const started = it.start_date <= day;
     const last = entries.at(-1)?.date ?? null;
     const recent = entries.some((e) => e.date >= cal.prev(yesterday));
-    const no_data = started && !finished && it.start_date < yesterday && (!qty || !recent);
+    // Only items planned with quantities are tracked; no report for two Werktage = missing data.
+    const no_data = started && !finished && it.start_date < yesterday && qty > 0 && !recent;
     // Planned share up to yesterday; without recent quantities, up to the last report (like with like).
     const through = no_data && last ? last : yesterday;
     const planned = it.start_date > through ? 0 : Math.min(total, cal.count(it.start_date, through < it.end_date ? through : it.end_date));
     let forecast_end = it.end_date;
     let own = 0;
     if (qty && started && !finished) {
-      if (last && actual > 0) {
-        const avg = actual / cal.count(it.start_date, last);
+      // Rate per reported Werktag; a forecast needs at least two reports.
+      if (last && actual > 0 && entries.length >= 2) {
+        const avg = actual / entries.length;
         const needed = Math.ceil((qty - actual) / avg - 1e-9);
         forecast_end = cal.add(last, needed);
       } else if (day > it.end_date) {
@@ -209,7 +211,8 @@ export function forecastItems(data: Pick<DashboardData, "schedule" | "progress" 
       if (f.finished) continue;
       for (const dep of f.item.depends_on) {
         const p = out.get(dep);
-        if (p && p.delay > f.delay) {
+        // Only a predecessor still running when this item should start pushes it.
+        if (p && p.delay > f.delay && p.forecast_end >= f.item.start_date) {
           f.delay = p.delay;
           f.waits_for = `${p.trade} ${p.item.area}`;
         }
@@ -369,7 +372,13 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
 
   // ── Heatmap Baustelle × Gewerk ──────────────────────────────────────
   const openHindrances = all.cases.filter((c) => c.doc_type === "behinderungsanzeige" && c.status !== "abgeschlossen" && c.status !== "entwurf" && projectIds.has(c.project_id));
-  const heatTrades = filters.trade ? HEAT_TRADES.filter((t) => t === filters.trade) : HEAT_TRADES;
+  // Columns: trades planned with quantities, and any trade with an open hindrance; preferred order first.
+  const tracked = new Set<string>([
+    ...[...now$.f.values()].filter((x) => x.item.planned_qty && projectIds.has(x.item.project_id)).map((x) => x.trade),
+    ...openHindrances.map(caseTrade).filter((t): t is string => !!t),
+  ]);
+  const order = (t: string) => (HEAT_TRADES.includes(t) ? HEAT_TRADES.indexOf(t) : 100);
+  const heatTrades = filters.trade ? [filters.trade] : [...tracked].sort((a, b) => order(a) - order(b) || a.localeCompare(b));
   const sites = all.projects
     .filter((p) => projectIds.has(p.id))
     .sort((a, b) => siteCode(a).localeCompare(siteCode(b)));
@@ -378,9 +387,10 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
     code: siteCode(p),
     name: p.name,
     cells: heatTrades.map((trade) => {
-      const items = [...now$.f.values()].filter((x) => x.item.project_id === p.id && x.trade === trade);
+      const all$ = [...now$.f.values()].filter((x) => x.item.project_id === p.id && x.trade === trade);
+      const items = all$.filter((x) => x.item.planned_qty);
       const hind = openHindrances.find((c) => c.project_id === p.id && caseTrade(c) === trade);
-      if (!items.length && !hind) return { trade, status: "none", delay: 0, reason: "Keine Arbeiten geplant", hindrance: null };
+      if (!items.length && !hind) return { trade, status: "none", delay: 0, reason: all$.length ? "Ohne Mengenplanung" : "Keine Arbeiten geplant", hindrance: null };
       const delay = Math.max(0, ...items.map((x) => x.delay));
       const noData = items.some((x) => x.no_data);
       const waits = items.find((x) => x.waits_for && x.delay > x.own_delay)?.waits_for;
@@ -422,8 +432,7 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
   }
   const bars: TradeBar[] = [...byTrade.entries()]
     .map(([trade, b]) => ({ trade, plan: Math.round((b.plan / b.weight) * 100), actual: Math.round((b.actual / b.weight) * 100), worst: false, items: b.items }))
-    .filter((b) => HEAT_TRADES.includes(b.trade) || filters.trade === b.trade)
-    .sort((a, b) => HEAT_TRADES.indexOf(a.trade) - HEAT_TRADES.indexOf(b.trade));
+    .sort((a, b) => order(a.trade) - order(b.trade) || a.trade.localeCompare(b.trade));
   const worstBar = [...bars].sort((a, b) => b.plan - b.actual - (a.plan - a.actual))[0];
   if (worstBar && worstBar.plan - worstBar.actual > 0) worstBar.worst = true;
   const barsTitle = worstBar && worstBar.plan - worstBar.actual > 0

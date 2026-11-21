@@ -6,7 +6,7 @@ import Link from "next/link";
 import { ChevronRight, FileText } from "lucide-react";
 import { DeadlineBadge } from "@/components/klara/deadline-badge";
 import { LightSummary } from "@/components/klara/traffic-light";
-import { docTitle } from "@/lib/doctypes";
+import { docTitle, getDocType } from "@/lib/doctypes";
 import type { CaseStatus, CaseView } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -21,10 +21,12 @@ const NEXT_STEP_DE: Record<CaseStatus, string> = {
 };
 
 /** What happens next, for the Polier. Office requests come first. */
-export function nextStepDe(c: Pick<CaseView, "status" | "flags">): string {
+export function nextStepDe(c: Pick<CaseView, "status" | "flags" | "doc_type">): string {
   if (c.flags.includes("returned")) return "Die Bauleitung braucht noch eine Angabe von Ihnen. Klara fragt im Chat.";
   if (c.flags.includes("correcting")) return "Klara wartet im Chat auf Ihre Korrektur.";
   if (c.flags.includes("collecting")) return "Klara braucht im Chat noch eine Angabe von Ihnen.";
+  // Internal reports (Bautagesbericht, Meldung) are never sent.
+  if (c.status === "validiert" && getDocType(c.doc_type)?.recipient === "internal") return "Von der Bauleitung geprüft.";
   return NEXT_STEP_DE[c.status];
 }
 

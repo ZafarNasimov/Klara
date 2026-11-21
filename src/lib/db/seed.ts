@@ -1,9 +1,12 @@
 // Fictional seed data (SPEC §9). Schedule dates are relative to the seed day so
 // the demo always plays "today". Fixed UUIDs keep links stable across resets.
+// Three sites of Muster Bau GmbH; the first one (Bürogebäude, Team Estrich RU,
+// Team Ausbau PL) is the demo story and what the tests use. The other two add
+// teams in TR, EN, DE and RO and a BGB contract. Past activity (letters,
+// replies, daily reports) comes from `demo-history.ts` on "Demo zurücksetzen".
 import { addWerktage, berlinDay, subWerktage, DEFAULT_HOLIDAY_REGION } from "@/lib/deadlines";
 import { IDS } from "@/lib/ids";
 import { buildSeedMeetings } from "@/lib/meetings/sample";
-import { withPortfolio } from "./seed-portfolio";
 import type { SeedData } from "./store";
 
 export { IDS };
@@ -16,9 +19,40 @@ export function buildSeed(now: Date = new Date()): SeedData {
   const region = DEFAULT_HOLIDAY_REGION;
   const today = berlinDay(now);
   const wt = (n: number) => (n >= 0 ? addWerktage(today, n, region) : subWerktage(today, -n, region));
-  const clientMailbox = process.env.DEMO_CLIENT_MAILBOX || "petra.lang@wohnbau-riem.example";
+  const sched = (
+    id: string,
+    project_id: string,
+    trade_id: string,
+    activity: string,
+    area: string,
+    start_date: string,
+    end_date: string,
+    planned_qty: number | null,
+    unit: string | null,
+    planned_per_day: number | null,
+    depends_on: string[],
+  ) => ({ id, project_id, trade_id, activity, area, start_date, end_date, planned_qty, unit, planned_per_day, depends_on });
+  // Daily quantities of past Werktage: [offset, qty]; ids derived from the item.
+  const progress = (item: string, ...days: [number, number][]) =>
+    days.map(([d, qty]) => ({
+      id: `00000000-0000-4000-8006-${item.slice(-3)}${String(Math.abs(d)).padStart(9, "0")}`,
+      schedule_item_id: item,
+      date: wt(d),
+      actual_qty: qty,
+      note: null,
+    }));
+  const demoMailbox = process.env.DEMO_CLIENT_MAILBOX?.trim() || null;
+  // A real send in the demo always lands in the demo mailbox, whichever site it is for.
+  const clientMailbox = demoMailbox ?? "petra.lang@immobilien-isar.example";
+  const settings = {
+    fiktive_abnahme_excluded: false,
+    holiday_region: region,
+    demo_clock_offset_ms: 0,
+    vad: DEFAULT_VAD,
+    hourly_rates: { Polier: 64, Facharbeiter: 58, Helfer: 46 },
+  };
 
-  const base: SeedData = {
+  return {
     company: [
       {
         id: IDS.company,
@@ -32,26 +66,47 @@ export function buildSeed(now: Date = new Date()): SeedData {
       { id: IDS.userPolierAusbau, name: "Piotr Kowalski", role: "polier", language: "pl", email: null },
       { id: IDS.userBauleiter, name: "Markus Hofmann", role: "bauleiter", language: "de", email: "m.hofmann@muster-bau.example" },
       { id: IDS.userBuero, name: "Julia Brenner", role: "buero", language: "de", email: "j.brenner@muster-bau.example" },
+      { id: IDS.userPolierRohbau, name: "Mehmet Yılmaz", role: "polier", language: "tr", email: null },
+      { id: IDS.userPolierFassade, name: "Liam O'Connor", role: "polier", language: "en", email: null },
+      { id: IDS.userPolierAbbruch, name: "Klaus Becker", role: "polier", language: "de", email: null },
+      { id: IDS.userPolierInnenausbau, name: "Andrei Popescu", role: "polier", language: "ro", email: null },
     ],
     project: [
       {
         id: IDS.project,
         company_id: IDS.company,
-        name: "Wohnanlage Riem",
-        address: "Riemer Straße 12, 81829 München",
-        lat: 48.1339,
-        lng: 11.6929,
+        name: "Neubau Bürogebäude München",
+        address: "Hanauer Straße, 80992 München",
+        lat: 48.1773,
+        lng: 11.5357,
         contract_type: "VOB_B",
-        contract_no: "WR-2026-114",
+        contract_no: "MB-2026-117",
         contract_date: "2026-03-02",
-        settings: {
-          fiktive_abnahme_excluded: false,
-          holiday_region: region,
-          demo_clock_offset_ms: 0,
-          vad: DEFAULT_VAD,
-          hourly_rates: { Polier: 64, Facharbeiter: 58, Helfer: 46 },
-          site_code: "B",
-        },
+        settings: { ...settings, site_code: "A" },
+      },
+      {
+        id: IDS.projectRiem,
+        company_id: IDS.company,
+        name: "Wohnanlage Riem, Haus B",
+        address: "Astrid-Lindgren-Straße 12, 81829 München",
+        lat: 48.1318,
+        lng: 11.6904,
+        contract_type: "VOB_B",
+        contract_no: "MB-2026-089",
+        contract_date: "2026-01-19",
+        settings: { ...settings, site_code: "B" },
+      },
+      {
+        id: IDS.projectSchwabing,
+        company_id: IDS.company,
+        name: "Sanierung Wohnhaus Schwabing",
+        address: "Hohenzollernstraße 58, 80801 München",
+        lat: 48.1623,
+        lng: 11.5754,
+        contract_type: "BGB",
+        contract_no: "MB-2026-102",
+        contract_date: "2026-02-10",
+        settings: { ...settings, site_code: "C" },
       },
     ],
     contact: [
@@ -59,11 +114,11 @@ export function buildSeed(now: Date = new Date()): SeedData {
         id: IDS.contactBauherr,
         project_id: IDS.project,
         name: "Dr. Petra Lang",
-        organisation: "Wohnbau Riem GmbH",
+        organisation: "Immobilien Isar GmbH",
         role: "bauherr",
         email: clientMailbox,
         has_authority: true,
-        address: "Willy-Brandt-Allee 10, 81829 München",
+        address: "Maximiliansplatz 9, 80333 München",
       },
       {
         id: IDS.contactArchitekt,
@@ -95,19 +150,102 @@ export function buildSeed(now: Date = new Date()): SeedData {
         has_authority: true,
         address: "Rosenheimer Straße 145, 81671 München",
       },
+      // Wohnanlage Riem
+      {
+        id: IDS.contactRiemBauherr,
+        project_id: IDS.projectRiem,
+        name: "Stefan Maier",
+        organisation: "Wohnbau Riem GmbH & Co. KG",
+        role: "bauherr",
+        email: demoMailbox ?? "s.maier@wohnbau-riem.example",
+        has_authority: true,
+        address: "Leopoldstraße 236, 80807 München",
+      },
+      {
+        id: IDS.contactRiemSteuerung,
+        project_id: IDS.projectRiem,
+        name: "Sabine Krämer",
+        organisation: "Krämer Projektsteuerung GmbH",
+        role: "architekt",
+        email: "s.kraemer@kraemer-ps.example",
+        has_authority: false,
+        address: "Arnulfstraße 60, 80335 München",
+      },
+      {
+        id: IDS.contactRiemGeruest,
+        project_id: IDS.projectRiem,
+        name: "Tobias Schmid",
+        organisation: "Gerüstbau Schmid GmbH",
+        role: "nu",
+        email: "t.schmid@geruestbau-schmid.example",
+        has_authority: true,
+        address: "Truderinger Straße 290, 81825 München",
+      },
+      // Sanierung Schwabing (BGB, Eigentümergemeinschaft)
+      {
+        id: IDS.contactSchwBauherr,
+        project_id: IDS.projectSchwabing,
+        name: "Dr. Claudia Ritter",
+        organisation: "Eigentümergemeinschaft Hohenzollernstraße 58",
+        role: "bauherr",
+        email: demoMailbox ?? "c.ritter@weg-hohenzollern58.example",
+        has_authority: true,
+        address: "Hohenzollernstraße 58, 80801 München",
+      },
+      {
+        id: IDS.contactSchwArchitekt,
+        project_id: IDS.projectSchwabing,
+        name: "Katharina Lindner",
+        organisation: "Lindner Architekten PartGmbB",
+        role: "architekt",
+        email: "k.lindner@lindner-architekten.example",
+        has_authority: false,
+        address: "Kurfürstenstraße 23, 80801 München",
+      },
+      {
+        id: IDS.contactSchwSanitaer,
+        project_id: IDS.projectSchwabing,
+        name: "Florian Gruber",
+        organisation: "Gruber Haustechnik GmbH",
+        role: "nu",
+        email: "f.gruber@gruber-haustechnik.example",
+        has_authority: true,
+        address: "Ingolstädter Straße 40, 80807 München",
+      },
+      {
+        id: IDS.contactSchwMaler,
+        project_id: IDS.projectSchwabing,
+        name: "Elif Demir",
+        organisation: "Demir Malerbetrieb e. K.",
+        role: "nu",
+        email: "e.demir@demir-maler.example",
+        has_authority: true,
+        address: "Schleißheimer Straße 210, 80809 München",
+      },
     ],
     team: [
       { id: IDS.teamEstrich, project_id: IDS.project, name: "Team Estrich", lead_user_id: IDS.userPolierEstrich },
       { id: IDS.teamAusbau, project_id: IDS.project, name: "Team Ausbau", lead_user_id: IDS.userPolierAusbau },
-      { id: IDS.teamHaustechnik, project_id: IDS.project, name: "Team Haustechnik", lead_user_id: null },
+      { id: IDS.teamRohbau, project_id: IDS.projectRiem, name: "Team Rohbau", lead_user_id: IDS.userPolierRohbau },
+      { id: IDS.teamFassade, project_id: IDS.projectRiem, name: "Team Fassade", lead_user_id: IDS.userPolierFassade },
+      { id: IDS.teamAbbruch, project_id: IDS.projectSchwabing, name: "Team Abbruch", lead_user_id: IDS.userPolierAbbruch },
+      { id: IDS.teamInnenausbau, project_id: IDS.projectSchwabing, name: "Team Innenausbau", lead_user_id: IDS.userPolierInnenausbau },
     ],
     trade: [
       { id: IDS.tradeElektro, project_id: IDS.project, name: "Elektro", contracted_by: "client", contact_id: null, team_id: null },
       { id: IDS.tradeTrockenbau, project_id: IDS.project, name: "Trockenbau", contracted_by: "us", contact_id: IDS.contactTrockenbau, team_id: null },
       { id: IDS.tradeEstrich, project_id: IDS.project, name: "Estrich", contracted_by: "us", contact_id: null, team_id: IDS.teamEstrich },
       { id: IDS.tradeBodenbelag, project_id: IDS.project, name: "Bodenbelag", contracted_by: "us", contact_id: IDS.contactBodenbelag, team_id: null },
-      { id: IDS.tradeSanitaer, project_id: IDS.project, name: "Sanitär", contracted_by: "us", contact_id: null, team_id: IDS.teamHaustechnik },
-      { id: IDS.tradeInnenputz, project_id: IDS.project, name: "Innenputz", contracted_by: "us", contact_id: null, team_id: IDS.teamAusbau },
+      { id: IDS.tradeRiemRohbau, project_id: IDS.projectRiem, name: "Rohbau", contracted_by: "us", contact_id: null, team_id: IDS.teamRohbau },
+      { id: IDS.tradeRiemFassade, project_id: IDS.projectRiem, name: "Fassade", contracted_by: "us", contact_id: null, team_id: IDS.teamFassade },
+      { id: IDS.tradeRiemGeruest, project_id: IDS.projectRiem, name: "Gerüstbau", contracted_by: "us", contact_id: IDS.contactRiemGeruest, team_id: null },
+      { id: IDS.tradeRiemFenster, project_id: IDS.projectRiem, name: "Fenster", contracted_by: "client", contact_id: null, team_id: null },
+      { id: IDS.tradeRiemHeizung, project_id: IDS.projectRiem, name: "Heizung", contracted_by: "client", contact_id: null, team_id: null },
+      { id: IDS.tradeSchwAbbruch, project_id: IDS.projectSchwabing, name: "Abbruch", contracted_by: "us", contact_id: null, team_id: IDS.teamAbbruch },
+      { id: IDS.tradeSchwInnenausbau, project_id: IDS.projectSchwabing, name: "Innenausbau", contracted_by: "us", contact_id: null, team_id: IDS.teamInnenausbau },
+      { id: IDS.tradeSchwElektro, project_id: IDS.projectSchwabing, name: "Elektro", contracted_by: "client", contact_id: null, team_id: null },
+      { id: IDS.tradeSchwSanitaer, project_id: IDS.projectSchwabing, name: "Sanitär", contracted_by: "us", contact_id: IDS.contactSchwSanitaer, team_id: null },
+      { id: IDS.tradeSchwMaler, project_id: IDS.projectSchwabing, name: "Maler", contracted_by: "us", contact_id: IDS.contactSchwMaler, team_id: null },
     ],
     schedule_item: [
       {
@@ -116,11 +254,11 @@ export function buildSeed(now: Date = new Date()): SeedData {
         trade_id: IDS.tradeElektro,
         activity: "Elektroinstallation (Leerrohre, Bodentanks)",
         area: "2.OG",
-        start_date: wt(-12),
+        start_date: wt(-10),
         end_date: wt(-2),
-        planned_qty: 1100,
-        unit: "m",
-        planned_per_day: 100,
+        planned_qty: null,
+        unit: null,
+        planned_per_day: null,
         depends_on: [],
       },
       {
@@ -129,11 +267,11 @@ export function buildSeed(now: Date = new Date()): SeedData {
         trade_id: IDS.tradeElektro,
         activity: "Elektroinstallation (Leerrohre, Bodentanks)",
         area: "3.OG",
-        start_date: wt(2),
-        end_date: wt(10),
-        planned_qty: 1260,
-        unit: "m",
-        planned_per_day: 140,
+        start_date: wt(-1),
+        end_date: wt(7),
+        planned_qty: null,
+        unit: null,
+        planned_per_day: null,
         depends_on: [],
       },
       {
@@ -175,48 +313,27 @@ export function buildSeed(now: Date = new Date()): SeedData {
         planned_per_day: 40,
         depends_on: [IDS.schedEstrich2],
       },
-      {
-        id: IDS.schedEstrich1,
-        project_id: IDS.project,
-        trade_id: IDS.tradeEstrich,
-        activity: "Zementestrich CT-C25-F4 auf Trennlage, 65 mm",
-        area: "1.OG",
-        start_date: wt(-9),
-        end_date: wt(-2),
-        planned_qty: 280,
-        unit: "m²",
-        planned_per_day: 35,
-        depends_on: [],
-      },
-      {
-        id: IDS.schedSanitaer3,
-        project_id: IDS.project,
-        trade_id: IDS.tradeSanitaer,
-        activity: "Sanitär-Rohinstallation",
-        area: "3.OG",
-        start_date: wt(-7),
-        end_date: wt(4),
-        planned_qty: 36,
-        unit: "Stk",
-        planned_per_day: 3,
-        depends_on: [],
-      },
-      {
-        id: IDS.schedInnenputz3,
-        project_id: IDS.project,
-        trade_id: IDS.tradeInnenputz,
-        activity: "Innenputz Q2",
-        area: "3.OG",
-        start_date: wt(-10),
-        end_date: wt(3),
-        planned_qty: 840,
-        unit: "m²",
-        planned_per_day: 60,
-        depends_on: [],
-      },
+      // Wohnanlage Riem, Haus B
+      sched(IDS.schedRiemMauerwerk, IDS.projectRiem, IDS.tradeRiemRohbau, "Mauerwerk Innenwände KS 17,5 cm", "Haus B, 2.OG", wt(-16), wt(-6), 310, "m²", 31, []),
+      sched(IDS.schedRiemDecke, IDS.projectRiem, IDS.tradeRiemRohbau, "Stahlbetondecke über 3.OG, d = 22 cm", "Haus B, 3.OG", wt(-6), wt(2), 240, "m²", 30, [IDS.schedRiemMauerwerk]),
+      sched(IDS.schedRiemGeruest, IDS.projectRiem, IDS.tradeRiemGeruest, "Fassadengerüst Nord- und Ostseite", "Haus B", wt(-13), wt(-10), null, null, null, []),
+      sched(IDS.schedRiemFenster, IDS.projectRiem, IDS.tradeRiemFenster, "Fenstermontage 1.–3.OG", "Haus B, Nordseite", wt(-9), wt(-4), null, null, null, [IDS.schedRiemGeruest]),
+      sched(IDS.schedRiemWdvs, IDS.projectRiem, IDS.tradeRiemFassade, "WDVS Mineralwolle 160 mm, kleben und dübeln", "Haus B, Nordseite", wt(-4), wt(8), 420, "m²", 35, [IDS.schedRiemFenster]),
+      sched(IDS.schedRiemHeizung, IDS.projectRiem, IDS.tradeRiemHeizung, "Fußbodenheizung, Verteiler und Rohre", "Haus B, 1.OG", wt(3), wt(9), null, null, null, []),
+      // Sanierung Schwabing
+      sched(IDS.schedSchwRueckbau, IDS.projectSchwabing, IDS.tradeSchwAbbruch, "Rückbau Bäder und Estrich", "2.OG, Wohnungen 5 und 6", wt(-13), wt(-5), 160, "m²", 20, []),
+      sched(IDS.schedSchwElektro, IDS.projectSchwabing, IDS.tradeSchwElektro, "Rückbau Altinstallation, neue Leitungsführung", "2.OG, Wohnungen 5 und 6", wt(-6), wt(-2), null, null, null, [IDS.schedSchwRueckbau]),
+      sched(IDS.schedSchwVorsatz, IDS.projectSchwabing, IDS.tradeSchwInnenausbau, "GK-Vorsatzschalen und Installationswände", "2.OG, Bäder", wt(-1), wt(7), 140, "m²", 18, [IDS.schedSchwElektro]),
+      sched(IDS.schedSchwSanitaer, IDS.projectSchwabing, IDS.tradeSchwSanitaer, "Vorwandinstallation Bäder", "2.OG, Bäder", wt(5), wt(11), null, null, null, [IDS.schedSchwVorsatz]),
+      sched(IDS.schedSchwMaler, IDS.projectSchwabing, IDS.tradeSchwMaler, "Spachtelarbeiten Q3 und Anstrich", "Treppenhaus", wt(12), wt(20), 380, "m²", 48, []),
     ],
     progress_entry: [
       { id: IDS.progressEstrich2, schedule_item_id: IDS.schedEstrich2, date: wt(-1), actual_qty: 40, note: "Achsen A–C" },
+      ...progress(IDS.schedRiemMauerwerk, [-14, 32], [-13, 30], [-12, 33], [-11, 29], [-10, 31], [-9, 30], [-8, 34], [-7, 31], [-6, 30]),
+      ...progress(IDS.schedRiemDecke, [-5, 28], [-4, 32], [-3, 30], [-2, 24], [-1, 30]),
+      ...progress(IDS.schedRiemWdvs, [-2, 18], [-1, 34]),
+      ...progress(IDS.schedSchwRueckbau, [-12, 22], [-11, 20], [-10, 18], [-9, 21], [-8, 20], [-7, 19], [-6, 22], [-5, 18]),
+      ...progress(IDS.schedSchwVorsatz, [-1, 12]),
     ],
     conversation: [],
     turn: [],
@@ -229,6 +346,4 @@ export function buildSeed(now: Date = new Date()): SeedData {
     meeting: buildSeedMeetings(now),
     event: [],
   };
-  // Baustellen A and C, and 14 Werktage of history for all three sites.
-  return withPortfolio(base, now, region);
 }

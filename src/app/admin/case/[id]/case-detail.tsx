@@ -22,6 +22,7 @@ import type { ProjectContext } from "@/lib/db/repo";
 import { docTitle, getDocType, hasValue } from "@/lib/doctypes";
 import type { DocBody } from "@/lib/documents/types";
 import { CASE_STATUS_DE, fmtDate, fmtDateTime, fmtShort, fmtTime, REPLY_KIND_DE, ROLE_GENITIVE_DE, SPHERE_DE } from "@/lib/labels";
+import { useProjectId } from "@/lib/project-choice";
 import { useRole } from "@/lib/role";
 import type { CaseDetail, CaseStatus, CaseView, DocumentVersion, EmailIn, EmailOut, Evidence, ReplyClassification } from "@/lib/types";
 import { ApiError, postJson, useApi } from "@/lib/use-api";
@@ -43,7 +44,12 @@ const FLAG_DE: Record<string, string> = {
 
 export function CaseDetailView({ id }: { id: string }) {
   const { data, error, reload } = useApi<CaseDetail>(`/api/cases/${id}`);
-  const { data: ctx } = useApi<ProjectResponse>("/api/project");
+  const projectOfCase = data?.case.project_id ?? null;
+  const { data: ctx } = useApi<ProjectResponse>(projectOfCase ? `/api/project?id=${projectOfCase}` : null);
+  const [, setProjectId] = useProjectId();
+  useEffect(() => {
+    if (projectOfCase) setProjectId(projectOfCase);
+  }, [projectOfCase, setProjectId]);
   const user = useRole();
   const [versionId, setVersionId] = useState<string | null>(null);
   const [busy, setBusy] = useState<"validate" | "return" | null>(null);

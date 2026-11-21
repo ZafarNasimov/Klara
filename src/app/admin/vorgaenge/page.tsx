@@ -16,5 +16,5 @@ export default function CasesPage({ searchParams }: PageProps<"/admin/vorgaenge"
 async function Cases({ searchParams }: { searchParams: PageProps<"/admin/vorgaenge">["searchParams"] }) {
   const sp = await searchParams;
   const one = (v: string | string[] | undefined) => (typeof v === "string" && v ? v : null);
-  return <CaseBoard projectId={one(sp.site)} trade={one(sp.trade)} />;
+  return <CaseBoard site={one(sp.site)} trade={one(sp.trade)} />;
 }
