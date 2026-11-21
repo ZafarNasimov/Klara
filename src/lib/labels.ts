@@ -47,6 +47,11 @@ export const ROLE_GENITIVE_DE: Record<Contact["role"], string> = {
 
 /** Timeline wording for event kinds. Kinds without a label stay out of the timeline. */
 export const EVENT_DE: Record<string, string> = {
+  meeting_processed: "Besprechung ausgewertet",
+  meeting_case_created: "Aus Besprechung angelegt",
+  meeting_case_updated: "Durch Besprechung aktualisiert",
+  meeting_schedule: "Termin durch Besprechung geändert",
+  meeting_protocol_sent: "Protokoll versendet",
   case_created: "Vorgang angelegt",
   case_confirmed: "Vom Polier bestätigt",
   document_generated: "Dokument erstellt",
