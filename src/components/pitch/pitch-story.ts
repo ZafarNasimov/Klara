@@ -48,26 +48,51 @@ export type DocField = {
   mono?: boolean;
 };
 
+/**
+ * The case's facts: the single source for the form (Scenes 2–3) and the
+ * generated letter (Scene 3.5). The form shows them as fields; the letter
+ * template turns the same values into sentences. Nothing is typed twice.
+ */
+export const CASE = {
+  reference: "KL-2026-0042",
+  bauvorhaben: "Wohnanlage Riem, Haus 2",
+  client: "Wohnbau Riem GmbH",
+  clientAddress: ["Riemer Straße 12", "81829 München"],
+  contractNo: "WR-2026-114",
+  sender: { company: "Muster Bau GmbH", unit: "Bauleitung", address: "Musterstraße 1, 80331 München", city: "München", signer: "Tobias Bauer", signerRole: "Bauleiter" },
+  startTime: "07:00",
+  area: "2. OG",
+  /** The client's trade whose unfinished work blocks us. */
+  blockingWork: "Elektroarbeiten",
+  blockingTrade: "Elektro",
+  affectedWork: "Estricharbeiten",
+  crew: 4,
+  crewRole: "Facharbeiter",
+  duration: "ca. 2 Arbeitstage",
+  photo: { count: 1, label: "2. OG, gesperrter Bereich" },
+  vorbehalt: "Wir behalten uns Ansprüche auf Bauzeitverlängerung und Mehrkosten vor.",
+} as const;
+
 export const DOC_TITLE = "Behinderungsanzeige gemäß § 6 Abs. 1 VOB/B (Entwurf)";
-export const DOC_REFERENCE = "KL-2026-0042";
+export const DOC_REFERENCE = CASE.reference;
 
 export const DOC_FIELDS: DocField[] = [
-  { key: "bauvorhaben", label: "Bauvorhaben", value: () => "Wohnanlage Riem, Haus 2", filledAt: 0 },
-  { key: "adressat", label: "Adressat", value: () => "Wohnbau Riem GmbH (Bauherr)", filledAt: 4 },
-  { key: "beginn", label: "Beginn der Behinderung", value: (d) => `${d}, 07:00 Uhr`, filledAt: 2, mono: true },
-  { key: "ursache", label: "Ursache", value: () => "Elektroarbeiten im 2. OG nicht abgeschlossen, Fläche nicht freigegeben", filledAt: 0 },
-  { key: "sphaere", label: "Verantwortungssphäre", value: () => "Auftraggeber (Elektro vom Bauherrn beauftragt)", filledAt: 4 },
-  { key: "leistungen", label: "Betroffene Leistungen", value: () => "Estricharbeiten 2. OG", filledAt: 0 },
-  { key: "personal", label: "Personal", value: () => "4 Facharbeiter", filledAt: 2 },
+  { key: "bauvorhaben", label: "Bauvorhaben", value: () => CASE.bauvorhaben, filledAt: 0 },
+  { key: "adressat", label: "Adressat", value: () => `${CASE.client} (Bauherr)`, filledAt: 4 },
+  { key: "beginn", label: "Beginn der Behinderung", value: (d) => `${d}, ${CASE.startTime} Uhr`, filledAt: 2, mono: true },
+  { key: "ursache", label: "Ursache", value: () => `${CASE.blockingWork} im ${CASE.area} nicht abgeschlossen, Fläche nicht freigegeben`, filledAt: 0 },
+  { key: "sphaere", label: "Verantwortungssphäre", value: () => `Auftraggeber (${CASE.blockingTrade} vom Bauherrn beauftragt)`, filledAt: 4 },
+  { key: "leistungen", label: "Betroffene Leistungen", value: () => `${CASE.affectedWork} ${CASE.area}`, filledAt: 0 },
+  { key: "personal", label: "Personal", value: () => `${CASE.crew} ${CASE.crewRole}`, filledAt: 2 },
   { key: "dauer", label: "Voraussichtliche Dauer", value: () => null, filledAt: 7, openLabel: "offen" },
   { key: "foto", label: "Fotodokumentation", value: () => null, filledAt: 7, openLabel: "fehlt" },
-  { key: "vorbehalt", label: "Vorbehalt", value: () => "Wir behalten uns Ansprüche auf Bauzeitverlängerung und Mehrkosten vor.", filledAt: 7 },
+  { key: "vorbehalt", label: "Vorbehalt", value: () => CASE.vorbehalt, filledAt: 7 },
 ];
 
 /** Scene 3, after the site manager answers Klara's follow-up. */
 export const DOC_COMPLETION: Partial<Record<FieldKey, string>> = {
-  dauer: "ca. 2 Arbeitstage",
-  foto: "1 Foto · 2. OG, gesperrter Bereich",
+  dauer: CASE.duration,
+  foto: `${CASE.photo.count} Foto · ${CASE.photo.label}`,
 };
 
 export const CALL_CAPABILITIES = [
