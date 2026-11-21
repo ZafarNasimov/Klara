@@ -11,8 +11,9 @@ const SPOT = { x: 77, y: 30 };
 
 /**
  * Scene 6b – close. Same Klara and light as the title; the text arrives line
- * by line: "No missing reports." comes with the scene, then one line per click
- * (steps 1–4) up to the sign-off. In auto mode the lines follow on a timer.
+ * by line: "No missing reports." comes with the scene, then one press plays
+ * the rest on a timer, in order, up to the sign-off. In auto mode the whole
+ * sequence runs without a press.
  *
  * The robot is never faded in here: the light→dark wipe collapses onto it,
  * so it must already stand there when the wipe starts.
@@ -20,7 +21,11 @@ const SPOT = { x: 77, y: 30 };
 export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: SceneProps) {
   const show = phase !== "standby";
   const auto = revealMode === "auto";
-  const at = (n: number) => show && (auto || step >= n);
+  // One press (step 1) plays every following line; `play` offsets the delays to that press.
+  const play = auto || step >= 1;
+  const at = (n: number) => show && (n === 0 || play);
+  /** Seconds after the press (or, in auto mode, after the scene enters). */
+  const d = (pressed: number, autoAt: number) => (auto ? autoAt : pressed);
   const rootRef = useRef<HTMLElement>(null);
   const robotRef = useRef<KlaraRobotHandle>(null);
 
@@ -29,7 +34,9 @@ export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: 
     if (phase !== "enter") return;
     const cues: [string, number][] = auto
       ? [["line-1", 300], ["line-2", 1000], ["audience", 1900]]
-      : [step === 0 ? ["line-1", 300] : step === 1 ? ["line-2", 150] : ["audience", 150]];
+      : step === 0
+        ? [["line-1", 300]]
+        : [["line-2", 150], ["audience", 1050]];
     return scheduleGlances(rootRef.current, robotRef.current, cues);
   }, [phase, step, auto]);
 
@@ -69,7 +76,7 @@ export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: 
             as="p"
             gaze="line-2"
             show={at(1)}
-            delay={auto ? 0.9 : 0}
+            delay={d(0, 0.9)}
             className="leading-[1.15] tracking-[-0.02em] text-neutral-300"
             style={{ fontSize: u(56), marginTop: u(12) }}
           >
@@ -77,13 +84,13 @@ export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: 
           </FadeUp>
 
           <p className="font-bold leading-[1.02] tracking-[-0.035em]" style={{ fontSize: u(88), marginTop: u(20) }}>
-            <RevealWords text="No lost money." show={at(2)} delay={auto ? 1.8 : 0} stagger={0.06} wordClassName={SILVER_TEXT} />
+            <RevealWords text="No lost money." show={at(2)} delay={d(0.9, 1.8)} stagger={0.06} wordClassName={SILVER_TEXT} />
           </p>
 
           <FadeUp
             as="p"
             show={at(3)}
-            delay={auto ? 2.9 : 0.1}
+            delay={d(2.0, 2.9)}
             className="tracking-[-0.02em] text-neutral-300"
             style={{ fontSize: u(36), marginTop: u(40), lineHeight: 1.2 }}
           >
@@ -93,7 +100,7 @@ export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: 
           <FadeUp
             as="p"
             show={at(4)}
-            delay={auto ? 3.8 : 0.1}
+            delay={d(2.9, 3.8)}
             duration={0.5}
             className="text-zinc-400"
             style={{ fontSize: u(20), marginTop: u(56) }}
