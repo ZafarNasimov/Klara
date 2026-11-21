@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { cn } from "@/lib/utils";
 import { preloadKlaraRobot } from "./klara-robot-loader";
 import { PITCH_SCENES } from "./pitch-scenes";
-import type { PitchSceneDef, RevealMode } from "./scenes/scene-parts";
+import type { PitchSceneDef, RevealMode, SceneController } from "./scenes/scene-parts";
 import { DARK_BG, EASE_IN_OUT, EASE_OUT, LIGHT_BG, PITCH_UNIT, type ScenePhase, u } from "./stage";
 
 /**
@@ -35,7 +35,7 @@ const T = {
 const NEXT_KEYS = new Set(["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"]);
 const BACK_KEYS = new Set(["ArrowLeft", "ArrowUp", "PageUp", "Backspace"]);
 
-type Options = { start: number; fadeOnly: boolean; reveal: RevealMode };
+type Options = { start: number; fadeOnly: boolean; reveal: RevealMode; autoPace: boolean; debug: boolean };
 
 /** Scene for a key like "3" or "6b" (a bare digit picks the first scene starting with it). */
 function sceneIndex(scenes: PitchSceneDef[], key: string | null): number {
@@ -44,13 +44,15 @@ function sceneIndex(scenes: PitchSceneDef[], key: string | null): number {
   return exact >= 0 ? exact : scenes.findIndex((s) => s.key.startsWith(key));
 }
 
-/** Rehearsal switches: ?scene=6b, ?transition=fade, ?reveal=auto */
+/** Rehearsal switches: ?scene=6b, ?transition=fade, ?reveal=auto, ?pace=auto, ?debug=1 */
 function readOptions(scenes: PitchSceneDef[]): Options {
   const params = new URLSearchParams(window.location.search);
   return {
     start: Math.max(0, sceneIndex(scenes, params.get("scene"))),
     fadeOnly: params.get("transition") === "fade",
     reveal: params.get("reveal") === "auto" ? "auto" : "click",
+    autoPace: params.get("pace") === "auto" || params.get("reveal") === "auto",
+    debug: params.get("debug") === "1",
   };
 }
 
@@ -75,6 +77,13 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
   const [steps, setSteps] = useState<number[]>(() => scenes.map(() => 0));
   const [tx, setTx] = useState<Transition | null>(null);
   const [incomingPhase, setIncomingPhase] = useState<ScenePhase>("standby");
+  // "A": AUTO pacing for self-paced scenes (Scene 2), for rehearsals and video.
+  const [autoPace, setAutoPace] = useState(options.autoPace);
+  // "R" remounts the current scene, so every bit of its state starts over.
+  const [resetTokens, setResetTokens] = useState<number[]>(() => scenes.map(() => 0));
+  // Scenes entered by going back show their end state.
+  const [arrivedBack, setArrivedBack] = useState<boolean[]>(() => scenes.map(() => false));
+  const controllers = useRef(new Map<number, SceneController>());
 
   const layerEls = useRef(new Map<number, HTMLDivElement>());
   const headEls = useRef(new Map<number, HTMLDivElement>());
@@ -86,6 +95,14 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
       scenes.map((_, i) => (el: HTMLDivElement | null) => {
         if (el) layerEls.current.set(i, el);
         else layerEls.current.delete(i);
+      }),
+    [scenes],
+  );
+  const controllerRegistrars = useMemo(
+    () =>
+      scenes.map((_, i) => (controller: SceneController | null) => {
+        if (controller) controllers.current.set(i, controller);
+        else controllers.current.delete(i);
       }),
     [scenes],
   );
@@ -120,6 +137,7 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
       const kind: Kind = a === b ? "swap" : plain ? "fade" : a === "dark" ? "reveal" : "collapse";
       // Forward starts a scene from scratch; going back shows it fully revealed.
       setSteps((s) => s.map((v, i) => (i === to ? (to > from ? 0 : scenes[to].steps) : v)));
+      setArrivedBack((a) => a.map((v, i) => (i === to ? to < from : v)));
       setIncomingPhase("standby");
       setTx({ id: Date.now(), from, to, kind });
     },
@@ -128,6 +146,8 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
 
   const advance = useCallback(() => {
     if (tx) return;
+    // A self-paced scene takes the press first (e.g. queues the next turn).
+    if (controllers.current.get(index)?.onNext?.()) return;
     const maxStep = options.reveal === "click" ? scenes[index].steps : 0;
     if (steps[index] < maxStep) {
       setSteps((s) => s.map((v, i) => (i === index ? v + 1 : v)));
@@ -140,6 +160,7 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
   // Scene 3 is one key away), then goes to the previous scene, fully revealed.
   const back = useCallback(() => {
     if (tx) return;
+    if (controllers.current.get(index)?.onBack?.()) return;
     if (options.reveal === "click" && steps[index] > 0) {
       setSteps((s) => s.map((v, i) => (i === index ? v - 1 : v)));
       return;
@@ -155,7 +176,14 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
       if (key === "r") {
         // Reset the current scene to its first beat (REPLAY rehearsal).
         e.preventDefault();
-        if (!tx) setSteps((s) => s.map((v, i) => (i === index ? 0 : v)));
+        if (!tx) {
+          setSteps((s) => s.map((v, i) => (i === index ? 0 : v)));
+          setArrivedBack((a) => a.map((v, i) => (i === index ? false : v)));
+          setResetTokens((t) => t.map((v, i) => (i === index ? v + 1 : v)));
+        }
+      } else if (key === "a") {
+        e.preventDefault();
+        if (!e.repeat) setAutoPace((on) => !on);
       } else if (keyBeat !== undefined) {
         e.preventDefault();
         if (!e.repeat && steps[index] === keyBeat) advance();
@@ -293,9 +321,14 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
               aria-hidden={phase === "standby" || undefined}
             >
               <Component
+                key={resetTokens[i]}
                 phase={phase}
                 step={steps[i]}
                 revealMode={options.reveal}
+                autoPace={autoPace}
+                debug={options.debug}
+                arrivedBack={arrivedBack[i]}
+                registerController={controllerRegistrars[i]}
                 headRef={headRefs[i]}
                 // Covered robots stop rendering (a waiting one after its intro).
                 robotPaused={phase !== "enter"}

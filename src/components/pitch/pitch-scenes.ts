@@ -6,7 +6,6 @@ import { PortfolioScene } from "./scenes/PortfolioScene";
 import type { PitchSceneDef } from "./scenes/scene-parts";
 import { SourcesScene } from "./scenes/SourcesScene";
 import { TitleScene, TITLE_STATS } from "./scenes/TitleScene";
-import { CALL_EXCHANGES } from "./pitch-story";
 
 /**
  * The pitch, in order (content spec 2026-11-21). `steps` = clicks a scene
@@ -15,8 +14,8 @@ import { CALL_EXCHANGES } from "./pitch-story";
  */
 export const PITCH_SCENES: PitchSceneDef[] = [
   { id: "title", key: "1", label: "Ask Klara", theme: "dark", steps: TITLE_STATS.length, Component: TitleScene },
-  // 4 exchanges + "after the call"
-  { id: "call", key: "2", label: "The call", theme: "light", steps: CALL_EXCHANGES + 1, Component: CallScene },
+  // Self-paced: takes the presses itself (one turn per press, queued, never skipping the latency).
+  { id: "call", key: "2", label: "The call", theme: "light", steps: 0, Component: CallScene },
   // open case, transcript, close, clarify, recipient, sent (3.2), replied (3.3, also "S"), validated (3.4)
   { id: "office", key: "3", label: "The office", theme: "light", steps: 8, pointer: true, keyBeats: { s: OFFICE_BEATS.sent }, Component: AdminScene },
   { id: "sources", key: "4", label: "More sources", theme: "light", steps: 3, Component: SourcesScene },
