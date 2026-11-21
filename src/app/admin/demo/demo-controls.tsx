@@ -32,7 +32,7 @@ export function DemoControls() {
       <section className="rounded-xl border border-border bg-background p-5">
         <h2 className="text-sm font-medium text-foreground">Demo zurücksetzen</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Löscht alle Vorgänge, Gespräche und E-Mails und lädt die Ausgangsdaten (Muster Bau GmbH, Neubau Bürogebäude München).
+          Löscht alle Vorgänge, Gespräche und E-Mails und lädt die Ausgangsdaten (Muster Bau GmbH, Baustellen A, B und C mit 14 Tagen Verlauf).
         </p>
         <Button className="mt-3 h-10 px-4" disabled={busy !== null} onClick={() => run("reset", "/api/demo/reset", {}, "Demo zurückgesetzt")}>
           {busy === "reset" ? "Wird zurückgesetzt…" : "Demo zurücksetzen"}

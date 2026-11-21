@@ -1,5 +1,6 @@
 // Fixed seed ids (client-safe). The seed and the role switcher share them.
-const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+export const seedId = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
+const id = seedId;
 
 export const IDS = {
   company: id(1),
@@ -24,5 +25,39 @@ export const IDS = {
   schedTrockenbau2: id(504),
   schedBodenbelag2: id(505),
   progressEstrich2: id(601),
+  meetingKw46: id(701),
+  meetingKw47: id(702),
+  // Portfolio: Baustellen A (Schwabing) and C (Pasing), more teams and trades on B.
+  projectA: id(11),
+  projectC: id(12),
+  contactBauherrA: id(111),
+  contactBauherrC: id(121),
+  contactSanitaerB: id(105),
+  teamHaustechnik: id(303),
+  teamRohbauA: id(311),
+  teamAusbauA: id(312),
+  teamRohbauC: id(321),
+  teamFassadeC: id(322),
+  tradeSanitaer: id(205),
+  tradeInnenputz: id(206),
+  tradeRohbauA: id(211),
+  tradeTrockenbauA: id(212),
+  tradeElektroA: id(213),
+  tradeSanitaerA: id(214),
+  tradeRohbauC: id(221),
+  tradeFassadeC: id(222),
+  tradeSanitaerC: id(223),
+  tradeElektroC: id(224),
+  schedEstrich1: id(506),
+  schedSanitaer3: id(507),
+  schedInnenputz3: id(508),
+  schedRohbauA: id(511),
+  schedTrockenbauA: id(512),
+  schedElektroA: id(513),
+  schedSanitaerA: id(514),
+  schedRohbauC: id(521),
+  schedFassadeC: id(522),
+  schedSanitaerC: id(523),
+  schedElektroC: id(524),
 } as const;
 

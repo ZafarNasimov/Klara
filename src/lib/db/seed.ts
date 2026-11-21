@@ -2,6 +2,8 @@
 // the demo always plays "today". Fixed UUIDs keep links stable across resets.
 import { addWerktage, berlinDay, subWerktage, DEFAULT_HOLIDAY_REGION } from "@/lib/deadlines";
 import { IDS } from "@/lib/ids";
+import { buildSeedMeetings } from "@/lib/meetings/sample";
+import { withPortfolio } from "./seed-portfolio";
 import type { SeedData } from "./store";
 
 export { IDS };
@@ -14,9 +16,9 @@ export function buildSeed(now: Date = new Date()): SeedData {
   const region = DEFAULT_HOLIDAY_REGION;
   const today = berlinDay(now);
   const wt = (n: number) => (n >= 0 ? addWerktage(today, n, region) : subWerktage(today, -n, region));
-  const clientMailbox = process.env.DEMO_CLIENT_MAILBOX || "petra.lang@immobilien-isar.example";
+  const clientMailbox = process.env.DEMO_CLIENT_MAILBOX || "petra.lang@wohnbau-riem.example";
 
-  return {
+  const base: SeedData = {
     company: [
       {
         id: IDS.company,
@@ -35,12 +37,12 @@ export function buildSeed(now: Date = new Date()): SeedData {
       {
         id: IDS.project,
         company_id: IDS.company,
-        name: "Neubau Bürogebäude München",
-        address: "Hanauer Straße, 80992 München",
-        lat: 48.1773,
-        lng: 11.5357,
+        name: "Wohnanlage Riem",
+        address: "Riemer Straße 12, 81829 München",
+        lat: 48.1339,
+        lng: 11.6929,
         contract_type: "VOB_B",
-        contract_no: "MB-2026-117",
+        contract_no: "WR-2026-114",
         contract_date: "2026-03-02",
         settings: {
           fiktive_abnahme_excluded: false,
@@ -48,6 +50,7 @@ export function buildSeed(now: Date = new Date()): SeedData {
           demo_clock_offset_ms: 0,
           vad: DEFAULT_VAD,
           hourly_rates: { Polier: 64, Facharbeiter: 58, Helfer: 46 },
+          site_code: "B",
         },
       },
     ],
@@ -56,11 +59,11 @@ export function buildSeed(now: Date = new Date()): SeedData {
         id: IDS.contactBauherr,
         project_id: IDS.project,
         name: "Dr. Petra Lang",
-        organisation: "Immobilien Isar GmbH",
+        organisation: "Wohnbau Riem GmbH",
         role: "bauherr",
         email: clientMailbox,
         has_authority: true,
-        address: "Maximiliansplatz 9, 80333 München",
+        address: "Willy-Brandt-Allee 10, 81829 München",
       },
       {
         id: IDS.contactArchitekt,
@@ -96,12 +99,15 @@ export function buildSeed(now: Date = new Date()): SeedData {
     team: [
       { id: IDS.teamEstrich, project_id: IDS.project, name: "Team Estrich", lead_user_id: IDS.userPolierEstrich },
       { id: IDS.teamAusbau, project_id: IDS.project, name: "Team Ausbau", lead_user_id: IDS.userPolierAusbau },
+      { id: IDS.teamHaustechnik, project_id: IDS.project, name: "Team Haustechnik", lead_user_id: null },
     ],
     trade: [
       { id: IDS.tradeElektro, project_id: IDS.project, name: "Elektro", contracted_by: "client", contact_id: null, team_id: null },
       { id: IDS.tradeTrockenbau, project_id: IDS.project, name: "Trockenbau", contracted_by: "us", contact_id: IDS.contactTrockenbau, team_id: null },
       { id: IDS.tradeEstrich, project_id: IDS.project, name: "Estrich", contracted_by: "us", contact_id: null, team_id: IDS.teamEstrich },
       { id: IDS.tradeBodenbelag, project_id: IDS.project, name: "Bodenbelag", contracted_by: "us", contact_id: IDS.contactBodenbelag, team_id: null },
+      { id: IDS.tradeSanitaer, project_id: IDS.project, name: "Sanitär", contracted_by: "us", contact_id: null, team_id: IDS.teamHaustechnik },
+      { id: IDS.tradeInnenputz, project_id: IDS.project, name: "Innenputz", contracted_by: "us", contact_id: null, team_id: IDS.teamAusbau },
     ],
     schedule_item: [
       {
@@ -110,11 +116,11 @@ export function buildSeed(now: Date = new Date()): SeedData {
         trade_id: IDS.tradeElektro,
         activity: "Elektroinstallation (Leerrohre, Bodentanks)",
         area: "2.OG",
-        start_date: wt(-10),
+        start_date: wt(-12),
         end_date: wt(-2),
-        planned_qty: null,
-        unit: null,
-        planned_per_day: null,
+        planned_qty: 1100,
+        unit: "m",
+        planned_per_day: 100,
         depends_on: [],
       },
       {
@@ -123,11 +129,11 @@ export function buildSeed(now: Date = new Date()): SeedData {
         trade_id: IDS.tradeElektro,
         activity: "Elektroinstallation (Leerrohre, Bodentanks)",
         area: "3.OG",
-        start_date: wt(-1),
-        end_date: wt(7),
-        planned_qty: null,
-        unit: null,
-        planned_per_day: null,
+        start_date: wt(2),
+        end_date: wt(10),
+        planned_qty: 1260,
+        unit: "m",
+        planned_per_day: 140,
         depends_on: [],
       },
       {
@@ -169,6 +175,45 @@ export function buildSeed(now: Date = new Date()): SeedData {
         planned_per_day: 40,
         depends_on: [IDS.schedEstrich2],
       },
+      {
+        id: IDS.schedEstrich1,
+        project_id: IDS.project,
+        trade_id: IDS.tradeEstrich,
+        activity: "Zementestrich CT-C25-F4 auf Trennlage, 65 mm",
+        area: "1.OG",
+        start_date: wt(-9),
+        end_date: wt(-2),
+        planned_qty: 280,
+        unit: "m²",
+        planned_per_day: 35,
+        depends_on: [],
+      },
+      {
+        id: IDS.schedSanitaer3,
+        project_id: IDS.project,
+        trade_id: IDS.tradeSanitaer,
+        activity: "Sanitär-Rohinstallation",
+        area: "3.OG",
+        start_date: wt(-7),
+        end_date: wt(4),
+        planned_qty: 36,
+        unit: "Stk",
+        planned_per_day: 3,
+        depends_on: [],
+      },
+      {
+        id: IDS.schedInnenputz3,
+        project_id: IDS.project,
+        trade_id: IDS.tradeInnenputz,
+        activity: "Innenputz Q2",
+        area: "3.OG",
+        start_date: wt(-10),
+        end_date: wt(3),
+        planned_qty: 840,
+        unit: "m²",
+        planned_per_day: 60,
+        depends_on: [],
+      },
     ],
     progress_entry: [
       { id: IDS.progressEstrich2, schedule_item_id: IDS.schedEstrich2, date: wt(-1), actual_qty: 40, note: "Achsen A–C" },
@@ -181,7 +226,9 @@ export function buildSeed(now: Date = new Date()): SeedData {
     email_out: [],
     email_in: [],
     daily_report: [],
-    meeting: [],
+    meeting: buildSeedMeetings(now),
     event: [],
   };
+  // Baustellen A and C, and 14 Werktage of history for all three sites.
+  return withPortfolio(base, now, region);
 }

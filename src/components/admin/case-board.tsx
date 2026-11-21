@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowUpRight, Building2, Users } from "lucide-react";
+import { ArrowUpRight, Building2, Users, X } from "lucide-react";
 import { DeadlineBadge } from "@/components/klara/deadline-badge";
 import { CheckList, LightDot, LightSummary, overallLight } from "@/components/klara/traffic-light";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,16 +21,31 @@ type ProjectResponse = ProjectContext & { now: string };
 
 const OPEN = new Set(["unvollstaendig", "bereit", "validiert"]);
 
-export function CaseBoard() {
-  const { data: ctx } = useApi<ProjectResponse>("/api/project");
-  const { data: cases, error } = useApi<CaseView[]>("/api/cases");
-  const { data: events } = useApi<AppEvent[]>("/api/events?limit=30");
+type Site = { id: string; name: string; code: string; contract_no: string };
+
+export function CaseBoard({ projectId = null, trade = null }: { projectId?: string | null; trade?: string | null }) {
+  const q = projectId ? `project=${projectId}` : "";
+  const { data: ctx } = useApi<ProjectResponse>(projectId ? `/api/project?id=${projectId}` : "/api/project");
+  const { data: cases, error } = useApi<CaseView[]>(`/api/cases${q ? `?${q}` : ""}`);
+  const { data: events } = useApi<AppEvent[]>(`/api/events?limit=30${q ? `&${q}` : ""}`);
+  const { data: sites } = useApi<Site[]>("/api/projects", { live: false, pollMs: 0 });
+  // Trades a meeting put behind schedule ("at risk"), newest event per trade.
+  const tradeDelays = new Map<string, { days: number; area: string }>();
+  for (const e of events ?? []) {
+    const p = e.payload as { trade?: unknown; delay_days?: unknown; area?: unknown };
+    if (e.kind === "meeting_schedule" && typeof p.trade === "string" && typeof p.delay_days === "number" && !tradeDelays.has(p.trade)) {
+      tradeDelays.set(p.trade, { days: p.delay_days, area: String(p.area ?? "") });
+    }
+  }
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scope, setScope] = useState<"open" | "all">("open");
 
   // Drafts still being collected in a call are not shown to the office.
-  const visible = useMemo(() => (cases ?? []).filter((c) => c.status !== "entwurf"), [cases]);
+  const visible = useMemo(
+    () => (cases ?? []).filter((c) => c.status !== "entwurf" && (!trade || c.facts._trade === trade)),
+    [cases, trade],
+  );
   const rows = useMemo(
     () =>
       visible.filter((c) => (teamFilter ? c.team_id === teamFilter : true)).filter((c) => (scope === "open" ? OPEN.has(c.status) : true)),
@@ -57,6 +72,34 @@ export function CaseBoard() {
               <Building2 className="size-3.5" aria-hidden />
               {ctx.company.name}
             </p>
+            {sites && sites.length > 1 ? (
+              <nav aria-label="Baustellen" className="mt-2 flex gap-1 px-2">
+                {sites.map((s) => (
+                  <Link
+                    key={s.id}
+                    href={`/admin/vorgaenge?site=${s.id}${trade ? `&trade=${encodeURIComponent(trade)}` : ""}`}
+                    aria-current={s.id === ctx.project.id ? "page" : undefined}
+                    title={s.name}
+                    className={cn(
+                      "flex h-8 min-w-8 items-center justify-center rounded-md border px-2 font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      s.id === ctx.project.id ? "border-foreground bg-foreground text-background" : "border-border text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {s.code}
+                  </Link>
+                ))}
+              </nav>
+            ) : null}
+            {trade ? (
+              <Link
+                href={`/admin/vorgaenge?site=${ctx.project.id}`}
+                className="mx-2 mt-2 flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5 text-xs text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Filter Gewerk ${trade} entfernen`}
+              >
+                Gewerk: {trade}
+                <X className="size-3.5 text-muted-foreground" aria-hidden />
+              </Link>
+            ) : null}
             <button
               type="button"
               onClick={() => setTeamFilter(null)}
@@ -95,14 +138,23 @@ export function CaseBoard() {
             </ul>
             <h2 className="mt-6 px-2 text-xs font-medium text-muted-foreground">Gewerke</h2>
             <ul className="mt-1 space-y-1 px-2">
-              {ctx.trades.map((t) => (
-                <li key={t.id} className="text-sm">
-                  <span className="text-foreground">{t.name}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {t.contracted_by === "client" ? "vom Bauherrn beauftragt" : t.team_id ? "eigene Kolonne" : "eigener Nachunternehmer"}
-                  </span>
-                </li>
-              ))}
+              {ctx.trades.map((t) => {
+                const late = tradeDelays.get(t.name);
+                return (
+                  <li key={t.id} className="text-sm">
+                    <span className="text-foreground">{t.name}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {t.contracted_by === "client" ? "vom Bauherrn beauftragt" : t.team_id ? "eigene Kolonne" : "eigener Nachunternehmer"}
+                    </span>
+                    {late ? (
+                      <span className="mt-0.5 flex items-center gap-1.5 text-xs text-light-yellow-text">
+                        <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-light-yellow" />
+                        Verzug +{late.days} {late.days === 1 ? "Arbeitstag" : "Arbeitstage"} · {late.area} (Besprechung)
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </>
         ) : (

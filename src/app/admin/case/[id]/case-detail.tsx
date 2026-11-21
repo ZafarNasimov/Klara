@@ -58,7 +58,7 @@ export function CaseDetailView({ id }: { id: string }) {
           <Button variant="outline" onClick={reload}>
             Erneut laden
           </Button>
-          <Link href="/admin" className={buttonVariants({ variant: "ghost" })}>
+          <Link href="/admin/vorgaenge" className={buttonVariants({ variant: "ghost" })}>
             Zur Übersicht
           </Link>
         </div>
@@ -104,7 +104,7 @@ export function CaseDetailView({ id }: { id: string }) {
         {/* ── Header ─────────────────────────────────────────────── */}
         <header className="border-b border-border bg-background px-8 pt-4 pb-5">
           <Link
-            href="/admin"
+            href="/admin/vorgaenge"
             className="-ml-2 inline-flex h-8 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ChevronLeft className="size-4" aria-hidden />
