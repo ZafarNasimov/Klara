@@ -53,3 +53,26 @@ describe("meeting items", () => {
     expect(verifyItems(raw, SAMPLE_SEGMENTS, ctx)).toHaveLength(raw.length);
   });
 });
+
+describe("seed meetings", async () => {
+  const { buildSeedMeetings, SAMPLE_RESULT: R } = await import("./sample");
+  const { buildSeed } = await import("@/lib/db/seed");
+  const now = new Date("2026-11-20T08:00:00Z");
+
+  it("MT-2026-0006 and MT-2026-0007 keep every stored item (all quotes verbatim)", () => {
+    const [kw46, kw47] = buildSeedMeetings(now);
+    const p46 = kw46.protocol as { ref: string; items: unknown[] };
+    const p47 = kw47.protocol as { ref: string; items: { kind: string }[]; changes: { text_de: string }[] };
+    expect([p46.ref, p47.ref]).toEqual(["MT-2026-0006", "MT-2026-0007"]);
+    expect(p46.items).toHaveLength(2);
+    expect(p47.items).toHaveLength(R.items.length);
+    expect(p47.items.some((i) => i.kind === "mangel" || i.kind === "bedenken")).toBe(false);
+    expect(p47.changes.map((c) => c.text_de)).toContain("4 Aufgaben angelegt");
+  });
+
+  it("buildSeed carries the meetings but no cases", () => {
+    const seed = buildSeed(now);
+    expect(seed.meeting).toHaveLength(2);
+    expect(seed.case).toHaveLength(0);
+  });
+});

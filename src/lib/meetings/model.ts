@@ -55,7 +55,9 @@ export type MeetingItem = {
   /** KL-… of the case this item created or updated (stays readable if the case is gone). */
   case_ref: string | null;
   /** What happened to the case: drafted, updated, or it already existed (re-run). */
-  case_action?: "created" | "updated" | "existing";
+  case_action?: "created" | "updated" | "existing" | "noop";
+  /** The doc type of that case: a reference only links if the case is of this type. */
+  case_doc_type?: string;
   status: "offen" | "erledigt";
 };
 
@@ -64,6 +66,7 @@ export type MeetingChange = {
   text_de: string;
   case_id: string | null;
   case_ref: string | null;
+  case_doc_type?: string;
 };
 
 export type Participant = { name: string; role: string; contact_id: string | null; email: string | null };

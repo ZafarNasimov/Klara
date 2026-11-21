@@ -252,7 +252,17 @@ function Evidence({ item, onJump }: { item: MeetingItem; onJump: (ts: number) =>
 function DetectedRow({ item, link, onJump }: { item: MeetingItem; link: ReactNode; onJump: (ts: number) => void }) {
   const t = TEMPLATE_DE[item.kind as TemplateKind];
   const action =
-    item.case_action === "existing" ? "bereits vorhanden" : item.updated_case_id ? "aktualisiert" : item.created_case_id ? "Entwurf" : item.kind === "termin" ? "Terminplan" : "festgehalten";
+    item.case_action === "existing"
+      ? "bereits vorhanden"
+      : item.case_action === "noop"
+        ? "festgehalten, kein Eintrag im Terminplan geändert"
+        : item.updated_case_id
+          ? "aktualisiert"
+          : item.created_case_id
+            ? "Entwurf"
+            : item.kind === "termin"
+              ? "Terminplan angepasst"
+              : "festgehalten";
   return (
     <li className="rounded-lg border border-border px-3.5 py-2.5">
       <p className="flex flex-wrap items-baseline gap-x-2 text-sm">

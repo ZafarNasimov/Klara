@@ -25,6 +25,14 @@ export function CaseBoard() {
   const { data: ctx } = useApi<ProjectResponse>("/api/project");
   const { data: cases, error } = useApi<CaseView[]>("/api/cases");
   const { data: events } = useApi<AppEvent[]>("/api/events?limit=30");
+  // Trades a meeting put behind schedule ("at risk"), newest event per trade.
+  const tradeDelays = new Map<string, { days: number; area: string }>();
+  for (const e of events ?? []) {
+    const p = e.payload as { trade?: unknown; delay_days?: unknown; area?: unknown };
+    if (e.kind === "meeting_schedule" && typeof p.trade === "string" && typeof p.delay_days === "number" && !tradeDelays.has(p.trade)) {
+      tradeDelays.set(p.trade, { days: p.delay_days, area: String(p.area ?? "") });
+    }
+  }
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scope, setScope] = useState<"open" | "all">("open");
@@ -95,14 +103,23 @@ export function CaseBoard() {
             </ul>
             <h2 className="mt-6 px-2 text-xs font-medium text-muted-foreground">Gewerke</h2>
             <ul className="mt-1 space-y-1 px-2">
-              {ctx.trades.map((t) => (
-                <li key={t.id} className="text-sm">
-                  <span className="text-foreground">{t.name}</span>
-                  <span className="block text-xs text-muted-foreground">
-                    {t.contracted_by === "client" ? "vom Bauherrn beauftragt" : t.team_id ? "eigene Kolonne" : "eigener Nachunternehmer"}
-                  </span>
-                </li>
-              ))}
+              {ctx.trades.map((t) => {
+                const late = tradeDelays.get(t.name);
+                return (
+                  <li key={t.id} className="text-sm">
+                    <span className="text-foreground">{t.name}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {t.contracted_by === "client" ? "vom Bauherrn beauftragt" : t.team_id ? "eigene Kolonne" : "eigener Nachunternehmer"}
+                    </span>
+                    {late ? (
+                      <span className="mt-0.5 flex items-center gap-1.5 text-xs text-light-yellow-text">
+                        <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-light-yellow" />
+                        Verzug +{late.days} {late.days === 1 ? "Arbeitstag" : "Arbeitstage"} · {late.area} (Besprechung)
+                      </span>
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </>
         ) : (

@@ -24,16 +24,24 @@ export function toView(row: Meeting, caseRefs: Record<string, string> = {}): Mee
   };
 }
 
-/** reference → case id for every case the meeting points at (links resolve once the case exists). */
+/**
+ * reference → case id for the cases a meeting points at. A link resolves only
+ * when a case with that reference exists AND is of the expected doc type (in a
+ * reset demo the same number can later belong to a different letter).
+ */
 async function caseRefsFor(views: MeetingProtocol[], projectId: string): Promise<Record<string, string>> {
-  const wanted = new Set<string>();
+  const wanted = new Map<string, string | undefined>();
   for (const v of views) {
-    for (const i of v.items) if (i.case_ref) wanted.add(i.case_ref);
-    for (const c of v.changes) if (c.case_ref) wanted.add(c.case_ref);
+    for (const i of v.items) if (i.case_ref) wanted.set(i.case_ref, i.case_doc_type);
+    for (const c of v.changes) if (c.case_ref) wanted.set(c.case_ref, c.case_doc_type);
   }
   if (!wanted.size) return {};
   const out: Record<string, string> = {};
-  for (const c of await listCases(projectId)) if (wanted.has(c.reference)) out[c.reference] = c.id;
+  for (const c of await listCases(projectId)) {
+    if (!wanted.has(c.reference)) continue;
+    const type = wanted.get(c.reference);
+    if (!type || type === c.doc_type) out[c.reference] = c.id;
+  }
   return out;
 }
 

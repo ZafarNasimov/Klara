@@ -140,6 +140,18 @@ function Recorder({ m, onChanged }: { m: MeetingView; onChanged: () => void }) {
     return () => window.clearTimeout(t);
   }, [autostart, start]);
 
+  /** A fallback replaces the live recording: stop it and drop its audio. */
+  function discard() {
+    const r = rec.current;
+    if (r && r.state !== "inactive") {
+      r.ondataavailable = null;
+      r.stop();
+    }
+    rec.current = null;
+    cleanup();
+    setPhase("idle");
+  }
+
   function togglePause() {
     const r = rec.current;
     if (!r) return;
@@ -214,7 +226,7 @@ function Recorder({ m, onChanged }: { m: MeetingView; onChanged: () => void }) {
         ) : null}
       </section>
 
-      {phase === "idle" ? <Fallbacks m={m} onChanged={onChanged} /> : null}
+      {phase !== "ending" ? <Fallbacks m={m} onChanged={onChanged} onBeforeUse={discard} recording={phase !== "idle"} /> : null}
     </div>
   );
 }
@@ -233,12 +245,13 @@ function LevelMeter({ level }: { level: number }) {
 }
 
 /** Offline / demo: upload a file, or replay the sample meeting through the real pipeline. */
-function Fallbacks({ m, onChanged }: { m: MeetingView; onChanged: () => void }) {
+function Fallbacks({ m, onChanged, onBeforeUse, recording = false }: { m: MeetingView; onChanged: () => void; onBeforeUse?: () => void; recording?: boolean }) {
   const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<"upload" | "sample" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function upload(f: File) {
+    onBeforeUse?.();
     setBusy("upload");
     setError(null);
     try {
@@ -254,6 +267,7 @@ function Fallbacks({ m, onChanged }: { m: MeetingView; onChanged: () => void }) 
   }
 
   async function sample() {
+    onBeforeUse?.();
     setBusy("sample");
     setError(null);
     try {
@@ -268,7 +282,10 @@ function Fallbacks({ m, onChanged }: { m: MeetingView; onChanged: () => void }) 
   return (
     <section aria-label="Ohne Mikrofon" className="rounded-xl border border-border bg-background px-5 py-4">
       <h2 className="text-sm font-semibold text-foreground">Ohne Mikrofon</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Eine vorhandene Aufnahme auswerten, oder die Beispielaufnahme (MT-2026-0007) durch die echte Auswertung schicken.</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Eine vorhandene Aufnahme auswerten, oder die Beispielaufnahme (MT-2026-0007) durch die echte Auswertung schicken.
+        {recording ? " Die laufende Aufnahme wird dabei verworfen." : ""}
+      </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <input ref={file} type="file" accept="audio/*" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
         <Button variant="outline" onClick={() => file.current?.click()} disabled={!!busy}>

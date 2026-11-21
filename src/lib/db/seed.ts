@@ -2,6 +2,7 @@
 // the demo always plays "today". Fixed UUIDs keep links stable across resets.
 import { addWerktage, berlinDay, subWerktage, DEFAULT_HOLIDAY_REGION } from "@/lib/deadlines";
 import { IDS } from "@/lib/ids";
+import { buildSeedMeetings } from "@/lib/meetings/sample";
 import type { SeedData } from "./store";
 
 export { IDS };
@@ -181,7 +182,7 @@ export function buildSeed(now: Date = new Date()): SeedData {
     email_out: [],
     email_in: [],
     daily_report: [],
-    meeting: [],
+    meeting: buildSeedMeetings(now),
     event: [],
   };
 }

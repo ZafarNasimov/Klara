@@ -66,7 +66,8 @@ export async function applyItems(m: MeetingView, items: MeetingItem[], at: Date)
         next = await hindrance(c, item, changes);
         break;
       case "termin":
-        await reschedule(c, item, changes);
+        // Said, but nothing in the schedule to move (no matching item, or not later): say so.
+        if (!(await reschedule(c, item, changes))) next = { ...item, case_action: "noop" };
         break;
       default:
         break;
@@ -130,8 +131,8 @@ async function draftOnce(
   const existing = c.cases.find((x) => x.doc_type === docType && OPEN.includes(x.status) && normalizeText(String(x.facts._meeting_quote ?? "")) === q);
   const title = TEMPLATE_DE[item.kind as keyof typeof TEMPLATE_DE]?.title ?? docType;
   if (existing) {
-    changes.push({ kind: "case_updated", text_de: `${existing.reference} bereits vorhanden: ${title}`, case_id: existing.id, case_ref: existing.reference });
-    return { ...item, updated_case_id: existing.id, case_ref: existing.reference, case_action: "existing" };
+    changes.push({ kind: "case_updated", text_de: `${existing.reference} bereits vorhanden: ${title}`, case_id: existing.id, case_ref: existing.reference, case_doc_type: docType });
+    return { ...item, updated_case_id: existing.id, case_ref: existing.reference, case_action: "existing", case_doc_type: docType };
   }
   const full = { ...clean(facts), _meeting_id: c.m.id, _meeting_ref: c.m.ref, _meeting_quote: item.quote, _confidence: 0.9 };
   const ev = evaluate(docType, full, sphere, c);
@@ -156,8 +157,8 @@ async function draftOnce(
   await generateDocument(created.id, c.at, { ctx: c.ctx });
   await evidence(c, created.id, item);
   await event(c, created, "meeting_case_created", `Neuer Entwurf ${created.reference}: ${title}`);
-  changes.push({ kind: "case_created", text_de: `Neuer Entwurf ${created.reference}: ${title}`, case_id: created.id, case_ref: created.reference });
-  return { ...item, created_case_id: created.id, case_ref: created.reference, case_action: "created" };
+  changes.push({ kind: "case_created", text_de: `Neuer Entwurf ${created.reference}: ${title}`, case_id: created.id, case_ref: created.reference, case_doc_type: docType });
+  return { ...item, created_case_id: created.id, case_ref: created.reference, case_action: "created", case_doc_type: docType };
 }
 
 /** Hindrance: update the open Behinderungsanzeige for the same trade and area, else draft one. */
@@ -185,8 +186,8 @@ async function hindrance(c: Ctx, item: MeetingItem, changes: MeetingChange[]): P
     const text = `${match.reference} aktualisiert: ${what}${sent ? " (Schreiben bereits versendet, Nachtrag prüfen)" : ""}`;
     await evidence(c, match.id, item);
     await event(c, match, "meeting_case_updated", text);
-    changes.push({ kind: "case_updated", text_de: text, case_id: match.id, case_ref: match.reference });
-    return { ...item, updated_case_id: match.id, case_ref: match.reference, case_action: "updated" };
+    changes.push({ kind: "case_updated", text_de: text, case_id: match.id, case_ref: match.reference, case_doc_type: match.doc_type });
+    return { ...item, updated_case_id: match.id, case_ref: match.reference, case_action: "updated", case_doc_type: match.doc_type };
   }
 
   return draftOnce(
@@ -201,12 +202,12 @@ async function hindrance(c: Ctx, item: MeetingItem, changes: MeetingChange[]): P
 
 // ── Schedule ─────────────────────────────────────────────────────────────
 
-async function reschedule(c: Ctx, item: MeetingItem, changes: MeetingChange[]): Promise<void> {
+async function reschedule(c: Ctx, item: MeetingItem, changes: MeetingChange[]): Promise<boolean> {
   const trade = tradeOf(c, item);
-  if (!trade || !item.new_date) return;
+  if (!trade || !item.new_date) return false;
   const area = normalizeArea(item.area);
   const sched = c.ctx.schedule.find((s) => s.trade_id === trade.id && (!area || normalizeArea(s.area) === area));
-  if (!sched || item.new_date <= sched.end_date) return;
+  if (!sched || item.new_date <= sched.end_date) return false;
   const delay = werktageBetween(sched.end_date, item.new_date);
   await store().update("schedule_item", sched.id, { end_date: item.new_date });
   const moved = [{ trade: trade.name, area: sched.area, delay, old: sched.end_date, next: item.new_date }];
@@ -230,6 +231,7 @@ async function reschedule(c: Ctx, item: MeetingItem, changes: MeetingChange[]): 
       c.at,
     );
   }
+  return true;
 }
 
 // ── Audit trail ──────────────────────────────────────────────────────────

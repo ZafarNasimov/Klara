@@ -24,5 +24,7 @@ export const IDS = {
   schedTrockenbau2: id(504),
   schedBodenbelag2: id(505),
   progressEstrich2: id(601),
+  meetingKw46: id(701),
+  meetingKw47: id(702),
 } as const;
 
