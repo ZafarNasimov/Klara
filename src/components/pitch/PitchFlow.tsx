@@ -150,7 +150,16 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (/^[1-9]$/.test(e.key)) {
+      const key = e.key.toLowerCase();
+      const keyBeat = scenes[index].keyBeats?.[key];
+      if (key === "r") {
+        // Reset the current scene to its first beat (REPLAY rehearsal).
+        e.preventDefault();
+        if (!tx) setSteps((s) => s.map((v, i) => (i === index ? 0 : v)));
+      } else if (keyBeat !== undefined) {
+        e.preventDefault();
+        if (!e.repeat && steps[index] === keyBeat) advance();
+      } else if (/^[1-9]$/.test(e.key)) {
         const target = sceneIndex(scenes, e.key);
         if (target >= 0) {
           e.preventDefault();
@@ -166,7 +175,7 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [advance, back, go, scenes]);
+  }, [advance, back, go, scenes, index, steps, tx]);
 
   // Run one transition. Input is ignored until it finishes (no double skips).
   useEffect(() => {
@@ -263,7 +272,12 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
         lang="en"
         className={cn("fixed inset-0 overflow-hidden select-none", !current.pointer && "cursor-none")}
         style={{ "--pitch-u": PITCH_UNIT, background: current.theme === "dark" ? DARK_BG : LIGHT_BG } as CSSProperties}
-        onClick={(e) => e.button === 0 && advance()}
+        onClick={(e) => {
+          if (e.button !== 0) return;
+          // In click-into scenes only the marked next control advances.
+          if (current.pointer && !(e.target as Element).closest("[data-next]")) return;
+          advance();
+        }}
       >
         {layers.map(({ i, phase, z, style }) => {
           const { Component } = scenes[i];

@@ -33,8 +33,13 @@ export type PitchSceneDef = {
   key: string;
   label: string;
   theme: SceneTheme;
-  /** Shows the mouse pointer (scenes the presenter clicks into). */
+  /**
+   * Shows the mouse pointer (scenes the presenter clicks into). A click then
+   * only advances on the control marked `data-next`; keys work as everywhere.
+   */
   pointer?: boolean;
+  /** Extra keys that advance one specific beat: `{ s: 6 }` = "S" advances from beat 6. */
+  keyBeats?: Record<string, number>;
   /** Clicks a scene consumes before the next click changes scene (click mode). */
   steps: number;
   Component: ComponentType<SceneProps>;

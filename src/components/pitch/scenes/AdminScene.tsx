@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertCircle, Building2, Check, CircleCheck, FileText, ImageIcon, Mic, Reply, X } from "lucide-react";
+import { AlertCircle, Building2, Check, CircleCheck, Clock, FileText, ImageIcon, Mic, Reply, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { KlaraAvatar } from "@/components/klara/klara-avatar";
 import { cn } from "@/lib/utils";
@@ -17,16 +17,19 @@ import {
   SITES,
 } from "../pitch-story";
 import { EASE_OUT, u } from "../stage";
-import { CaseDocument, PAPER_SHADOW, type DocStatus } from "./CaseDocument";
+import { CaseDocument, PAPER_SHADOW, STATUS_COLORS, type DocStatus } from "./CaseDocument";
 import { appScaleVars, LightScene, NEXT_ACTION, useBeat, type SceneProps } from "./scene-parts";
 
-/** Beats, in click order. */
-const B = { open: 1, transcript: 2, closeTranscript: 3, clarify: 4, recipient: 5, send: 6, validate: 7 } as const;
+/**
+ * Beats, in click order (spec update 2026-11-21): 3.1 = recipient (Clarify
+ * panel ready), 3.2 = sent, waiting, 3.3 = the site manager replied (only
+ * the next key or "S"), 3.4 = validated. Everything derives from the beat,
+ * so ← restores each earlier state exactly.
+ */
+export const OFFICE_BEATS = { open: 1, transcript: 2, closeTranscript: 3, clarify: 4, recipient: 5, sent: 6, replied: 7, validated: 8 } as const;
+const B = OFFICE_BEATS;
 
-/** The site manager's answer lands this long after "Send" (REPLAY). */
-const UPDATE_DELAY_MS = 1800;
 const TRANSCRIPT_TIMES = ["0:00", "0:07", "0:13", "0:16", "0:20", "0:22", "0:33", "0:35"];
-
 const PRESENT = ["Start time", "Cause", "Responsible party (client)", "Affected works", "Crew"];
 const MISSING = [
   { label: "Expected duration", added: `${DOC_COMPLETION.dauer}` },
@@ -36,12 +39,12 @@ const MISSING = [
 const ease = { duration: 0.3, ease: EASE_OUT };
 
 /**
- * Scene 3 – the office side (REPLAY, interactive). Every click is the next
- * action; the control that comes next carries a ring, so the presenter can
- * click it with the mouse or just use the clicker.
+ * Scene 3 – the office side (REPLAY, interactive). The control that comes
+ * next carries a ring and `data-next`: clicking it (or the presenter's next
+ * key) advances; other clicks in this scene do nothing.
  */
 export function AdminScene({ phase, step, revealMode }: SceneProps) {
-  const beat = useBeat(phase, step, revealMode, [1200, 3800, 6400, 8000, 11400, 14200, 19200]);
+  const beat = useBeat(phase, step, revealMode, [1200, 3800, 6400, 8000, 11400, 14000, 17000, 20000]);
 
   // Voice input: the request appears word by word.
   const words = CLARIFY_REQUEST.split(" ");
@@ -53,19 +56,13 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
   }, [phase, beat, words.length]);
   const heardWords = beat > B.clarify ? words.length : beat === B.clarify ? heard : 0;
 
-  // After "Send", the site manager's answer arrives and the gaps close.
-  const [answeredAt, setAnsweredAt] = useState(0);
-  useEffect(() => {
-    if (phase !== "enter" || beat !== B.send) return;
-    const timer = window.setTimeout(() => setAnsweredAt(B.send), UPDATE_DELAY_MS);
-    return () => window.clearTimeout(timer);
-  }, [phase, beat]);
-  const complete = beat >= B.validate || (beat === B.send && answeredAt === B.send);
-
-  const status: DocStatus = beat >= B.validate ? "validated" : complete ? "ready" : "open";
+  const complete = beat >= B.replied;
+  const status: DocStatus = beat >= B.validated ? "validated" : complete ? "ready" : "open";
   const opened = beat >= B.open;
-  const composer = beat >= B.clarify && beat < B.send;
-  const next = (b: number) => (beat === b - 1 ? NEXT_ACTION : "");
+  const composer = beat >= B.clarify && beat < B.sent;
+  const isNext = (b: number) => beat === b - 1;
+  const next = (b: number) => (isNext(b) ? NEXT_ACTION : "");
+  const nextAttr = (b: number) => (isNext(b) ? { "data-next": "" } : {});
 
   return (
     <LightScene label="Scene 3 – the office" phase={phase}>
@@ -104,6 +101,7 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                     <button
                       key={team}
                       type="button"
+                      {...(target ? nextAttr(B.open) : {})}
                       className={cn(
                         "ml-6 flex items-center justify-between rounded-md px-2 py-1 text-left text-sm text-zinc-600",
                         selected && "bg-white font-medium text-zinc-900 ring-1 ring-zinc-200",
@@ -141,30 +139,18 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                     </p>
                   </div>
                   <div className="ml-auto flex items-center gap-2">
-                    <Button variant="outline" className={next(B.transcript)}>
+                    <Button variant="outline" className={next(B.transcript)} {...nextAttr(B.transcript)}>
                       View transcript
                     </Button>
-                    <Button variant="outline" className={next(B.clarify)}>
+                    <Button variant="outline" className={next(B.clarify)} {...nextAttr(B.clarify)}>
                       <Mic aria-hidden /> Clarify
                     </Button>
-                    <Button
-                      aria-disabled={!complete || undefined}
-                      className={cn(!complete && "opacity-50", complete && next(B.validate))}
-                    >
-                      {status === "validated" ? (
-                        <>
-                          <Check aria-hidden /> Validated
-                        </>
-                      ) : (
-                        "Validate"
-                      )}
-                    </Button>
+                    <ValidateButton complete={complete} validated={status === "validated"} isNext={isNext(B.validated)} />
                   </div>
                 </div>
                 <div className="relative min-h-0 flex-1 overflow-hidden p-5" style={appScaleVars(1.35)}>
                   <CaseDocument heardUpTo={CALL_SCRIPT.length - 1} complete={complete} status={status} className="mx-auto max-w-3xl" />
                 </div>
-
 
                 <AnimatePresence>
                   {beat === B.transcript && (
@@ -180,16 +166,16 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                   )}
                 </AnimatePresence>
 
-                {/* Clarify composer */}
+                {/* Clarify panel (3.1); closes on Send: down 16 px + fade, 300 ms */}
                 <AnimatePresence>
                   {composer && (
                     <motion.section
                       key="composer"
                       aria-label="Clarify"
                       className="absolute inset-x-5 bottom-5 flex flex-col gap-4 rounded-xl border border-zinc-200 bg-white p-5 shadow-xl"
-                      initial={{ opacity: 0, y: 24 }}
+                      initial={{ opacity: 0, y: 16 }}
                       animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 24 }}
+                      exit={{ opacity: 0, y: 16 }}
                       transition={ease}
                     >
                       <div className="flex items-start gap-3">
@@ -211,6 +197,7 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                               <button
                                 key={r}
                                 type="button"
+                                {...(i === 0 ? nextAttr(B.recipient) : {})}
                                 className={cn(
                                   "flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1 text-sm text-zinc-700",
                                   chosen && "border-primary bg-blue-50 text-primary",
@@ -234,7 +221,9 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                               {CLARIFY_MESSAGE_EN}
                             </p>
                           </div>
-                          <Button size="lg" className={next(B.send)}>Send</Button>
+                          <Button size="lg" className={next(B.sent)} {...nextAttr(B.sent)}>
+                            Send
+                          </Button>
                         </motion.div>
                       )}
                     </motion.section>
@@ -257,22 +246,24 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                 <KlaraAvatar size={28} className="size-7" />
                 <span className="text-sm font-semibold">Klara check</span>
               </div>
-              <StatusLine status={status} />
+              <StatusLine beat={beat} />
 
-              {/* The loop, in the panel: sent → the site manager's reply */}
+              {/* 3.2: waiting → 3.3: the reply */}
               <AnimatePresence mode="popLayout" initial={false}>
-                {beat === B.send && !complete && (
+                {beat === B.sent && (
                   <motion.p
-                    key="sent"
+                    key="pending"
                     role="status"
-                    className="flex items-start gap-2 rounded-lg border border-zinc-200 p-3 text-sm leading-snug text-zinc-800"
-                    initial={{ opacity: 0, y: -6 }}
+                    className="flex items-start gap-2 text-sm leading-snug text-zinc-600"
+                    initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                     transition={ease}
                   >
-                    <Check className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden />
-                    Sent to site manager · Klara will ask him in his language.
+                    <Clock className="mt-0.5 size-4 shrink-0 text-zinc-400" aria-hidden />
+                    <span>
+                      Request sent <span className="font-mono">07:52</span> · Klara asks him in his language
+                    </span>
                   </motion.p>
                 )}
                 {complete && (
@@ -280,7 +271,7 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                     key="reply"
                     role="status"
                     className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3"
-                    initial={{ opacity: 0, y: -6 }}
+                    initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={ease}
                   >
@@ -300,7 +291,9 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
               </AnimatePresence>
 
               <section className="flex flex-col gap-2">
-                <h4 className="flex items-center gap-1.5 text-xs text-zinc-500"><CircleCheck className="size-3.5" aria-hidden /> Present</h4>
+                <h4 className="flex items-center gap-1.5 text-xs text-zinc-500">
+                  <CircleCheck className="size-3.5" aria-hidden /> Present
+                </h4>
                 {PRESENT.map((p) => (
                   <CheckRow key={p} ok label={p} />
                 ))}
@@ -308,7 +301,9 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
               </section>
 
               <section className="flex flex-col gap-2">
-                <h4 className="flex items-center gap-1.5 text-xs text-zinc-500"><AlertCircle className="size-3.5" aria-hidden /> Missing</h4>
+                <h4 className="flex items-center gap-1.5 text-xs text-zinc-500">
+                  <AlertCircle className="size-3.5" aria-hidden /> Missing
+                </h4>
                 {complete ? (
                   <p className="text-sm text-zinc-500">Nothing missing.</p>
                 ) : (
@@ -332,7 +327,13 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                       <p className="text-sm font-semibold">
                         Call transcript <span className="font-normal text-zinc-500">· Team Estrich, 07:41</span>
                       </p>
-                      <Button variant="ghost" size="icon-lg" aria-label="Close transcript" className={next(B.closeTranscript)}>
+                      <Button
+                        variant="ghost"
+                        size="icon-lg"
+                        aria-label="Close transcript"
+                        className={next(B.closeTranscript)}
+                        {...nextAttr(B.closeTranscript)}
+                      >
                         <X aria-hidden />
                       </Button>
                     </div>
@@ -352,36 +353,105 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
             </motion.aside>
           )}
         </div>
+
+        {/* Toasts, bottom right, 2.5 s each */}
+        <div className="pointer-events-none absolute right-5 bottom-5 flex flex-col items-end gap-2">
+          {beat === B.sent && <TimedToast key="sent">Sent to site manager · <span className="font-mono">07:52</span></TimedToast>}
+          {beat === B.validated && <TimedToast key="validated">Validiert · ready to send to Wohnbau Riem GmbH</TimedToast>}
+        </div>
       </div>
     </LightScene>
   );
 }
 
-function StatusLine({ status }: { status: DocStatus }) {
+/** Disabled until the reply completes the case; one soft pulse when it unlocks. */
+function ValidateButton({ complete, validated, isNext }: { complete: boolean; validated: boolean; isNext: boolean }) {
+  return (
+    <motion.span
+      className="rounded-lg"
+      initial={false}
+      animate={
+        complete && !validated
+          ? { boxShadow: ["0 0 0 0 rgb(37 99 235 / 0.45)", "0 0 0 10px rgb(37 99 235 / 0)"] }
+          : { boxShadow: "0 0 0 0 rgb(37 99 235 / 0)" }
+      }
+      transition={{ duration: 0.9, ease: EASE_OUT }}
+    >
+      <Button
+        aria-disabled={!complete || undefined}
+        tabIndex={complete ? undefined : -1}
+        className={cn(!complete && "pointer-events-none opacity-50", isNext && NEXT_ACTION)}
+        {...(isNext ? { "data-next": "" } : {})}
+      >
+        {validated ? (
+          <>
+            <Check aria-hidden /> Validated
+          </>
+        ) : (
+          "Validate"
+        )}
+      </Button>
+    </motion.span>
+  );
+}
+
+/** A toast that shows for `ms`, then leaves; re-entering the beat shows it again. */
+function TimedToast({ children, ms = 2500 }: { children: ReactNode; ms?: number }) {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setVisible(false), ms);
+    return () => window.clearTimeout(timer);
+  }, [ms]);
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.p
+          role="status"
+          className="flex max-w-64 items-start gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm leading-snug text-zinc-900 shadow-lg"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8 }}
+          transition={ease}
+        >
+          <Check className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden />
+          <span>{children}</span>
+        </motion.p>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/** Klara's verdict: amber while something is missing, green once complete (300 ms colour crossfade). */
+function StatusLine({ beat }: { beat: number }) {
+  const green = beat >= B.replied;
   const text =
-    status === "validated"
-      ? "Validiert"
-      : status === "ready"
+    beat >= B.validated
+      ? <>Validiert by Office · <span className="font-mono">07:59</span></>
+      : green
         ? "Complete · ready to validate"
-        : "2 missing · expected duration, photo";
-  const green = status === "ready" || status === "validated";
+        : beat === B.sent
+          ? "2 missing · waiting for site manager"
+          : "2 missing · expected duration, photo";
+  const c = green ? STATUS_COLORS.green : STATUS_COLORS.amber;
   return (
     <motion.p
-      key={status}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={ease}
-      className={cn(
-        "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium",
-        green ? "border-green-200 bg-green-50 text-light-green-text" : "border-amber-200 bg-amber-50 text-light-yellow-text",
-      )}
+      className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium"
+      initial={false}
+      animate={{ backgroundColor: c.bg, borderColor: c.border, color: c.text }}
+      transition={{ duration: 0.3, ease: "easeInOut" }}
     >
-      {status === "validated" ? (
-        <Check className="size-4" strokeWidth={2.5} aria-hidden />
+      {beat >= B.validated ? (
+        <Check className="size-4 shrink-0" strokeWidth={2.5} aria-hidden />
       ) : (
-        <span aria-hidden className={cn("size-2.5 rounded-full", green ? "bg-light-green" : "bg-light-yellow")} />
+        <motion.span
+          aria-hidden
+          className="size-2.5 shrink-0 rounded-full"
+          initial={false}
+          animate={{ backgroundColor: c.dot }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+        />
       )}
-      {text}
+      <span>{text}</span>
     </motion.p>
   );
 }
@@ -390,8 +460,8 @@ function CheckRow({ ok = false, label, detail, fresh = false }: { ok?: boolean; 
   return (
     <motion.p
       className="flex items-start gap-2 text-sm leading-snug"
-      initial={fresh ? { opacity: 0, x: -6 } : false}
-      animate={{ opacity: 1, x: 0 }}
+      initial={fresh ? { opacity: 0, y: 8 } : false}
+      animate={{ opacity: 1, y: 0 }}
       transition={ease}
     >
       {ok ? (
