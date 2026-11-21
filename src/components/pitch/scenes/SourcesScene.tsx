@@ -7,7 +7,9 @@ import { KlaraAvatar } from "@/components/klara/klara-avatar";
 import { cn } from "@/lib/utils";
 import { EASE_OUT, u } from "../stage";
 import { PAPER_SHADOW } from "./CaseDocument";
-import { LightScene, PitchHeadline, useBeat, type SceneProps } from "./scene-parts";
+import { MeetingDetail } from "@/components/meetings/meeting-detail";
+import { PITCH_MEETING } from "../meeting-fixture";
+import { appScaleVars, LightScene, PitchHeadline, useBeat, type SceneProps } from "./scene-parts";
 
 const CARD = { top: 290, width: 500, height: 650, lefts: [160, 710, 1260] };
 
@@ -20,25 +22,13 @@ export function SourcesScene({ phase, step, revealMode }: SceneProps) {
       <PitchHeadline>Calls. Meetings. Emails. One reporting system.</PitchHeadline>
 
       <SourceCard index={0} show={beat >= 1} title="Meeting summaries" result="1 verbal client order detected → written confirmation drafted">
-        <MiniHeader icon={<CalendarDays aria-hidden />} title="Baubesprechung, 19.11." meta="Protokoll" />
-        <p className="text-xs text-zinc-500">3 Beschlüsse · 4 Aufgaben</p>
-        <ul className="flex flex-col divide-y divide-zinc-100 text-xs">
-          {[
-            ["Freigabe 2. OG melden", "Elektro (AG)", "22.11."],
-            ["Angebot Brandschutztüren", "Bauleitung", "25.11."],
-            ["Bautagesberichte KW 47", "Polier Ausbau", "21.11."],
-            ["Fotodoku Fassade", "Polier Rohbau", "24.11."],
-          ].map(([task, owner, due]) => (
-            <li key={task} className="grid grid-cols-[1fr_auto] gap-x-3 py-1.5">
-              <span className="text-zinc-900">{task}</span>
-              <span className="font-mono text-zinc-500">{due}</span>
-              <span className="col-span-2 text-zinc-500">{owner}</span>
-            </li>
-          ))}
-        </ul>
-        <p className="rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs leading-snug text-light-yellow-text">
-          Mündliche Anordnung Bauherr: zusätzliche Steckdosen Haus 2
-        </p>
+        <MiniHeader icon={<CalendarDays aria-hidden />} title={PITCH_MEETING.title} meta={PITCH_MEETING.ref} />
+        {/* The app's real meeting detail, cropped to summary / detected / changes. Inert: a click advances the pitch. */}
+        <div inert aria-hidden className="pointer-events-none relative min-h-0 flex-1 overflow-hidden mask-[linear-gradient(to_bottom,#000_82%,transparent)]">
+          <div className="[&_section]:rounded-md [&_section]:px-3 [&_section]:py-2 [&_h2]:mb-1 [&>div]:space-y-2.5 [&_li.rounded-lg]:py-1.5" style={appScaleVars(0.95)}>
+            <MeetingDetail m={PITCH_MEETING} sections={["summary", "detected", "changes"]} dense />
+          </div>
+        </div>
       </SourceCard>
 
       <SourceCard index={1} show={beat >= 2} title="Email parsing" result="Additional work detected → Mehrkostenanzeige drafted (before execution)">

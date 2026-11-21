@@ -23,7 +23,18 @@ const ALL: DetailSection[] = ["header", "summary", "decisions", "tasks", "detect
  * The finished meeting (status "ready"). Presentational: the app page and the
  * pitch card (cropped to summary / detected / changes) render the same thing.
  */
-export function MeetingDetail({ m, sections = ALL, actions }: { m: MeetingView; sections?: DetailSection[]; actions?: ReactNode }) {
+export function MeetingDetail({
+  m,
+  sections = ALL,
+  actions,
+  dense = false,
+}: {
+  m: MeetingView;
+  sections?: DetailSection[];
+  actions?: ReactNode;
+  /** One line per detected item (pitch preview); the full page shows text and evidence. */
+  dense?: boolean;
+}) {
   const show = (s: DetailSection) => sections.includes(s);
   const [openTranscript, setOpenTranscript] = useState(false);
   const [flash, setFlash] = useState<number | null>(null);
@@ -147,7 +158,7 @@ export function MeetingDetail({ m, sections = ALL, actions }: { m: MeetingView; 
           {detected.length ? (
             <ul className="space-y-2.5">
               {detected.map((i) => (
-                <DetectedRow key={i.id} item={i} link={caseLink(i.case_ref)} onJump={jump} />
+                <DetectedRow key={i.id} item={i} link={caseLink(i.case_ref)} onJump={jump} dense={dense} />
               ))}
             </ul>
           ) : (
@@ -249,7 +260,7 @@ function Evidence({ item, onJump }: { item: MeetingItem; onJump: (ts: number) =>
   );
 }
 
-function DetectedRow({ item, link, onJump }: { item: MeetingItem; link: ReactNode; onJump: (ts: number) => void }) {
+function DetectedRow({ item, link, onJump, dense }: { item: MeetingItem; link: ReactNode; onJump: (ts: number) => void; dense: boolean }) {
   const t = TEMPLATE_DE[item.kind as TemplateKind];
   const action =
     item.case_action === "existing"
@@ -270,8 +281,12 @@ function DetectedRow({ item, link, onJump }: { item: MeetingItem; link: ReactNod
         <span className="text-xs text-muted-foreground">{action}</span>
         <span className="ml-auto">{link}</span>
       </p>
-      <p className="mt-0.5 text-sm text-foreground">{item.text}</p>
-      <Evidence item={item} onJump={onJump} />
+      {dense ? null : (
+        <>
+          <p className="mt-0.5 text-sm text-foreground">{item.text}</p>
+          <Evidence item={item} onJump={onJump} />
+        </>
+      )}
     </li>
   );
 }

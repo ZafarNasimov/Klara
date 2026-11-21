@@ -49,6 +49,20 @@ Last update: 2026-11-21 (local session: unclear reports → one case each, trans
 - ✅ `/app/case/[id]` mobile case page with "Per Sprache korrigieren" (critique notes in `.impeccable/critique/`).
 - ✅ `/admin/case/[id]` office case page (`src/app/admin/case/[id]/case-detail.tsx`): header with status, deadline, **Validieren** (shows why it is blocked), **Zurück zur Ergänzung** dialog, **E-Mail vorbereiten** once validated (M4 composer still a shell); tabs Dokument (HTML letter preview from the same DocBody, version switch, SHA-256, PDF/Word download), Nachweise (transcript, weather), Verlauf, Hinweise; right rail with checks and facts. Critiqued (29/40) and the findings fixed.
 
+### Besprechungen / meeting notes (branch `meetings`, not merged)
+
+Record a meeting → transcript → summary → only the evidenced letters → visible changes. Admin tab "Besprechungen" (`/admin/meetings`, `/admin/meetings/[id]`). Code: `src/lib/meetings/*`, `src/components/meetings/*`, `src/app/api/meetings/**`.
+
+- **Storage:** the existing `meeting` table, no migration: `type`, `transcript` = `{segments: [{speaker, start_sec, text}]}`, `protocol` = header, items (the spec's `meeting_item`), changes, processing steps, mail draft. Audio chunks in `meetings/<id>/chunk-NNNNN` via `src/lib/files.ts` (Supabase Storage or `.data/files`).
+- **Flow:** "Meeting starten" (title "Baubesprechung KW n", type, team for internal meetings, participants from the project, required consent) → recording (MediaRecorder, 5 s chunks uploaded in order, timer, level, pause, "Meeting beenden"; fallbacks "Audio hochladen" ≤ 4 MB and "Beispielaufnahme verwenden", also while recording) → processing in `after()` (`maxDuration` 300) with the four steps → detail.
+- **Pipeline** (`pipeline.ts`): Whisper `verbose_json` segments + `gpt-4o-transcribe-diarize` speaker turns (by overlap, "Sprecher A/B") → one Claude tool call (`record_meeting`: ≤ 5 summary bullets, items with a verbatim quote, speaker labels → names only with evidence) → `verifyItems` drops every item whose quote is not in the transcript → `applyItems`. Without a key (`LLM_MODE=mock`) or if Claude fails: rule extractor + notice; the sample falls back to its stored result + notice.
+- **Templates** (`apply.ts`, same path as a call: `evaluateCase` → `createCase` → `generateDocument` → evidence kind `meeting` + event with `source: meeting:<ref>`): Anordnung → Bestätigung einer Anordnung; Mehrkosten → Ankündigung Mehrvergütung; Behinderung → updates the open Behinderungsanzeige of the same trade/area (`expected_duration`), else a draft; Mangel → `maengelanzeige`, Bedenken → `bedenken` (new meeting-only doc types, outside the call agent's list); Termin → moves the schedule item and its dependents (Werktage). Re-running never duplicates (same quote → "bereits vorhanden"). Trade from the sentence, else from the speaker's role.
+- **Detail:** header, Zusammenfassung, Entscheidungen, Aufgaben (was/wer/bis/Gewerk), Erkannt & erstellt (quote, speaker, timestamp → transcript, case link), Nichts erkannt, Änderungen, Transkript, "Protokoll an Teilnehmer senden" (draft; sent only on confirm via `deliver()`).
+- **Board:** meeting events in "Letzte Ereignisse"; Gewerke show "Verzug +N Arbeitstage · area (Besprechung)".
+- **Seed:** MT-2026-0006 (NU coordination, 2 tasks) and MT-2026-0007 (the sample, stored result) as history: no case, no date changed (notice says so); links resolve only when a case with that reference AND the expected doc type exists. New meetings continue at MT-2026-0008.
+- **Pitch** Scene 4 "Meeting summaries" renders the real `MeetingDetail` (dense: summary, Erkannt & erstellt, Änderungen) from `src/components/pitch/meeting-fixture.ts` in the pitch's Riem names.
+- **Verified:** 162 tests (quote check, dates, rule extractor, pipeline on the memory store with the golden-path call: KL-2026-0042 updated not duplicated, schedule +N, no Mängel from "keine Mängel"; offline fallbacks; seed). In Chrome on the memory store with live Claude/OpenAI: start → 32 s recording (fake mic, German speech) → end → processing 8–20 s → detail, speakers named; "Beispielaufnahme verwenden" via the UI (8 s); board shows the delay. No console errors.
+
 ### Pitch `/pitch` (branch `pitchflow`)
 
 Full-screen pitch deck for the 3-minute presentation. Code in `src/components/pitch/**`, route `src/app/pitch/page.tsx`, assets in `public/pitch/**`.
@@ -210,6 +224,7 @@ Status (2026-11-20, checked from a separate session): all 18 tables exist and th
 
 ## Known issues and open decisions
 
+- Meetings: `maxDuration = 300` on `/api/meetings/[id]/end` and `/sample`; check the Vercel plan allows it before merging. Each processed recording costs two transcription calls (Whisper + diarize) and one Claude call. Uploads go in 5 s chunks (Vercel body limit); "Audio hochladen" takes ≤ 4 MB. Speakers are only named with evidence; otherwise "Sprecher A/B".
 - Keys were checked on 2026-11-20 from a separate cloud session (Supabase with 2 teams, Anthropic, OpenAI). The live voice path works over HTTP; after the 2026-11-21 latency work a voice turn takes 2.6–4.3 s on the server locally (see "Call latency work"). The browser call screen has not run with real keys yet. Newer models reject forced `tool_choice`; `src/lib/agent/llm.ts` falls back to auto + instruction.
 - Hands-free was verified only with a simulated mic (Playwright `--use-file-for-fake-audio-capture` with synthetic speech) and a stubbed `/api/voice`.
 - Open-Meteo's free tier rate-limits shared cloud IPs ("Daily API request limit exceeded"); then no weather is attached.
