@@ -386,6 +386,10 @@ export type CaseDetail = {
   validation_blocker: string | null;
   /** Fields the office can ask the Polier about, missing ones first. */
   askable_fields: { key: string; label: string; missing: boolean }[];
+  /** The linked letters, oldest first (this case included). */
+  chain: { id: string; reference: string; doc_type: string }[];
+  /** Events of the whole chain, newest first ("Verlauf"). */
+  chain_events: AppEvent[];
   /** E-mails for this case's letter (draft or sent). */
   emails: EmailOut[];
   /** Replies matched to this case, newest first. */

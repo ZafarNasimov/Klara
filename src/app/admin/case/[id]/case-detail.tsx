@@ -234,7 +234,7 @@ export function CaseDetailView({ id }: { id: string }) {
           </TabsContent>
 
           <TabsContent value="verlauf" className="pt-5">
-            <Timeline events={data.events} />
+            <Timeline events={data.chain_events} chain={data.chain} current={c.id} />
           </TabsContent>
 
           <TabsContent value="hinweise" className="pt-5">
@@ -778,26 +778,64 @@ function Weather({ e }: { e: Evidence }) {
 
 // ── Verlauf ───────────────────────────────────────────────────────────
 
-function Timeline({ events }: { events: CaseDetail["events"] }) {
-  const shown = events.filter((e) => eventTitle(e)).sort((a, b) => b.created_at.localeCompare(a.created_at));
+/** The history of the whole chain of letters, newest first; entries of linked letters name their letter. */
+function Timeline({ events, chain, current }: { events: CaseDetail["events"]; chain: CaseDetail["chain"]; current: string }) {
+  const shown = events.filter((e) => eventTitle(e));
   if (!shown.length) return <Empty title="Noch kein Verlauf">Ereignisse zu diesem Vorgang erscheinen hier.</Empty>;
+  const linked = chain.length > 1;
+  const caseOf = (id: string | null) => chain.find((x) => x.id === id) ?? null;
   return (
-    <ol className="max-w-[760px] divide-y divide-border rounded-xl border border-border bg-background">
-      {shown.map((e) => (
-        <li key={e.id} className="grid grid-cols-[148px_minmax(0,1fr)] gap-4 px-4 py-3 text-sm">
-          <time dateTime={e.created_at} className="font-mono text-xs leading-5 text-muted-foreground">
-            {fmtDateTime(e.created_at)}
-          </time>
-          <div className="min-w-0">
-            <p className="text-foreground">
-              {eventTitle(e)}
-              {typeof e.payload.by === "string" && e.payload.by ? <span className="text-muted-foreground">, {e.payload.by}</span> : null}
-            </p>
-            {eventDetail(e) ? <p className="text-muted-foreground">{eventDetail(e)}</p> : null}
-          </div>
-        </li>
-      ))}
-    </ol>
+    <div className="max-w-[760px]">
+      {linked ? (
+        <p className="mb-3 text-sm text-muted-foreground">
+          Verlauf aller verknüpften Schreiben:{" "}
+          {chain.map((x, i) => (
+            <span key={x.id}>
+              {i ? " → " : null}
+              {x.id === current ? (
+                <span aria-current="page" className="text-foreground">
+                  <span className="font-mono">{x.reference}</span> {docTitle(x.doc_type)}
+                </span>
+              ) : (
+                <Link
+                  href={`/admin/case/${x.id}`}
+                  className="text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span className="font-mono">{x.reference}</span> {docTitle(x.doc_type)}
+                </Link>
+              )}
+            </span>
+          ))}
+        </p>
+      ) : null}
+      <ol className="divide-y divide-border rounded-xl border border-border bg-background">
+        {shown.map((e) => {
+          const other = linked && e.case_id !== current ? caseOf(e.case_id) : null;
+          return (
+            <li key={e.id} className="grid grid-cols-[148px_minmax(0,1fr)] gap-4 px-4 py-3 text-sm">
+              <time dateTime={e.created_at} className="font-mono text-xs leading-5 text-muted-foreground">
+                {fmtDateTime(e.created_at)}
+              </time>
+              <div className="min-w-0">
+                <p className="text-foreground">
+                  {eventTitle(e)}
+                  {typeof e.payload.by === "string" && e.payload.by ? <span className="text-muted-foreground">, {e.payload.by}</span> : null}
+                </p>
+                {eventDetail(e) ? <p className="text-muted-foreground">{eventDetail(e)}</p> : null}
+                {other ? (
+                  <Link
+                    href={`/admin/case/${other.id}`}
+                    className="mt-0.5 inline-block text-xs text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <span className="font-mono">{other.reference}</span> {docTitle(other.doc_type)}
+                  </Link>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 

@@ -160,7 +160,8 @@ export async function receiveReply(p: InboundPayload, at: Date): Promise<Inbound
       at,
     ),
   ]);
-  // Events last (each one makes the office screen refetch), +1 ms each to keep their order.
+  // Events last (each one makes the office screen refetch), +1 ms each to keep their order;
+  // after the follow-up's own events (see draftRebuttal) when there is one.
   const events: Parameters<typeof addEvent>[0][] = [
     {
       project_id: c.project_id,
@@ -195,7 +196,7 @@ export async function receiveReply(p: InboundPayload, at: Date): Promise<Inbound
       ? [{ project_id: c.project_id, case_id: c.id, kind: "case_closed", payload: { reference: c.reference, summary_de: `${kindDe}: ${classification.summary_de}` } }]
       : []),
   ];
-  for (const [i, e] of events.entries()) await addEvent(e, new Date(at.getTime() + i));
+  for (const [i, e] of events.entries()) await addEvent(e, new Date(at.getTime() + (i && followup ? i + 2 : i)));
   return { email, case: await requireCase(c.id), classification, followup, duplicate: false };
 }
 
@@ -243,7 +244,8 @@ async function draftRebuttal(orig: Case, email: EmailIn, quote: string, ctx: Pro
     },
     at,
   );
-  await generateDocument(created.id, at, { ctx });
+  // In the chain's history: reply (at) → case (+1 ms) → document (+2 ms) → proposal on the original (+3 ms).
+  await generateDocument(created.id, new Date(at.getTime() + 2), { ctx });
   await addEvent(
     { project_id: created.project_id, case_id: created.id, kind: "case_created", payload: { reference: created.reference, doc_type: created.doc_type } },
     new Date(at.getTime() + 1),

@@ -3,6 +3,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { runTurn } from "@/lib/agent/turn";
 import { validateCase } from "@/lib/cases/actions";
+import { caseDetail } from "@/lib/cases/detail";
 import { store } from "@/lib/db";
 import { createConversation, listCases, listDocumentVersions, listEvents, listEvidence } from "@/lib/db/repo";
 import { buildSeed, IDS } from "@/lib/db/seed";
@@ -181,6 +182,20 @@ describe("scenario 7: rejection → Stellungnahme (SPEC §6.4, §10)", () => {
 });
 
 describe("inbound webhook route", () => {
+  it("shows the whole chain in the history of both letters", async () => {
+    const c = await sentHindrance();
+    const f = (await simulateReply(null, tick())).followup!;
+    for (const id of [c.id, f.id]) {
+      const d = await caseDetail(id);
+      expect(d.chain.map((x) => x.reference)).toEqual(["KL-2026-0042", "KL-2026-0043"]);
+      const kinds = d.chain_events.map((e) => `${e.case_id === c.id ? "orig" : "followup"}:${e.kind}`);
+      expect(kinds).toEqual(expect.arrayContaining(["orig:email_sent", "orig:reply_received", "followup:case_created"]));
+      // Newest first, in the order things happened.
+      expect(d.chain_events.map((e) => e.created_at)).toEqual([...d.chain_events.map((e) => e.created_at)].sort().reverse());
+      expect(kinds.slice(0, 4)).toEqual(["orig:followup_proposed", "followup:document_generated", "followup:case_created", "orig:reply_received"]);
+    }
+  });
+
   it("refuses a wrong token with 403 and accepts Postmark JSON with the right one", async () => {
     const { POST } = await import("@/app/api/email/inbound/route");
     process.env.POSTMARK_INBOUND_TOKEN = "s3cret";

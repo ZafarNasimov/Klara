@@ -140,6 +140,28 @@ export function createCase(input: NewCase, at: Date): Promise<Case> {
   return result;
 }
 
+/**
+ * A case and its linked letters (SPEC §1 "timeline shows full chain"): up to
+ * the first case, then everything that follows from it (e.g. Behinderungsanzeige
+ * → Stellungnahme zur Zurückweisung), oldest first.
+ */
+export async function caseChain(c: Case): Promise<Case[]> {
+  let first = c;
+  for (let i = 0; i < 4 && first.parent_case_id; i++) {
+    const p = await getCase(first.parent_case_id);
+    if (!p) break;
+    first = p;
+  }
+  const out = [first];
+  let frontier = [first];
+  for (let depth = 0; depth < 4 && frontier.length; depth++) {
+    const next = (await Promise.all(frontier.map((f) => store().list("case", { where: { parent_case_id: f.id } })))).flat();
+    out.push(...next);
+    frontier = next;
+  }
+  return out.sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
 export async function updateCase(id: string, patch: Partial<Case>, at: Date = new Date()): Promise<Case> {
   return store().update("case", id, { ...patch, updated_at: at.toISOString() });
 }
