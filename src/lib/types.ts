@@ -356,8 +356,8 @@ export type MailDraftView = {
   needs_validation: boolean;
   /** Why validating and sending in one step is not possible (missing facts, red checks …). */
   validation_blocker: string | null;
-  /** postmark = real e-mail; simulated = no mail server configured, nothing leaves the app. */
-  delivery: "postmark" | "simulated";
+  /** smtp = a real mailbox (replies read over IMAP); postmark = real e-mail via Postmark; simulated = nothing leaves the app. */
+  delivery: "smtp" | "postmark" | "simulated";
   from: string | null;
 };
 

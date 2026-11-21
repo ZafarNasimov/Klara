@@ -1,39 +1,16 @@
-// Postmark over fetch (SPEC D4): outbound e-mail with the letter attached.
-// Without POSTMARK_SERVER_TOKEN nothing leaves the app: "send" is simulated
-// with a local message id, and the UI says so.
+// Postmark over fetch (SPEC D4): one of the ways Klara sends e-mail (see delivery.ts).
 import "server-only";
 import { HttpError } from "@/lib/api";
-import { uid } from "@/lib/db/repo";
+import type { OutgoingMail, SentMail } from "./delivery";
 
-export type Delivery = "postmark" | "simulated";
+export const postmarkToken = () => process.env.POSTMARK_SERVER_TOKEN?.trim() || null;
+export const postmarkFrom = () => process.env.POSTMARK_FROM?.trim() || null;
 
-export function mailDelivery(): Delivery {
-  return process.env.POSTMARK_SERVER_TOKEN?.trim() ? "postmark" : "simulated";
-}
-
-/** Sender shown in the composer; Postmark needs a confirmed sender signature for it. */
-export function mailFrom(): string | null {
-  return process.env.POSTMARK_FROM?.trim() || null;
-}
-
-export type OutgoingMail = {
-  to: string[];
-  cc: string[];
-  subject: string;
-  text: string;
-  attachments: { name: string; content: Buffer; contentType: string }[];
-  /** Klara metadata (case reference); Postmark returns it in webhooks. */
-  metadata?: Record<string, string>;
-};
-
-export type SentMail = { messageId: string; submittedAt: string; delivery: Delivery };
-
-/** Send one e-mail. Throws an HttpError with a German message when Postmark refuses it. */
-export async function deliver(mail: OutgoingMail, at: Date): Promise<SentMail> {
-  const token = process.env.POSTMARK_SERVER_TOKEN?.trim();
-  if (!token) return { messageId: `sim-${uid()}`, submittedAt: at.toISOString(), delivery: "simulated" };
-
-  const from = mailFrom();
+/** Send one e-mail through Postmark. Throws an HttpError with a German message when Postmark refuses it. */
+export async function sendPostmark(mail: OutgoingMail, at: Date): Promise<SentMail> {
+  const token = postmarkToken();
+  const from = postmarkFrom();
+  if (!token) throw new HttpError("Postmark ist nicht eingerichtet (POSTMARK_SERVER_TOKEN fehlt).", 503);
   if (!from) throw new HttpError("E-Mail-Versand ist nicht vollständig eingerichtet (POSTMARK_FROM fehlt).", 503);
   const replyTo = process.env.POSTMARK_REPLY_TO?.trim();
   const res = await fetch("https://api.postmarkapp.com/email", {

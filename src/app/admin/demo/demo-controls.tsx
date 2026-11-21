@@ -8,7 +8,7 @@ import { fmtDateTime } from "@/lib/labels";
 import { postJson, useApi } from "@/lib/use-api";
 import type { VadSettings } from "@/lib/voice/types";
 
-type ProjectResponse = ProjectContext & { now: string; llm_mode: "live" | "mock"; backend: "memory" | "supabase"; mail: "postmark" | "simulated" };
+type ProjectResponse = ProjectContext & { now: string; llm_mode: "live" | "mock"; backend: "memory" | "supabase"; mail: "smtp" | "postmark" | "simulated" };
 
 export function DemoControls() {
   const { data, reload } = useApi<ProjectResponse>("/api/project");
@@ -81,7 +81,9 @@ export function DemoControls() {
             <dt className="text-muted-foreground">Sprachmodell</dt>
             <dd className="text-foreground">{data.llm_mode === "live" ? "Claude (live)" : "Testmodus ohne KI-Modell"}</dd>
             <dt className="text-muted-foreground">E-Mail-Versand</dt>
-            <dd className="text-foreground">{data.mail === "postmark" ? "Postmark (echte E-Mails)" : "Testversand ohne E-Mail-Server"}</dd>
+            <dd className="text-foreground">
+              {data.mail === "smtp" ? "E-Mail-Postfach (echte E-Mails, Antworten per IMAP)" : data.mail === "postmark" ? "Postmark (echte E-Mails)" : "Testversand ohne E-Mail-Server"}
+            </dd>
           </dl>
         </section>
       ) : null}

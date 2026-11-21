@@ -17,7 +17,7 @@ import { validateCase, validationBlocker } from "@/lib/cases/actions";
 import type { ProjectContext } from "@/lib/db/repo";
 import { emailsOf, mailRecipients, mailSubject, suggestBody } from "./compose";
 import { fieldBlocker, type Addressee } from "./fields";
-import { deliver, mailDelivery, mailFrom } from "./postmark";
+import { deliver, mailDelivery, mailFrom } from "./delivery";
 
 const SENT_STATUSES = new Set(["versendet", "beantwortet", "abgeschlossen"]);
 

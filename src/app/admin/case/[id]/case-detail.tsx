@@ -27,7 +27,8 @@ import type { CaseDetail, CaseStatus, CaseView, DocumentVersion, EmailIn, EmailO
 import { ApiError, postJson, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 
-type ProjectResponse = ProjectContext & { now: string };
+type ProjectResponse = ProjectContext & { now: string; mail?: MailMode };
+type MailMode = "smtp" | "postmark" | "simulated";
 
 const SENT = new Set<CaseStatus>(["versendet", "beantwortet", "abgeschlossen"]);
 
@@ -194,7 +195,7 @@ export function CaseDetailView({ id }: { id: string }) {
 
         {sentMail ? (
           <div className="px-8 pt-5">
-            <MailStatus mail={sentMail} data={data} contacts={ctx?.contacts ?? []} now={ctx?.now ?? null} onChange={reload} />
+            <MailStatus mail={sentMail} data={data} contacts={ctx?.contacts ?? []} now={ctx?.now ?? null} mode={ctx?.mail ?? null} onChange={reload} />
           </div>
         ) : null}
 
@@ -287,12 +288,14 @@ function MailStatus({
   data,
   contacts,
   now,
+  mode,
   onChange,
 }: {
   mail: EmailOut;
   data: CaseDetail;
   contacts: Contacts;
   now: string | null;
+  mode: MailMode | null;
   onChange: () => void;
 }) {
   const reduce = useReducedMotion();
@@ -324,7 +327,7 @@ function MailStatus({
             <ReplyCard reply={reply} data={data} contacts={contacts} />
           </motion.div>
         ) : (
-          <Waiting key="waiting" mail={mail} caseId={data.case.id} contacts={contacts} now={now} onChange={onChange} />
+          <Waiting key="waiting" mail={mail} caseId={data.case.id} contacts={contacts} now={now} mode={mode} onChange={onChange} />
         )}
       </AnimatePresence>
     </div>
@@ -336,31 +339,64 @@ const contactName = (email: string, contacts: Contacts) => {
   return k ? `${k.name} (${k.organisation})` : email;
 };
 
-/** SPEC §1 fallback: if the client's e-mail has not arrived after 15 s, the demo can play it in. */
-const SIMULATE_AFTER_MS = 15_000;
+/**
+ * SPEC §1 fallback: if the client's answer has not arrived, the demo can play it in.
+ * 15 s for a test send; with a real mailbox a person has to write the answer, so 60 s.
+ */
+const SIMULATE_AFTER_MS = { real: 60_000, test: 15_000 };
+/** How often the page asks the server to read the mailbox (SMTP/IMAP mode). */
+const INBOX_POLL_MS = 10_000;
 
 function Waiting({
   mail,
   caseId,
   contacts,
   now,
+  mode,
   onChange,
 }: {
   mail: EmailOut;
   caseId: string;
   contacts: Contacts;
   now: string | null;
+  mode: MailMode | null;
   onChange: () => void;
 }) {
+  const simulated = mail.message_id?.startsWith("sim-") ?? false;
+  const polling = mode === "smtp" && !simulated;
+  const simulateAfter = polling ? SIMULATE_AFTER_MS.real : SIMULATE_AFTER_MS.test;
   const sentAgo = now && mail.sent_at ? Date.parse(now) - Date.parse(mail.sent_at) : 0;
-  const [late, setLate] = useState(sentAgo >= SIMULATE_AFTER_MS);
+  const [late, setLate] = useState(sentAgo >= simulateAfter);
   const [busy, setBusy] = useState(false);
+  const [lastCheck, setLastCheck] = useState<{ at: Date; error: string | null } | null>(null);
   useEffect(() => {
     if (late) return;
-    const t = setTimeout(() => setLate(true), Math.max(0, SIMULATE_AFTER_MS - sentAgo));
+    const t = setTimeout(() => setLate(true), Math.max(0, simulateAfter - sentAgo));
     return () => clearTimeout(t);
-  }, [late, sentAgo]);
-  const simulated = mail.message_id?.startsWith("sim-") ?? false;
+  }, [late, sentAgo, simulateAfter]);
+
+  // Real mailbox: read it every 10 s while this panel is open; a matched answer reloads the case.
+  const [checkNonce, setCheckNonce] = useState(0);
+  useEffect(() => {
+    if (!polling) return;
+    let stopped = false;
+    const check = async () => {
+      try {
+        const r = await postJson<{ received: { case_id: string | null }[] }>("/api/email/poll", {});
+        if (stopped) return;
+        setLastCheck({ at: new Date(), error: null });
+        if (r.received.some((x) => x.case_id === caseId)) onChange();
+      } catch (e) {
+        if (!stopped) setLastCheck({ at: new Date(), error: e instanceof ApiError && e.status < 500 ? e.message : e instanceof Error ? e.message : "Postfach nicht erreichbar" });
+      }
+    };
+    void check();
+    const t = setInterval(() => void check(), INBOX_POLL_MS);
+    return () => {
+      stopped = true;
+      clearInterval(t);
+    };
+  }, [polling, caseId, onChange, checkNonce]);
 
   const simulate = async () => {
     setBusy(true);
@@ -392,6 +428,30 @@ function Waiting({
             an {mail.to.map((a) => contactName(a, contacts)).join(", ")}
             {simulated ? " als Testversand, nicht zugestellt" : null}. Antworten auf diese E-Mail ordnet Klara diesem Vorgang zu.
           </p>
+          {polling ? (
+            <p className="mt-1 text-sm text-muted-foreground" aria-live="polite">
+              {lastCheck?.error ? (
+                <span className="text-light-red-text">{lastCheck.error}</span>
+              ) : (
+                <>
+                  Klara prüft das Postfach alle 10 Sekunden
+                  {lastCheck ? (
+                    <>
+                      , zuletzt um <span className="font-mono">{fmtTime(lastCheck.at)}</span>
+                    </>
+                  ) : null}
+                  .
+                </>
+              )}{" "}
+              <button
+                type="button"
+                onClick={() => setCheckNonce((n) => n + 1)}
+                className="rounded-sm text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Jetzt prüfen
+              </button>
+            </p>
+          ) : null}
         </div>
       </div>
       {late ? (

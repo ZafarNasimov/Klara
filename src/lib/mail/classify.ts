@@ -9,10 +9,26 @@ import type { ReplyClassification, ReplyKind } from "@/lib/types";
 
 export const REPLY_KINDS: ReplyKind[] = ["acceptance", "rejection", "request_info", "counter_instruction", "change_request", "other"];
 
+/**
+ * The new part of a reply: everything before the quoted original (Gmail
+ * "Am … schrieb …", Outlook "Von:" / "-----Ursprüngliche Nachricht-----",
+ * English "On … wrote:") and without "> " lines.
+ */
+export function stripQuoted(text: string): string {
+  const t = text.replace(/\r\n/g, "\n");
+  const cut = t.search(
+    /^\s*(?:Am [^\n]{5,200} schrieb|On [^\n]{5,200}(?:\n[^\n]{0,120})?wrote:|-{2,}\s*(?:Original|Ursprüngliche)|_{5,}|Von:\s|From:\s)/m,
+  );
+  return (cut >= 0 ? t.slice(0, cut) : t)
+    .split("\n")
+    .filter((l) => !/^\s*>/.test(l))
+    .join("\n")
+    .trim();
+}
+
 /** Sentences of a plain-text mail, without greeting, closing, signature and quoted history. */
 export function replySentences(text: string): string[] {
-  const body = text
-    .split(/\n(?:-{2,}|_{2,}|Am .{5,120} schrieb|On .{5,120} wrote|Von: |From: |-----Original)/)[0]
+  const body = stripQuoted(text)
     .split(/\n\s*(?:Mit freundlichen Grüßen|Freundliche Grüße|Viele Grüße|Beste Grüße|MfG)\b/i)[0]
     .split("\n")
     .filter((l) => !/^\s*>/.test(l) && !/^\s*(Sehr geehrte|Hallo|Guten Tag)\b/i.test(l))

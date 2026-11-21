@@ -144,7 +144,7 @@ function DraftForm({ view, onStale }: { view: MailDraftView; onStale: () => void
     try {
       await sendJson("PATCH", url, outgoing);
       await postJson(`${url}/send`, { user_id: user.userId, attach_docx: docx, validate: validateAndSend });
-      if (view.delivery === "postmark") toast.success(`${docTitle(c.doc_type)} an ${outgoing.to.join(", ")} versendet`);
+      if (view.delivery !== "simulated") toast.success(`${docTitle(c.doc_type)} an ${outgoing.to.join(", ")} versendet`);
       else toast("Testversand im Verlauf festgehalten, nicht zugestellt");
       router.push(`/admin/case/${c.id}`);
     } catch (e) {

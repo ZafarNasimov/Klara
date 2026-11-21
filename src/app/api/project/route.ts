@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { handle } from "@/lib/api";
 import { DEFAULT_PROJECT_ID, getProjectContext, projectNow } from "@/lib/db/repo";
-import { mailDelivery } from "@/lib/mail/postmark";
+import { mailDelivery } from "@/lib/mail/delivery";
 import { dataBackend, llmMode } from "@/lib/runtime";
 
 /** Project master data + demo clock + which backends are live. */

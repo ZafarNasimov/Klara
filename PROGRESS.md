@@ -95,6 +95,14 @@ Earlier cloud test (2026-11-20, 23:20 UTC, HTTP only): STT exact and 1.15 s, TTS
 
 Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-0039..0041 so the board is not empty before the demo case.
 
+## Real e-mail through a mailbox (decided by Zafar, 2026-11-21)
+
+Instead of Postmark, Klara can use a normal mailbox: `src/lib/mail/mailbox.ts` sends over SMTP (nodemailer, Klara sets the Message-ID, letter PDF attached) and reads answers over IMAP (imapflow + mailparser): unread mails of the last 7 days that reply to a Klara e-mail or carry "KL-…" in the subject go through `receiveReply` and are marked read. The case page calls `POST /api/email/poll` every 10 s while it shows "Wartet auf Antwort" ("Jetzt prüfen" link; "Antwort simulieren" after 60 s instead of 15 s). `delivery.ts` picks the mailbox first, then Postmark, else the test send. SPEC §13 lists Gmail/Outlook (OAuth) as out of scope; this uses an app password, and Zafar chose it.
+
+- Mailbox: musterbau.bauleitung@gmail.com (Gmail app password in `MAIL_PASSWORD`, needs 2-Step Verification). The Bauherr contact gets `DEMO_CLIENT_MAILBOX` on "Demo zurücksetzen".
+- Site password: `SITE_PASSWORD` → `src/proxy.ts` sends visitors without the cookie to `/login` (API: 401); `/api/email/inbound` stays open (own token).
+- Not live-tested yet (waiting for the app password): sending through Gmail, reading the reply, Gmail keeping our Message-ID.
+
 ## Deployment (Vercel)
 
 - Live: **https://klara-liard.vercel.app** (also klara-zafars-projects-3fafacbe.vercel.app), project `klara` in team "Zafar's projects", functions in `fra1` (`vercel.json`, next to Supabase). Deployed 2026-11-21 with `vercel deploy --prod`; `.vercelignore` keeps `.env*` and local data out of the upload.
