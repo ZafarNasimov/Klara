@@ -9,7 +9,8 @@ let client: SupabaseClient | null = null;
 /** The project URL, also when the REST endpoint was pasted ("https://x.supabase.co/rest/v1/"). */
 export const projectUrl = (url: string) => url.trim().replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
 
-function db(): SupabaseClient {
+/** The server-side Supabase client (service role). Also used for Storage (src/lib/files.ts). */
+export function db(): SupabaseClient {
   if (!client) {
     const url = process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;

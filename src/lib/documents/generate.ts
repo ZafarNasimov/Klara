@@ -7,6 +7,7 @@ import { BadRequestError } from "@/lib/api";
 import { store } from "@/lib/db";
 import { addEvent, getCase, getProjectContext, listDocumentVersions, listEvidence, requireCase, uid, type ProjectContext } from "@/lib/db/repo";
 import { NotFoundError } from "@/lib/db/store";
+import { readFile } from "@/lib/files";
 import { berlinDay } from "@/lib/deadlines";
 import { requireDocType } from "@/lib/doctypes";
 import { resolveRecipient } from "@/lib/rules";
@@ -94,6 +95,18 @@ export async function auditInfo(v: DocumentVersion): Promise<{ body: DocBody; au
   const name = (id: string | null) => ctx.users.find((u) => u.id === id)?.name ?? id;
   const transcript = evidence.find((e) => e.kind === "transcript")?.data.turns;
   const weather = evidence.find((e) => e.kind === "weather")?.data.summary_de;
+  // react-pdf embeds JPEG and PNG only.
+  const shots = evidence.filter((e) => e.kind === "photo" && e.ref && /^image\/(jpeg|png)$/.test(String(e.data.content_type))).slice(0, 6);
+  const photos = (
+    await Promise.all(
+      shots.map(async (e) => {
+        const data = await readFile(e.ref!);
+        return data
+          ? { data, format: (e.data.content_type === "image/png" ? "png" : "jpg") as "jpg" | "png", at: e.created_at, by: typeof e.data.by === "string" ? e.data.by : "Polier" }
+          : null;
+      }),
+    )
+  ).filter((x) => !!x);
   return {
     c,
     body: v.body as DocBody,
@@ -109,6 +122,7 @@ export async function auditInfo(v: DocumentVersion): Promise<{ body: DocBody; au
       checks: c.checks,
       transcript: Array.isArray(transcript) ? (transcript as AuditInfo["transcript"]) : [],
       weather: typeof weather === "string" ? weather : null,
+      photos,
     },
   };
 }

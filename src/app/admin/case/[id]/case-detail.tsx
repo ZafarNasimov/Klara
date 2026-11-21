@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { toast } from "sonner";
-import { ChevronLeft, CloudSun, Download, ExternalLink, FileText, Mail, MessagesSquare, Send, Undo2 } from "lucide-react";
+import { Camera, ChevronLeft, CloudSun, Download, ExternalLink, FileText, Mail, MessagesSquare, Send, Undo2 } from "lucide-react";
 import { eventDetail, eventTitle } from "@/components/admin/event-text";
 import { formatFact } from "@/components/admin/format-fact";
 import { LetterPreview } from "@/components/documents/letter-preview";
@@ -652,12 +652,17 @@ function EvidenceList({ evidence, author }: { evidence: Evidence[]; author: stri
     );
   }
   const order = { transcript: 0, weather: 1, photo: 2, diary: 3, email: 4, meeting: 5 } as const;
+  const photos = evidence.filter((e) => e.kind === "photo").sort((a, b) => a.created_at.localeCompare(b.created_at));
   return (
     <div className="max-w-[760px] space-y-4">
       {[...evidence]
         .sort((a, b) => order[a.kind] - order[b.kind])
+        // All photos show as one grid, where the first one sorts.
+        .filter((e) => e.kind !== "photo" || e.id === photos[0]?.id)
         .map((e) =>
-          e.kind === "transcript" ? (
+          e.kind === "photo" ? (
+            <Photos key="photos" photos={photos} />
+          ) : e.kind === "transcript" ? (
             <Transcript key={e.id} e={e} author={author} />
           ) : e.kind === "weather" ? (
             <Weather key={e.id} e={e} />
@@ -724,6 +729,34 @@ function Transcript({ e, author }: { e: Evidence; author: string | null }) {
           </li>
         ))}
       </ol>
+    </Section>
+  );
+}
+
+function Photos({ photos }: { photos: Evidence[] }) {
+  return (
+    <Section title={`Fotos von der Baustelle (${photos.length})`} icon={<Camera className="size-4 text-muted-foreground" aria-hidden />}>
+      <ul className="grid grid-cols-3 gap-3">
+        {photos.map((p) => {
+          const by = typeof p.data.by === "string" ? p.data.by : "Polier";
+          return (
+            <li key={p.id}>
+              <a
+                href={`/api/photos/${p.id}`}
+                target="_blank"
+                rel="noreferrer"
+                className="block overflow-hidden rounded-lg border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- private API image */}
+                <img src={`/api/photos/${p.id}`} alt={`Foto von ${by}, ${fmtDateTime(p.created_at)}`} loading="lazy" className="aspect-[4/3] w-full object-cover" />
+              </a>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {by}, <time dateTime={p.created_at} className="font-mono">{fmtDateTime(p.created_at)}</time>
+              </p>
+            </li>
+          );
+        })}
+      </ul>
     </Section>
   );
 }

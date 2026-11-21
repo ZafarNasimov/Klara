@@ -11,7 +11,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ArrowUp, Keyboard, Mic, MicOff, Phone, PhoneOff } from "lucide-react";
+import { ArrowUp, Camera, Keyboard, Mic, MicOff, Phone, PhoneOff } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { KlaraAvatar, type KlaraMood } from "@/components/klara/klara-avatar";
 import { BTN_OUTLINE, BTN_PRIMARY } from "@/components/mobile/buttons";
@@ -21,6 +21,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cardLines } from "@/lib/agent/lines";
 import type { TurnResponse } from "@/lib/agent/types";
 import type { CaseView, Conversation, ConversationDetail, Turn } from "@/lib/types";
+import { uploadPhoto } from "@/lib/photo-client";
 import { ApiError, postJson } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { createAudioContext, createLevelMeter, createSpeaker, MIC_CONSTRAINTS, startRecording, type Speaker } from "@/lib/voice/client";
@@ -56,6 +57,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
   const [mode, setMode] = useState<Mode>("handsfree");
   const [vadState, setVadState] = useState<"off" | "loading" | "ready" | "failed">("off");
   const [muted, setMuted] = useState(false);
+  const [photoBusy, setPhotoBusy] = useState(false);
 
   const convRef = useRef<Conversation | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -74,6 +76,24 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
 
   const isNew = callId === "new";
   const team = detail?.team ?? null;
+
+  /** "Foto" during the call: goes to the case being talked about; Klara's confirmation shows in the transcript (not spoken). */
+  const sendPhoto = async (file: File) => {
+    const conv = convRef.current;
+    const teamOfCall = detail?.team?.id ?? teamId;
+    if (!conv || !teamOfCall) return;
+    setPhotoBusy(true);
+    try {
+      const r = await uploadPhoto({ file, teamId: teamOfCall, conversationId: conv.id });
+      const klara = r.klara_turn;
+      if (klara) setTurns((prev) => [...prev, klara]);
+      setNotice(null);
+    } catch (e) {
+      setNotice(e instanceof ApiError && e.status < 500 ? e.message : "Das Foto wurde nicht gesendet. Bitte erneut versuchen.");
+    } finally {
+      setPhotoBusy(false);
+    }
+  };
   const channelHref = team ? `/app/channel/${team.id}` : teamId ? `/app/channel/${teamId}` : "/app";
   const voice = cfg?.stt === "openai" && micReady;
   const handsFree = voice && mode === "handsfree";
@@ -690,21 +710,24 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
               </div>
             ) : null}
             <div className="grid grid-cols-[1fr_auto_1fr] items-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setTyping((v) => !v);
-                  if (!typing) requestAnimationFrame(() => inputRef.current?.focus());
-                }}
-                aria-pressed={typing}
-                aria-label="Tippen statt sprechen"
-                className={cn(
-                  "flex size-14 items-center justify-center justify-self-start rounded-full border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                  typing ? "bg-muted text-foreground" : "bg-background text-foreground hover:bg-muted",
-                )}
-              >
-                <Keyboard className="size-6" aria-hidden />
-              </button>
+              <div className="flex items-center gap-3 justify-self-start">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTyping((v) => !v);
+                    if (!typing) requestAnimationFrame(() => inputRef.current?.focus());
+                  }}
+                  aria-pressed={typing}
+                  aria-label="Tippen statt sprechen"
+                  className={cn(
+                    "flex size-14 items-center justify-center rounded-full border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    typing ? "bg-muted text-foreground" : "bg-background text-foreground hover:bg-muted",
+                  )}
+                >
+                  <Keyboard className="size-6" aria-hidden />
+                </button>
+                <CameraButton busy={photoBusy} onPhoto={(f) => void sendPhoto(f)} />
+              </div>
               {handsFree ? (
                 <button
                   type="button"
@@ -757,7 +780,8 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
             </div>
           </>
         ) : (
-          <div className="flex justify-center">
+          <div className="flex items-center justify-center gap-6">
+            <CameraButton busy={photoBusy} onPhoto={(f) => void sendPhoto(f)} />
             <button
               type="button"
               onClick={hangUp}
@@ -883,5 +907,38 @@ function Ended({
         </Link>
       </div>
     </div>
+  );
+}
+
+/** "Foto" on the call screen: opens the phone's camera; the picture goes to the case being talked about. */
+function CameraButton({ busy, onPhoto }: { busy: boolean; onPhoto: (file: File) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) onPhoto(file);
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => ref.current?.click()}
+        disabled={busy}
+        aria-label={busy ? "Foto wird gesendet" : "Foto aufnehmen"}
+        aria-busy={busy}
+        className="flex size-14 items-center justify-center rounded-full border border-border bg-background text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
+      >
+        <Camera className="size-6" aria-hidden />
+      </button>
+    </>
   );
 }

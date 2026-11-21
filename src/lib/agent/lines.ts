@@ -21,6 +21,7 @@ export type LineKey =
   | "progressNoted"
   | "deviationNote"
   | "unconfirmedSaved"
+  | "photoSaved"
   | "returnedFor"
   | "correctAsk"
   | "callGreeting";
@@ -49,6 +50,7 @@ export const LINES: Record<string, Table> = {
     progressNoted: "Noted: {item}, {qty} today, that is {pct}\u00a0% of the plan.",
     deviationNote: "At this rate we'll be about {days} working days late. I'm preparing a notice for {successor}.",
     unconfirmedSaved: "Okay. I've saved what we have; the site manager will follow up.",
+    photoSaved: "Photo saved with {ref}.",
     returnedFor: "The site manager needs more information for {doc} {ref}.",
     correctAsk: "{doc} {ref}: what should I correct?",
     callGreeting: "Hello {name}, this is Klara. What has happened on site?",
@@ -74,6 +76,7 @@ export const LINES: Record<string, Table> = {
     progressNoted: "Notiert: {item}, heute {qty}, das sind {pct}\u00a0% vom Plan.",
     deviationNote: "Bei diesem Tempo rechnen wir mit etwa {days} Arbeitstagen Verzug. Ich bereite eine Information an {successor} vor.",
     unconfirmedSaved: "In Ordnung. Ich habe das Bisherige gespeichert, die Bauleitung meldet sich.",
+    photoSaved: "Foto abgelegt bei {ref}.",
     returnedFor: "Die Bauleitung braucht noch eine Angabe zu {doc} {ref}.",
     correctAsk: "{doc} {ref}: Was soll ich korrigieren?",
     callGreeting: "Hallo {name}, hier ist Klara. Was gibt es auf der Baustelle?",
@@ -99,6 +102,7 @@ export const LINES: Record<string, Table> = {
     progressNoted: "Записала: {item}, сегодня {qty}, это {pct}\u00a0% от плана.",
     deviationNote: "При таком темпе отставание около {days} рабочих дней. Готовлю уведомление для {successor}.",
     unconfirmedSaved: "Хорошо. Я сохранила то, что есть, руководитель свяжется с вами.",
+    photoSaved: "Фото сохранено в {ref}.",
     returnedFor: "Руководителю нужно уточнение по документу «{doc}» {ref}.",
     correctAsk: "{doc} {ref}: что мне исправить?",
     callGreeting: "Здравствуйте, {name}, это Клара. Что случилось на стройке?",
@@ -124,6 +128,7 @@ export const LINES: Record<string, Table> = {
     progressNoted: "Zanotowane: {item}, dziś {qty}, to {pct}\u00a0% planu.",
     deviationNote: "W tym tempie opóźnienie wyniesie około {days} dni roboczych. Przygotowuję informację dla {successor}.",
     unconfirmedSaved: "Dobrze. Zapisałam to, co mamy, kierownik się odezwie.",
+    photoSaved: "Zdjęcie zapisane w {ref}.",
     returnedFor: "Kierownik budowy potrzebuje jeszcze informacji do dokumentu „{doc}” {ref}.",
     correctAsk: "{doc} {ref}: co mam poprawić?",
     callGreeting: "Dzień dobry, {name}, tu Klara. Co się dzieje na budowie?",
@@ -149,6 +154,7 @@ export const LINES: Record<string, Table> = {
     progressNoted: "Not edildi: {item}, bugün {qty}, planın %{pct}'i.",
     deviationNote: "Bu hızla yaklaşık {days} iş günü gecikme olacak. {successor} için bir bilgilendirme hazırlıyorum.",
     unconfirmedSaved: "Tamam. Elimizdekini kaydettim, şantiye şefi sizinle iletişime geçecek.",
+    photoSaved: "Fotoğraf {ref} kaydına eklendi.",
     returnedFor: "Şantiye şefinin {doc} {ref} için bir bilgiye daha ihtiyacı var.",
     correctAsk: "{doc} {ref}: neyi düzelteyim?",
     callGreeting: "Merhaba {name}, ben Klara. Şantiyede ne oldu?",
@@ -174,6 +180,7 @@ export const LINES: Record<string, Table> = {
     progressNoted: "Notat: {item}, azi {qty}, adică {pct}\u00a0% din plan.",
     deviationNote: "În acest ritm vom avea o întârziere de circa {days} zile lucrătoare. Pregătesc o informare pentru {successor}.",
     unconfirmedSaved: "Bine. Am salvat ce avem, șeful de șantier revine.",
+    photoSaved: "Fotografia a fost salvată la {ref}.",
     returnedFor: "Șeful de șantier mai are nevoie de o informație pentru {doc} {ref}.",
     correctAsk: "{doc} {ref}: ce să corectez?",
     callGreeting: "Bună ziua, {name}, sunt Klara. Ce s-a întâmplat pe șantier?",

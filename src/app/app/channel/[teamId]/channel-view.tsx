@@ -5,7 +5,7 @@
 // the user's language; what the user taps is sent as their own words.
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ArrowUp, Mic, Phone } from "lucide-react";
+import { ArrowUp, Camera, Mic, Phone } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { KlaraAvatar } from "@/components/klara/klara-avatar";
 import { BTN_OUTLINE, BTN_PRIMARY } from "@/components/mobile/buttons";
@@ -17,14 +17,18 @@ import type { TurnResponse } from "@/lib/agent/types";
 import { berlinDayOf, fmtDate, fmtNumber, fmtTime } from "@/lib/labels";
 import type { CaseView, ChannelFeed, ConfirmView, Conversation, Turn } from "@/lib/types";
 import { ApiError, postJson, useApi } from "@/lib/use-api";
+import { uploadPhoto } from "@/lib/photo-client";
 import { cn } from "@/lib/utils";
 
 type Item =
   | { kind: "turn"; at: string; turn: Turn }
   | { kind: "case"; at: string; c: CaseView }
-  | { kind: "call"; at: string; call: ChannelFeed["calls"][number] };
+  | { kind: "call"; at: string; call: ChannelFeed["calls"][number] }
+  | { kind: "photo"; at: string; photo: ChannelFeed["photos"][number] };
 
 type Pending = { text: string; error: string | null };
+/** A photo on its way to Klara (shown from the phone's own copy until the feed has it). */
+type PhotoPending = { file: File; preview: string; error: string | null };
 type Extra = { turns: Turn[]; cases: CaseView[]; confirm: ConfirmView | null; klaraTurnId: string | null };
 type Composer = { placeholder: string | null; numeric: boolean };
 
@@ -44,6 +48,8 @@ export function ChannelView({ teamId }: { teamId: string }) {
   const reduceMotion = useReducedMotion();
   // Turns and cards from the last reply, shown right away; the reloaded feed replaces them (same ids).
   const [extra, setExtra] = useState<Extra>(NO_EXTRA);
+  const [photo, setPhoto] = useState<PhotoPending | null>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   const items = useMemo(() => (feed ? buildItems(feed, extra) : []), [feed, extra]);
   const lang = feed?.language ?? "de";
@@ -87,6 +93,22 @@ export function ChannelView({ teamId }: { teamId: string }) {
       reload();
     } catch (e) {
       setPending({ text: t, error: sendError(e) });
+    }
+  };
+
+  /** "Foto": the phone's camera; the photo goes to the case being talked about (else today's case or report). */
+  const sendPhoto = async (file: File, preview: string) => {
+    setPhoto({ file, preview, error: null });
+    try {
+      const conv = feed?.conversation ?? (await postJson<Conversation>("/api/conversations", { team_id: teamId, kind: "chat" }));
+      const r = await uploadPhoto({ file, teamId, conversationId: conv.id });
+      const klara = r.klara_turn;
+      if (klara) setExtra((x) => ({ ...x, turns: [...x.turns, klara] }));
+      await reload();
+      setPhoto(null);
+      URL.revokeObjectURL(preview);
+    } catch (e) {
+      setPhoto({ file, preview, error: sendError(e) });
     }
   };
 
@@ -170,6 +192,23 @@ export function ChannelView({ teamId }: { teamId: string }) {
                   );
                 })}
               </AnimatePresence>
+              {photo ? (
+                <li>
+                  <PhotoBubble src={photo.preview} label="Ihr Foto" uploading={!photo.error} />
+                  {photo.error ? (
+                    <div className="mt-1.5 flex flex-wrap items-center justify-end gap-x-3 text-sm">
+                      <span className="text-foreground">Nicht gesendet. {photo.error}</span>
+                      <button
+                        type="button"
+                        onClick={() => void sendPhoto(photo.file, photo.preview)}
+                        className="h-12 rounded-lg px-3 font-medium text-primary outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        Erneut senden
+                      </button>
+                    </div>
+                  ) : null}
+                </li>
+              ) : null}
               {pending ? (
                 <li>
                   {items.length === 0 || berlinDayOf(items[items.length - 1].at) !== feed.today.day ? (
@@ -271,6 +310,29 @@ export function ChannelView({ teamId }: { teamId: string }) {
         onSubmit={onSubmit}
         className="flex shrink-0 items-center gap-2 border-t border-border bg-background px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))]"
       >
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void sendPhoto(file, URL.createObjectURL(file));
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => cameraRef.current?.click()}
+          disabled={!!photo && !photo.error}
+          aria-label="Foto aufnehmen"
+          className="flex size-12 shrink-0 items-center justify-center rounded-full border border-border bg-background text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+        >
+          <Camera className="size-5" aria-hidden />
+        </button>
         <label htmlFor="klara-input" className="sr-only">
           Nachricht an Klara
         </label>
@@ -338,14 +400,15 @@ function buildItems(feed: ChannelFeed, extra: Extra): Item[] {
     ...turns.map((turn) => ({ kind: "turn" as const, at: turn.created_at, turn })),
     ...cases.map((c) => ({ kind: "case" as const, at: typeof c.facts._confirmed_at === "string" ? c.facts._confirmed_at : c.created_at, c })),
     ...feed.calls.map((call) => ({ kind: "call" as const, at: call.ended_at ?? call.started_at, call })),
+    ...feed.photos.map((photo) => ({ kind: "photo" as const, at: photo.at, photo })),
   ];
-  // A case card follows Klara's confirmation in the same instant.
-  const rank = { turn: 0, call: 1, case: 2 };
+  // A photo comes before Klara's "Foto abgelegt", a case card after Klara's confirmation in the same instant.
+  const rank = { photo: -1, turn: 0, call: 1, case: 2 };
   return items.sort((a, b) => a.at.localeCompare(b.at) || rank[a.kind] - rank[b.kind]);
 }
 
 function itemKey(it: Item): string {
-  return it.kind === "turn" ? `t-${it.turn.id}` : it.kind === "case" ? `c-${it.c.id}` : `k-${it.call.id}`;
+  return it.kind === "turn" ? `t-${it.turn.id}` : it.kind === "case" ? `c-${it.c.id}` : it.kind === "photo" ? `p-${it.photo.id}` : `k-${it.call.id}`;
 }
 
 /** One timestamp per run of messages from the same speaker in the same minute. */
@@ -370,6 +433,7 @@ function DaySeparator({ day, today }: { day: string; today: string }) {
 
 function FeedItem({ it, showTime }: { it: Item; showTime: boolean }) {
   if (it.kind === "case") return <CaseCard c={it.c} className="ml-9" />;
+  if (it.kind === "photo") return <PhotoBubble src={it.photo.url} href={it.photo.url} label={`Foto zu ${it.photo.reference}`} at={it.photo.at} />;
   if (it.kind === "call") {
     return (
       <Link
@@ -405,6 +469,34 @@ function UserBubble({ text, subtitle, at, lang }: { text: string; subtitle?: str
       </div>
       {subtitle ? <Subtitle text={subtitle} align="right" /> : null}
       {at ? (
+        <time dateTime={at} className="mt-1 font-mono text-[11px] text-muted-foreground">
+          {fmtTime(at)}
+        </time>
+      ) : null}
+    </div>
+  );
+}
+
+/** A photo the Polier sent: on the user's side, tap opens it full size. */
+function PhotoBubble({ src, href, label, at, uploading = false }: { src: string; href?: string; label: string; at?: string; uploading?: boolean }) {
+  // eslint-disable-next-line @next/next/no-img-element -- a private API image, not a static asset for next/image
+  const img = <img src={src} alt={label} loading="lazy" className={cn("block max-h-64 max-w-full rounded-2xl rounded-br-md border border-border object-cover", uploading && "opacity-60")} />;
+  return (
+    <div className="flex flex-col items-end">
+      <div className="max-w-[70%]">
+        {href ? (
+          <a href={href} target="_blank" rel="noreferrer" className="block rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            {img}
+          </a>
+        ) : (
+          img
+        )}
+      </div>
+      {uploading ? (
+        <p className="mt-1 text-xs text-muted-foreground" aria-live="polite">
+          Foto wird gesendet …
+        </p>
+      ) : at ? (
         <time dateTime={at} className="mt-1 font-mono text-[11px] text-muted-foreground">
           {fmtTime(at)}
         </time>

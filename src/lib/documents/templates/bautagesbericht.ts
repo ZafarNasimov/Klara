@@ -84,6 +84,12 @@ export const bautagesbericht: Template = (t) => {
   blocks.push({ kind: "heading", text: "Besondere Vorkommnisse" });
   blocks.push(incidents.length ? { kind: "bullets", items: incidents } : { kind: "p", text: fact(t, "incidents") || "keine" });
 
+  const photos = typeof f._photos === "number" ? f._photos : 0;
+  if (photos) {
+    blocks.push({ kind: "heading", text: "Fotodokumentation" });
+    blocks.push({ kind: "p", text: `${photos} ${photos === 1 ? "Foto" : "Fotos"} von der Baustelle, abgelegt bei den Vorgängen des Tages.` });
+  }
+
   blocks.push({
     kind: "signatures",
     parties: [

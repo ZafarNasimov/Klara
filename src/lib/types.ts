@@ -436,6 +436,8 @@ export type ChannelFeed = {
   cases: CaseView[];
   /** Calls with Klara, newest first. */
   calls: { id: string; started_at: string; ended_at: string | null; turns: number }[];
+  /** Photos the team took, with the case they belong to. */
+  photos: { id: string; at: string; url: string; case_id: string; reference: string }[];
   today: {
     day: string;
     /** Hour of the demo clock in Berlin (morning / evening cards). */

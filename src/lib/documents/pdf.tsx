@@ -6,6 +6,7 @@ import "server-only";
 import {
   Document,
   Font,
+  Image,
   Page,
   renderToBuffer,
   StyleSheet,
@@ -422,6 +423,8 @@ export type AuditInfo = {
     at: string;
   }[];
   weather: string | null;
+  /** Up to six site photos (JPEG/PNG) as thumbnails (SPEC §6 audit page). */
+  photos?: { data: Buffer; format: "jpg" | "png"; at: string; by: string }[];
 };
 
 const LIGHT = {
@@ -496,6 +499,23 @@ function AuditPage({ body, audit }: { body: DocBody; audit: AuditInfo }) {
           <>
             <Text style={s.h2}>Wetter</Text>
             <Text>{audit.weather}</Text>
+          </>
+        ) : null}
+
+        {audit.photos?.length ? (
+          <>
+            <Text style={s.h2}>Fotos von der Baustelle</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+              {audit.photos.map((p, i) => (
+                <View key={i} style={{ width: "31%", marginRight: "2%", marginBottom: 6 }} wrap={false}>
+                  {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image has no alt; the caption below names it */}
+                  <Image src={{ data: p.data, format: p.format }} style={{ width: "100%", height: 96, objectFit: "cover" }} />
+                  <Text style={s.small}>
+                    {p.by}, {fmtDateTime(p.at)}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </>
         ) : null}
 

@@ -57,6 +57,7 @@ export const EVENT_DE: Record<string, string> = {
   deviation: "Abweichung vom Bauzeitenplan",
   progress_recorded: "Leistung gemeldet",
   call_ended: "Gespräch beendet",
+  photo_added: "Foto hinzugefügt",
   unsupported_event: "Meldung ohne Vorlage",
 };
 

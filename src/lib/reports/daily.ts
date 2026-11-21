@@ -86,6 +86,15 @@ export async function compileDailyReport(teamId: string, day: string, at: Date):
     .filter((e) => e.kind === "note" && typeof e.text === "string" && !/^Arbeiten nach Plan/i.test(e.text as string))
     .map((e) => e.text as string);
 
+  // Photos of the day: on the report itself or on the team's cases of that day.
+  const dayCaseIds = new Set([
+    ...(existing ? [existing.id] : []),
+    ...(await s.list("case", { where: { team_id: teamId } })).filter((c) => berlinDay(new Date(c.created_at)) === day).map((c) => c.id),
+  ]);
+  const photoCount = (await s.list("evidence", { where: { kind: "photo" } })).filter(
+    (e) => dayCaseIds.has(e.case_id) && berlinDay(new Date(e.created_at)) === day,
+  ).length;
+
   const lead = ctx.users.find((u) => u.id === team.lead_user_id) ?? null;
   const bauleiter = ctx.users.find((u) => u.role === "bauleiter") ?? null;
   const weather = await fetchWeather(ctx.project.lat, ctx.project.lng, berlinTime(day, 12, 0));
@@ -112,6 +121,7 @@ export async function compileDailyReport(teamId: string, day: string, at: Date):
     ...(incidents.length || notes.length ? { incidents: [...incidents, ...notes].join("; ") } : {}),
     _incidents: [...incidents, ...notes],
     _team_name: team.name,
+    _photos: photoCount,
     _lead_name: lead?.name ?? null,
     _bauleiter_name: bauleiter?.name ?? null,
   };

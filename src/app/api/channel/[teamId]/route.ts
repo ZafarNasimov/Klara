@@ -25,12 +25,13 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/channel/[teamId
     const conversations = await listConversations(teamId);
     const chat = conversations.find((c) => c.kind === "chat" && c.status === "open") ?? null;
     const calls = conversations.filter((c) => c.kind === "call");
-    const [turns, callTurns, cases, report, progress] = await Promise.all([
+    const [turns, callTurns, cases, report, progress, photos] = await Promise.all([
       chat ? listTurns(chat.id) : Promise.resolve([]),
       Promise.all(calls.map((c) => listTurns(c.id))),
       listCases(team.project_id),
       getDailyReport(teamId, day),
       store().list("progress_entry", { where: { date: day } }),
+      store().list("evidence", { where: { kind: "photo" }, order: { column: "created_at" } }),
     ]);
 
     const trade = pctx.trades.find((t) => t.team_id === teamId) ?? null;
@@ -72,6 +73,10 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/channel/[teamId
       calls: calls
         .map((c, i) => ({ id: c.id, started_at: c.started_at, ended_at: c.ended_at, turns: callTurns[i].length }))
         .filter((c) => c.turns > 0),
+      photos: photos.flatMap((e) => {
+        const c = cases.find((x) => x.id === e.case_id && x.team_id === teamId);
+        return c ? [{ id: e.id, at: e.created_at, url: `/api/photos/${e.id}`, case_id: c.id, reference: c.reference }] : [];
+      }),
       today: { day, hour: Number(hourFmt.format(now)), diary_done: entries.some((e) => e.kind === "note"), items },
     };
   });
