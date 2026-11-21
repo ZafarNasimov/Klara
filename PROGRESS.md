@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-21 00:00 UTC (local session: call latency) · branch `claude/project-thread-jrqak8`
+Last update: 2026-11-21 01:08 UTC (local session: pitch flow) · branch `pitchflow`
 
 ## Milestones (SPEC §11)
 
@@ -42,6 +42,17 @@ Last update: 2026-11-21 00:00 UTC (local session: call latency) · branch `claud
 - ✅ Bautagesbericht: report form PDF/DOCX/preview, compiled each evening, crew asked in the chat.
 - ✅ `/app/case/[id]` mobile case page with "Per Sprache korrigieren" (critique notes in `.impeccable/critique/`).
 - ✅ `/admin/case/[id]` office case page (`src/app/admin/case/[id]/case-detail.tsx`): header with status, deadline, **Validieren** (shows why it is blocked), **Zurück zur Ergänzung** dialog, **E-Mail vorbereiten** once validated (M4 composer still a shell); tabs Dokument (HTML letter preview from the same DocBody, version switch, SHA-256, PDF/Word download), Nachweise (transcript, weather), Verlauf, Hinweise; right rail with checks and facts. Critiqued (29/40) and the findings fixed.
+
+### Pitch `/pitch` (branch `pitchflow`)
+
+Full-screen pitch deck for the 3-minute presentation. Code in `src/components/pitch/**`, route `src/app/pitch/page.tsx`, assets in `public/pitch/**`.
+
+- **Scenes** (`src/components/pitch/pitch-scenes.ts`): 1 title (dark), 2–5 **light stand-ins** (the real scenes were specced earlier but never landed in the repo; swap each `Component`, wrap content in `<SceneContent phase>`), 6 close (dark).
+- **Control:** →, Space, Enter, PageDown or click = next (title: 3 clicks reveal the pain points; close: 2 clicks reveal lines 2–3); ←, PageUp = back. Input is ignored while a transition runs. Rehearsal switches: `?scene=6`, `?reveal=auto` (timed reveals), `?transition=fade` (crossfade instead of the circle wipe; also used with reduced motion).
+- **Klara robot** (`KlaraRobot.tsx`): 21st.dev Spline scene, served offline: `public/pitch/klara-robot.splinecode` + the runtime's `bevel.wasm` / `process.wasm` in `public/pitch/spline/` (the runtime fetches them from unpkg / cdn.spline.design otherwise). `@splinetool/runtime` is pinned to 2.0.211; **re-copy the two wasm files from `node_modules/@splinetool/runtime/build` when you bump it.** PNG fallback (`klara-robot.png`, transparent first frame) while loading, without WebGL, on errors or after 2 s. The scene opens on a head close-up and pulls back to the full robot in ~2.5 s (built into the scene). Head follows the pointer page-wide; cursor is hidden on the dark scenes.
+- **Transitions** (`PitchFlow.tsx`): dark→light = text blur-out, visor glow, clip-path circle from the robot's head (1100 ms); light→dark = the light collapses into the head of the closing scene, which is mounted hidden under Scene 5 so its robot is loaded before the wipe.
+- **Verified** (headless Chrome, offline, dev server): live robot 1.1–1.4 s after navigation, no request leaves localhost, PNG fallback with WebGL disabled (no layout shift), 1920×1080 and 1512×982 @2x, back navigation, key mashing. Reveal wipe: 60 fps, no long tasks. Collapse: 60 fps in 2 of 3 runs; one run had a single 383 ms frame *after* the wipe had finished (robot freezes briefly), cause not found.
+- **Before the pitch:** run it on the presentation laptop in Chrome full-screen from a production build (`npm run build && npm start`; in dev the first visit compiles the Spline chunk and can hit the 2 s PNG fallback). If the wipe stutters there, use `?transition=fade`.
 
 ### Call latency work (2026-11-21, local, real keys)
 
@@ -99,6 +110,7 @@ Earlier cloud test (2026-11-20, 23:20 UTC, HTTP only): STT exact and 1.15 s, TTS
    - Done criterion (SPEC §12): scenario 2 → validated → sent → reply → follow-up draft in ≤ 2:30 without reload.
 3. **Photo button** (SPEC §8: channel and call screen). Not built. `evidence.case_id` is NOT NULL, so a photo needs a case: the conversation's pending case, else the team's latest open case of the day, else that day's Bautagesbericht. Store files in Supabase Storage (`SUPABASE_STORAGE_BUCKET`) or `.data/files/` in memory mode. Show thumbnails on the audit page (PDF page 2) and in the Bautagesbericht.
 4. M5 (realtime admin updates, timeline, fallbacks), M6 (eval set ≥ 30 utterances, `eval/run.ts`), per SPEC §11.
+5. **Pitch:** build the real light Scenes 2–5 into `src/components/pitch/pitch-scenes.ts`, then rehearse on the presentation laptop (see "Pitch `/pitch`").
 
 Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-0039..0041 so the board is not empty before the demo case.
 
@@ -165,6 +177,7 @@ Status (2026-11-20, checked from a separate session): all 18 tables exist and th
 - Next.js 16 here differs from older versions: read `node_modules/next/dist/docs/` first (AGENTS.md). With `cacheComponents`, async page work goes inside `<Suspense>`, GET handlers call `await connection()`, and run `npx next typegen` after adding routes (for `RouteContext` / `PageProps`).
 - react-pdf: fixed absolute `View`s don't render (use fixed `Text`s); no `lineHeight` on `Page`; a unitless `lineHeight` needs `fontSize` in the same style. tsx cannot load react-pdf; test PDFs via Vitest.
 - JS `\b` is ASCII-only; the keyword reader uses Unicode lookarounds.
+- Pitch: the Spline runtime logs `updating from 114 to 136` (warning) on every robot load because the 21st.dev scene file is an older format. Only a re-export from the Spline editor removes it. `npm i @splinetool/react-spline` without exact versions failed with a bogus ERESOLVE (`react@undefined`); installing with exact versions works.
 
 ## Working rules
 
