@@ -16,11 +16,28 @@ import { EASE_OUT, LIGHT_BG, type ScenePhase, type SceneTheme, u } from "../stag
 
 export type RevealMode = "click" | "auto";
 
+/**
+ * A scene that paces itself (Scene 2) takes the presenter's presses first:
+ * return true when the scene handled the press, false to let PitchFlow move on.
+ */
+export type SceneController = {
+  onNext?: () => boolean;
+  onBack?: () => boolean;
+};
+
 export type SceneProps = {
   phase: ScenePhase;
   /** In-scene reveals done so far (click mode). */
   step: number;
   revealMode: RevealMode;
+  /** "A" key: AUTO pacing for self-paced scenes (rehearsal / video). */
+  autoPace?: boolean;
+  /** ?debug=1: timing overlays. */
+  debug?: boolean;
+  /** The scene was entered by going back: show its end state. */
+  arrivedBack?: boolean;
+  /** Self-paced scenes register their press handlers here. */
+  registerController?: (controller: SceneController | null) => void;
   /** Dark scenes attach this to KlaraRobot's head anchor. */
   headRef?: RefCallback<HTMLDivElement>;
   /** True while a transition covers this scene's robot. */
@@ -284,3 +301,24 @@ export function useBeat(phase: ScenePhase, step: number, revealMode: RevealMode,
 
 /** Ring that tells the presenter (and the jury) which control comes next. */
 export const NEXT_ACTION = "ring-[3px] ring-primary/35 ring-offset-2 ring-offset-white";
+
+/**
+ * Klara is typing / transcribing: three 6 px dots bouncing 4 px with a 150 ms
+ * stagger on a 900 ms loop, opacity 0.4 → 1. A status indicator, shown only
+ * while Klara works.
+ */
+export function TypingDots({ className, color = "bg-zinc-500" }: { className?: string; color?: string }) {
+  return (
+    <span aria-hidden className={cn("inline-flex items-center", className)} style={{ gap: u(5), height: u(14) }}>
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          className={cn("rounded-full", color)}
+          style={{ width: u(6), height: u(6) }}
+          animate={{ y: [0, -4, 0], opacity: [0.4, 1, 0.4] }}
+          transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut", delay: i * 0.15 }}
+        />
+      ))}
+    </span>
+  );
+}

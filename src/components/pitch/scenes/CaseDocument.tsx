@@ -5,20 +5,17 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { DOC_COMPLETION, DOC_FIELDS, DOC_REFERENCE, DOC_TITLE, todayDE, type DocField } from "../pitch-story";
 
-export type DocStatus = "building" | "processing" | "open" | "ready" | "validated";
+export type DocStatus = "building" | "open" | "ready" | "validated";
 
 /** Status tones as values, so a change can crossfade (traffic light: DESIGN.md). */
 export const STATUS_COLORS = {
   neutral: { bg: "#ffffff", border: "#e4e4e7", text: "#52525b", dot: "#d4d4d8" },
-  blue: { bg: "#eff6ff", border: "#bfdbfe", text: "#2563eb", dot: "#2563eb" },
   amber: { bg: "#fffbeb", border: "#fde68a", text: "#b45309", dot: "#d97706" },
   green: { bg: "#f0fdf4", border: "#bbf7d0", text: "#15803d", dot: "#16a34a" },
 } as const;
 
 const STATUS: Record<DocStatus, { text: string; tone: keyof typeof STATUS_COLORS }> = {
   building: { text: "Entwurf · wird erstellt", tone: "neutral" },
-  // Between the foreman's sentence and the fields it fills.
-  processing: { text: "Klara verarbeitet die Aussage …", tone: "blue" },
   open: { text: "Entwurf · 2 Angaben offen", tone: "amber" },
   ready: { text: "Vollständig · bereit zur Validierung", tone: "green" },
   validated: { text: "Validiert", tone: "green" },
@@ -100,7 +97,7 @@ function FieldRow({ field, heardUpTo, complete, today }: { field: DocField; hear
   const state = value ? "filled" : open ? "open" : "empty";
 
   return (
-    <div className="grid grid-cols-[38%_1fr] gap-4 border-b border-zinc-100 py-2 last:border-0">
+    <div data-field={field.key} data-state={state} className="grid grid-cols-[38%_1fr] gap-4 border-b border-zinc-100 py-2 last:border-0">
       <dt className="text-xs leading-relaxed text-zinc-500">{field.label}</dt>
       <dd className="min-h-[1.5em] text-sm leading-snug text-pretty">
         {state === "filled" && (

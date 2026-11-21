@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "seed": "tsx --env-file-if-exists=.env.local --conditions=react-server scripts/seed.ts",
     "eval": "tsx --env-file-if-exists=.env.local --conditions=react-server eval/run.ts",
-    "postinstall": "node scripts/copy-vad-assets.mjs"
+    "postinstall": "node scripts/copy-vad-assets.mjs",
+    "check:pitch": "node scripts/check-pitch-timing.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.12.0",
@@ -50,6 +51,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
+    "playwright-core": "1.65.1",
     "tailwindcss": "4.3.3",
     "tsx": "^4.23.15",
     "typescript": "^5",

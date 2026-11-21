@@ -18,7 +18,8 @@ import {
 } from "../pitch-story";
 import { EASE_OUT, u } from "../stage";
 import { CaseDocument, PAPER_SHADOW, STATUS_COLORS, type DocStatus } from "./CaseDocument";
-import { appScaleVars, LightScene, NEXT_ACTION, useBeat, type SceneProps } from "./scene-parts";
+import { appScaleVars, LightScene, NEXT_ACTION, TypingDots, useBeat, type SceneProps } from "./scene-parts";
+import { CALL_TIMING } from "../call-timing";
 
 /**
  * Beats, in click order (spec update 2026-11-21): 3.1 = recipient (Clarify
@@ -46,15 +47,15 @@ const ease = { duration: 0.3, ease: EASE_OUT };
 export function AdminScene({ phase, step, revealMode }: SceneProps) {
   const beat = useBeat(phase, step, revealMode, [1200, 3800, 6400, 8000, 11400, 14000, 17000, 20000]);
 
-  // Voice input: the request appears word by word.
-  const words = CLARIFY_REQUEST.split(" ");
-  const [heard, setHeard] = useState(0);
+  // Voice input: "Transcribing…" for 1.5 s (same pace as the call), then the
+  // whole transcript at once.
+  const [transcribed, setTranscribed] = useState(false);
   useEffect(() => {
     if (phase !== "enter" || beat !== B.clarify) return;
-    const timer = window.setInterval(() => setHeard((n) => Math.min(n + 1, words.length)), 120);
-    return () => window.clearInterval(timer);
-  }, [phase, beat, words.length]);
-  const heardWords = beat > B.clarify ? words.length : beat === B.clarify ? heard : 0;
+    const timer = window.setTimeout(() => setTranscribed(true), CALL_TIMING.docAfterForemanMs);
+    return () => window.clearTimeout(timer);
+  }, [phase, beat]);
+  const hasTranscript = beat > B.clarify || (beat === B.clarify && transcribed);
 
   const complete = beat >= B.replied;
   const status: DocStatus = beat >= B.validated ? "validated" : complete ? "ready" : "open";
@@ -182,13 +183,33 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                         <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-white">
                           <Mic className="size-5" aria-hidden />
                         </span>
-                        <p className="min-h-[1.4em] pt-1.5 text-base leading-snug">
-                          {words.slice(0, heardWords).join(" ")}
-                          {heardWords < words.length && <span className="text-zinc-400"> …</span>}
-                        </p>
+                        <AnimatePresence mode="wait" initial={false}>
+                          {hasTranscript ? (
+                            <motion.p
+                              key="text"
+                              data-text
+                              className="min-h-[1.4em] pt-1.5 text-base leading-snug"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 0.15 }}
+                            >
+                              {CLARIFY_REQUEST}
+                            </motion.p>
+                          ) : (
+                            <motion.p
+                              key="transcribing"
+                              role="status"
+                              className="flex min-h-[1.4em] items-center gap-3 pt-1.5 text-base leading-snug text-zinc-500"
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.15 }}
+                            >
+                              Transcribing… <TypingDots />
+                            </motion.p>
+                          )}
+                        </AnimatePresence>
                       </div>
 
-                      {heardWords === words.length && (
+                      {hasTranscript && (
                         <motion.div className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={ease}>
                           <span className="mr-1 text-sm text-zinc-500">Send to</span>
                           {CLARIFY_RECIPIENTS.map((r, i) => {
