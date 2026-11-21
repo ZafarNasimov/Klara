@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, CalendarDays, Mail, Sunrise, Sunset } from "lucide-react";
+import { ArrowDown, CalendarDays, CircleCheck, Mail, Sunrise, Sunset } from "lucide-react";
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { KlaraAvatar } from "@/components/klara/klara-avatar";
@@ -21,7 +21,21 @@ export function SourcesScene({ phase, step, revealMode }: SceneProps) {
     <LightScene label="Scene 4 – more sources" phase={phase}>
       <PitchHeadline>Calls. Meetings. Emails. One reporting system.</PitchHeadline>
 
-      <SourceCard index={0} show={beat >= 1} title="Meeting summaries" result="1 verbal client order detected → written confirmation drafted">
+      <SourceCard
+        index={0}
+        show={beat >= 1}
+        title="Meeting intelligence"
+        subtitle="Schedules & records meetings · updates cases and dashboards"
+        result={
+          <>
+            Recorded → summarized → 1 case updated, 2 drafts created →{" "}
+            <span className="inline-flex items-center whitespace-nowrap" style={{ gap: u(6) }}>
+              dashboard updated
+              <CircleCheck className="shrink-0 text-blue-600" style={{ width: u(22), height: u(22) }} aria-hidden />
+            </span>
+          </>
+        }
+      >
         <MiniHeader icon={<CalendarDays aria-hidden />} title={PITCH_MEETING.title} meta={PITCH_MEETING.ref} />
         {/* The app's real meeting detail, cropped to summary / detected / changes. Inert: a click advances the pitch. */}
         <div inert aria-hidden className="pointer-events-none relative min-h-0 flex-1 overflow-hidden mask-[linear-gradient(to_bottom,#000_82%,transparent)]">
@@ -48,7 +62,7 @@ export function SourcesScene({ phase, step, revealMode }: SceneProps) {
         </div>
       </SourceCard>
 
-      <SourceCard index={2} show={beat >= 3} title="Daily plans & reports" result="1 delay detected → +2 days forecast, flooring team informed">
+      <SourceCard index={2} show={beat >= 3} title="Daily check-ins" result="1 delay detected → +2 days forecast, flooring team informed">
         <div className="flex flex-col gap-2 rounded-md border border-zinc-200 p-3">
           <p className="flex items-center gap-2 text-xs text-zinc-500">
             <Sunrise className="size-4" aria-hidden /> Morgens <span className="font-mono">07:00</span>
@@ -81,13 +95,15 @@ function SourceCard({
   index,
   show,
   title,
+  subtitle,
   result,
   children,
 }: {
   index: number;
   show: boolean;
   title: string;
-  result: string;
+  subtitle?: string;
+  result: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -98,9 +114,16 @@ function SourceCard({
       animate={show ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }}
       transition={{ duration: 0.5, ease: EASE_OUT }}
     >
-      <h3 className="font-semibold tracking-[-0.02em] text-zinc-900" style={{ fontSize: u(30), padding: `${u(26)} ${u(28)} ${u(18)}` }}>
-        {title}
-      </h3>
+      <header style={{ padding: `${u(26)} ${u(28)} ${u(18)}` }}>
+        <h3 className="font-semibold tracking-[-0.02em] text-zinc-900" style={{ fontSize: u(30) }}>
+          {title}
+        </h3>
+        {subtitle ? (
+          <p className="whitespace-nowrap text-zinc-500" style={{ fontSize: u(14), marginTop: u(4) }}>
+            {subtitle}
+          </p>
+        ) : null}
+      </header>
       <div lang="de" className="flex min-h-0 flex-1 flex-col gap-3 px-5">
         {children}
       </div>
