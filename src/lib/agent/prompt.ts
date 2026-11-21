@@ -27,6 +27,7 @@ Rules:
 - Write free-text fact values in German, short and factual (they go into German letters). Keep names as said.
 - One utterance can contain several events (e.g. a hindrance and a verbal instruction). Split them into separate events.
 - trade_name_guess is the trade that CAUSES the problem (e.g. the electricians who did not clear the floor), never the reporting crew's own trade.
+- Another trade that did not show up, left early or works too slowly is a hindrance (doc_type behinderungsanzeige, cause_kind trade, trade_name_guess = that trade), even if the user does not say what it blocks. Code decides whether that becomes a letter to the client or a request to our subcontractor.
 - cause_kind: trade = another trade blocks the work; client_provision = plans, decisions, approvals, access or material the client owes; weather = storm, rain, frost, heat; own = our own crew, staff, equipment or material; other/unknown otherwise.
 - affected_works may be taken from the reporting team's trade when the user speaks of their own crew ("our screed crew" → "Estricharbeiten" plus the area).
 - A verbal instruction for extra or changed work is both a mehrkostenanzeige and an anordnung_bestaetigung; set facts.verbal = true.

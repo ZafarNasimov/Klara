@@ -1,0 +1,48 @@
+{
+  "_about": "SPEC §10 eval set: first turn of a site report in the team chat. doc_types = letters Klara opens (sorted; a recognised but not built type such as bedenkenanzeige counts too; the Bautagesbericht is left out). sphere = sphere of the hindrance case (behinderungsanzeige / verzug_nu). missing_fields = required facts still missing after the first turn (only where the utterance settles them). Seed: Muster Bau GmbH, Elektro hired by the client, Trockenbau and Bodenbelag our subcontractors, Team Estrich (RU) and Team Ausbau (PL). Friday 20.11.2026.",
+  "utterances": [
+    { "id": "ru-elektro", "lang": "ru", "team": "estrich", "text": "Электрики не освободили второй этаж, четыре человека простаивают с семи утра.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "client", "missing_fields": [] } },
+    { "id": "ru-trockenbau", "lang": "ru", "team": "estrich", "text": "Сухостроители сегодня не пришли, мы не можем начать стяжку в коридоре третьего этажа.", "expect": { "doc_types": ["verzug_nu"], "sphere": "own_sub" } },
+    { "id": "ru-storm", "lang": "ru", "team": "estrich", "text": "Сильный ветер, кран весь день стоял, бетон не подали.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "weather" } },
+    { "id": "ru-instruction", "lang": "ru", "team": "estrich", "text": "Архитектор Вебер сказал устно: три дополнительные противопожарные двери на втором этаже.", "expect": { "doc_types": ["anordnung_bestaetigung", "mehrkostenanzeige"] } },
+    { "id": "ru-diary", "lang": "ru", "team": "estrich", "text": "Всё по плану, без происшествий.", "expect": { "doc_types": [] } },
+    { "id": "ru-ende", "lang": "ru", "team": "estrich", "text": "Электрики закончили, со второго этажа снова работаем с десяти часов.", "expect": { "doc_types": ["behinderung_ende"] } },
+    { "id": "ru-evening", "lang": "ru", "team": "estrich", "time": "16:30", "text": "Стяжка второй этаж сегодня только 15 квадратов.", "expect": { "doc_types": ["info_folgegewerk"] } },
+    { "id": "ru-vague", "lang": "ru", "team": "estrich", "text": "Сегодня как-то всё не так.", "expect": { "doc_types": [] } },
+
+    { "id": "pl-elektro", "lang": "pl", "team": "ausbau", "text": "Elektrycy nie skończyli instalacji na drugim piętrze, nasza ekipa, trzech ludzi, czeka od siódmej.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "client" } },
+    { "id": "pl-trockenbau", "lang": "pl", "team": "ausbau", "text": "Firma od suchej zabudowy znowu nie przyszła, ściany w korytarzu na trzecim piętrze nie są zamknięte.", "expect": { "doc_types": ["verzug_nu"], "sphere": "own_sub" } },
+    { "id": "pl-rain", "lang": "pl", "team": "ausbau", "text": "Ulewny deszcz od rana, cały dzień nie dało się pracować na zewnątrz.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "weather" } },
+    { "id": "pl-instruction", "lang": "pl", "team": "ausbau", "text": "Architekt Weber powiedział ustnie, że mamy dodatkowo zamontować trzy drzwi przeciwpożarowe na drugim piętrze.", "expect": { "doc_types": ["anordnung_bestaetigung", "mehrkostenanzeige"] } },
+    { "id": "pl-diary", "lang": "pl", "team": "ausbau", "text": "Wszystko zgodnie z planem.", "expect": { "doc_types": [] } },
+    { "id": "pl-two-events", "lang": "pl", "team": "estrich", "text": "Elektrycy blokują drugie piętro, czterech ludzi czeka od siódmej. Poza tym architekt Weber kazał dołożyć trzy drzwi przeciwpożarowe.", "expect": { "doc_types": ["anordnung_bestaetigung", "behinderungsanzeige", "mehrkostenanzeige"], "sphere": "client" } },
+    { "id": "pl-unknown-trade", "lang": "pl", "team": "estrich", "text": "Monterzy okien blokują drugie piętro, czterech ludzi czeka od siódmej.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "unclear" } },
+    { "id": "pl-vague", "lang": "pl", "team": "ausbau", "text": "Dzisiaj jakoś dziwnie.", "expect": { "doc_types": [] } },
+
+    { "id": "de-elektro", "lang": "de", "team": "estrich", "text": "Die Elektriker haben das 2.OG nicht freigegeben, 4 Leute stehen seit 7 Uhr.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "client", "missing_fields": [] } },
+    { "id": "de-trockenbau", "lang": "de", "team": "ausbau", "text": "Die Trockenbauer sind heute nicht gekommen.", "expect": { "doc_types": ["verzug_nu"], "sphere": "own_sub" } },
+    { "id": "de-storm", "lang": "de", "team": "estrich", "text": "Sturm, der Kran stand den ganzen Tag.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "weather" } },
+    { "id": "de-instruction", "lang": "de", "team": "estrich", "text": "Architekt Weber hat heute gesagt: 3 zusätzliche Brandschutztüren im 2.OG.", "expect": { "doc_types": ["anordnung_bestaetigung", "mehrkostenanzeige"] } },
+    { "id": "de-diary", "lang": "de", "team": "estrich", "text": "Alles nach Plan.", "expect": { "doc_types": [] } },
+    { "id": "de-vague", "lang": "de", "team": "estrich", "text": "es ist irgendwie blöd heute", "expect": { "doc_types": [] } },
+    { "id": "de-bedenken", "lang": "de", "team": "estrich", "text": "Der Untergrund im 3.OG ist viel zu feucht, da können wir keinen Estrich einbringen, ich habe Bedenken.", "expect": { "doc_types": ["bedenkenanzeige"] } },
+    { "id": "de-ende", "lang": "de", "team": "estrich", "text": "Die Elektriker sind fertig, wir arbeiten seit 10 Uhr wieder im 2.OG.", "expect": { "doc_types": ["behinderung_ende"] } },
+    { "id": "de-evening", "lang": "de", "team": "estrich", "time": "16:30", "text": "Estrich 2.OG heute nur 15 m²", "expect": { "doc_types": ["info_folgegewerk"] } },
+    { "id": "de-own-crew", "lang": "de", "team": "estrich", "text": "Unser Estrichmischer ist kaputt, wir konnten erst ab Mittag arbeiten.", "expect": { "doc_types": [] } },
+
+    { "id": "tr-elektro", "lang": "tr", "team": "estrich", "text": "Elektrikçiler ikinci katı bitirmedi, dört kişi sabah yediden beri bekliyor.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "client" } },
+    { "id": "tr-storm", "lang": "tr", "team": "estrich", "text": "Fırtına var, vinç bütün gün çalışmadı.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "weather" } },
+    { "id": "tr-instruction", "lang": "tr", "team": "estrich", "text": "Mimar Weber sözlü olarak ikinci kata üç ek yangın kapısı takmamızı istedi.", "expect": { "doc_types": ["anordnung_bestaetigung", "mehrkostenanzeige"] } },
+    { "id": "tr-trockenbau", "lang": "tr", "team": "estrich", "text": "Alçıpan ekibi bugün gelmedi, üçüncü kat koridorunda şap dökemiyoruz.", "expect": { "doc_types": ["verzug_nu"], "sphere": "own_sub" } },
+    { "id": "tr-diary", "lang": "tr", "team": "estrich", "text": "Her şey plana göre gidiyor.", "expect": { "doc_types": [] } },
+    { "id": "tr-vague", "lang": "tr", "team": "estrich", "text": "Bugün her şey biraz garip.", "expect": { "doc_types": [] } },
+
+    { "id": "en-elektro", "lang": "en", "team": "estrich", "text": "The electricians haven't cleared the second floor. Our screed crew has been standing since seven, four people waiting.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "client", "missing_fields": [] } },
+    { "id": "en-instruction", "lang": "en", "team": "estrich", "text": "The architect told me verbally to add three extra fire doors on the second floor.", "expect": { "doc_types": ["anordnung_bestaetigung", "mehrkostenanzeige"] } },
+    { "id": "en-noshow", "lang": "en", "team": "ausbau", "text": "The drywall guys didn't show up today.", "expect": { "doc_types": ["verzug_nu"], "sphere": "own_sub" } },
+    { "id": "en-storm", "lang": "en", "team": "estrich", "text": "Heavy storm, the crane was down all day.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "weather" } },
+    { "id": "en-diary", "lang": "en", "team": "estrich", "text": "All according to plan today, nothing special.", "expect": { "doc_types": [] } },
+
+    { "id": "ro-elektro", "lang": "ro", "team": "estrich", "text": "Electricienii nu au eliberat etajul doi, patru oameni așteaptă de la ora șapte.", "expect": { "doc_types": ["behinderungsanzeige"], "sphere": "client" } }
+  ]
+}
