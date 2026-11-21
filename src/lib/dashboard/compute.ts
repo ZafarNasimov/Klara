@@ -46,7 +46,7 @@ export type HeatCell = {
   status: CellStatus;
   delay: number;
   reason: string;
-  hindrance: { id: string; reference: string } | null;
+  hindrance: { id: string; reference: string; since: string } | null;
 };
 export type HeatRow = { project_id: string; code: string; name: string; cells: HeatCell[] };
 
@@ -73,7 +73,23 @@ export type CompletenessRow = { team_id: string; team: string; code: string; cel
 export type PipelineStep = { status: "entwurf" | "unvollstaendig" | "bereit" | "validiert" | "versendet"; label: string; count: number };
 
 export type FeedSource = "call" | "meeting" | "email" | "checkin" | "system";
-export type FeedItem = { id: string; at: string; source: FeedSource; title: string; detail: string | null; href: string | null; code: string | null };
+export type FeedItem = { id: string; at: string; source: FeedSource; title: string; ref: string | null; detail: string | null; href: string | null; code: string | null };
+
+/** One card in "Handlungsbedarf": the most severe first. */
+export type ActionItem = {
+  id: string;
+  kind: "hindrance" | "delay" | "report" | "no_data" | "letter";
+  status: Exclude<CellStatus, "none">;
+  severity: number;
+  /** One short line, e.g. "Elektro · Riem · Behinderung offen". */
+  text: string;
+  href: string;
+  /** Tooltip: what it is based on. */
+  detail: string;
+};
+
+/** A site on the map: worst status, open cases, forecast delay days. */
+export type SiteSummary = { id: string; code: string; name: string; short: string; lat: number; lng: number; status: CellStatus; open: number; delay: number };
 
 export type DashboardView = {
   now: string;
@@ -89,6 +105,8 @@ export type DashboardView = {
   completeness: { days: string[]; rows: CompletenessRow[]; title: string };
   pipeline: { steps: PipelineStep[]; title: string };
   feed: FeedItem[];
+  actions: { items: ActionItem[]; ok: string[] };
+  site_map: SiteSummary[];
 };
 
 /** Heatmap columns (in this order). */
@@ -133,6 +151,12 @@ function makeCalendar(region: string) {
 type Cal = ReturnType<typeof makeCalendar>;
 
 const siteCode = (p: Project | undefined) => (p && typeof p.settings.site_code === "string" ? p.settings.site_code : "–");
+/** "Riem", "Schwabing", "Pasing": the district in the site's name or address. */
+const siteShort = (p: Project | undefined) =>
+  (p && typeof p.settings.site_short === "string" ? p.settings.site_short : null) ?? p?.name.split(/[ ,]/).find((w) => /^(Riem|Schwabing|Pasing)$/.test(w)) ?? p?.name ?? "–";
+const timeFmt = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" });
+/** "07:00" today, else "19.11." */
+const fmtSince = (iso: string, today: string) => (dayOf(iso) === today ? timeFmt.format(new Date(iso)) : `${dayOf(iso).slice(8, 10)}.${dayOf(iso).slice(5, 7)}.`);
 
 // ── Forecast per schedule item ──────────────────────────────────────────
 
@@ -157,7 +181,15 @@ export type ItemForecast = {
  * between the planned and the forecast end are the delay. An unfinished item
  * also inherits the delay of a late predecessor (depends_on).
  */
-export function forecastItems(data: Pick<DashboardData, "schedule" | "progress" | "trades">, day: string, cal: Cal): Map<string, ItemForecast> {
+/** An active hindrance: the blocking trade on a site (and area) is stopped until `end`. */
+export type ActiveHindrance = { case_id: string; reference: string; project_id: string; team_id: string | null; trade: string; area: string | null; start: string; start_at: string; end: string };
+
+export function forecastItems(
+  data: Pick<DashboardData, "schedule" | "progress" | "trades">,
+  day: string,
+  cal: Cal,
+  hindrances: ActiveHindrance[] = [],
+): Map<string, ItemForecast> {
   const tradeName = new Map(data.trades.map((t) => [t.id, t.name]));
   const byItem = new Map<string, ProgressEntry[]>();
   for (const p of data.progress) if (p.date <= day) (byItem.get(p.schedule_item_id) ?? byItem.set(p.schedule_item_id, []).get(p.schedule_item_id)!).push(p);
@@ -189,6 +221,12 @@ export function forecastItems(data: Pick<DashboardData, "schedule" | "progress" 
       } else if (day > it.end_date) {
         forecast_end = day; // overdue, no rate known: at least until today
       }
+      // An active hindrance of this trade stops the work for its remaining Werktage.
+      const trade = tradeName.get(it.trade_id);
+      const stop = hindrances
+        .filter((h) => h.project_id === it.project_id && h.trade === trade && sameFloor(h.area, it.area))
+        .reduce((n, h) => Math.max(n, cal.count(day, h.end)), 0);
+      if (stop) forecast_end = cal.add(forecast_end < day ? day : forecast_end, stop);
       own = forecast_end > it.end_date ? werktageBetween(it.end_date, forecast_end) : 0;
     }
     out.set(it.id, {
@@ -205,15 +243,19 @@ export function forecastItems(data: Pick<DashboardData, "schedule" | "progress" 
       waits_for: null,
     });
   }
-  // Late predecessors push their unfinished successors.
+  // A predecessor still running when its successor should start pushes the
+  // successor by the overlap (Werktage from the day before the start to the predecessor's forecast end).
   for (let pass = 0; pass < 3; pass++) {
     for (const f of out.values()) {
       if (f.finished) continue;
       for (const dep of f.item.depends_on) {
         const p = out.get(dep);
-        // Only a predecessor still running when this item should start pushes it.
-        if (p && p.delay > f.delay && p.forecast_end >= f.item.start_date) {
-          f.delay = p.delay;
+        // Only a late predecessor pushes, only by its own lateness, and only work that has not started yet.
+        if (!p || p.delay <= 0 || p.forecast_end < f.item.start_date || f.actual > 0) continue;
+        const shift = Math.min(p.delay, werktageBetween(cal.prev(f.item.start_date), p.forecast_end));
+        if (shift > f.delay) {
+          f.delay = shift;
+          f.forecast_end = cal.add(f.item.end_date, shift);
           f.waits_for = `${p.trade} ${p.item.area}`;
         }
       }
@@ -254,6 +296,7 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
   const versionsByCase = new Map<string, DocumentVersion[]>();
   for (const v of all.versions) (versionsByCase.get(v.case_id) ?? versionsByCase.set(v.case_id, []).get(v.case_id)!).push(v);
   const project = (id: string) => all.projects.find((p) => p.id === id);
+  const teamName = (id: string) => all.teams.find((t) => t.id === id)?.name ?? null;
   const data = { schedule, progress: all.progress, trades: all.trades };
 
   // ── KPI history ────────────────────────────────────────────────────
@@ -285,10 +328,33 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
     return n;
   };
 
+  // Hindrances active on a day: reported, not ended (Behinderung-Ende or closed), within the expected duration.
+  const endNotice = new Map<string, string>();
+  for (const c of all.cases) if (c.doc_type === "behinderung_ende" && c.parent_case_id && c.status !== "entwurf") endNotice.set(c.parent_case_id, dayOf(c.created_at));
+  const hindrancesAt = (d: string): ActiveHindrance[] =>
+    all.cases
+      .filter((c) => c.doc_type === "behinderungsanzeige" && c.status !== "entwurf" && projectIds.has(c.project_id))
+      .flatMap((c) => {
+        const trade = caseTrade(c);
+        const startAt = typeof c.facts.start_at === "string" ? c.facts.start_at : c.created_at;
+        const start = dayOf(startAt);
+        if (!trade || start > d || dayOf(c.created_at) > d) return [];
+        if (c.status === "abgeschlossen" && dayOf(c.updated_at) <= d) return [];
+        const ended = endNotice.get(c.id);
+        if (ended && ended <= d) return [];
+        const n = durationDays(c.facts.expected_duration);
+        const end = n ? cal.add(start, n - 1) : d;
+        if (end < d) return [];
+        const area = typeof c.facts.area === "string" ? c.facts.area : null;
+        return [{ case_id: c.id, reference: c.reference, project_id: c.project_id, team_id: c.team_id, trade, area, start, start_at: startAt, end }];
+      });
+  const activeNow = hindrancesAt(today);
+
   const cellDelays = (d: string) => {
-    const f = forecastItems(data, d, cal);
+    const f = forecastItems(data, d, cal, d === today ? activeNow : hindrancesAt(d));
     const cells = new Map<string, number>();
     for (const x of f.values()) {
+      if (!x.item.planned_qty) continue; // only work planned with quantities is forecast
       const key = `${x.item.project_id}|${x.trade}`;
       cells.set(key, Math.max(cells.get(key) ?? 0, x.delay));
     }
@@ -371,11 +437,10 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
   ];
 
   // ── Heatmap Baustelle × Gewerk ──────────────────────────────────────
-  const openHindrances = all.cases.filter((c) => c.doc_type === "behinderungsanzeige" && c.status !== "abgeschlossen" && c.status !== "entwurf" && projectIds.has(c.project_id));
   // Columns: trades planned with quantities, and any trade with an open hindrance; preferred order first.
   const tracked = new Set<string>([
-    ...[...now$.f.values()].filter((x) => x.item.planned_qty && projectIds.has(x.item.project_id)).map((x) => x.trade),
-    ...openHindrances.map(caseTrade).filter((t): t is string => !!t),
+    ...[...now$.f.values()].filter((x) => x.item.planned_qty && projectIds.has(x.item.project_id) && ((x.item.start_date <= today && !x.finished) || x.delay > 0)).map((x) => x.trade),
+    ...activeNow.map((h) => h.trade),
   ]);
   const order = (t: string) => (HEAT_TRADES.includes(t) ? HEAT_TRADES.indexOf(t) : 100);
   const heatTrades = filters.trade ? [filters.trade] : [...tracked].sort((a, b) => order(a) - order(b) || a.localeCompare(b));
@@ -388,8 +453,9 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
     name: p.name,
     cells: heatTrades.map((trade) => {
       const all$ = [...now$.f.values()].filter((x) => x.item.project_id === p.id && x.trade === trade);
-      const items = all$.filter((x) => x.item.planned_qty);
-      const hind = openHindrances.find((c) => c.project_id === p.id && caseTrade(c) === trade);
+      // Work running today (started, not finished) planned with quantities.
+      const items = all$.filter((x) => x.item.planned_qty && ((x.item.start_date <= today && !x.finished) || x.delay > 0));
+      const hind = activeNow.find((h) => h.project_id === p.id && h.trade === trade);
       if (!items.length && !hind) return { trade, status: "none", delay: 0, reason: all$.length ? "Ohne Mengenplanung" : "Keine Arbeiten geplant", hindrance: null };
       const delay = Math.max(0, ...items.map((x) => x.delay));
       const noData = items.some((x) => x.no_data);
@@ -402,7 +468,7 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
           : noData
             ? "Keine Mengenmeldung seit 2 Arbeitstagen"
             : "Im Plan";
-      return { trade, status, delay, reason, hindrance: hind ? { id: hind.id, reference: hind.reference } : null };
+      return { trade, status, delay, reason, hindrance: hind ? { id: hind.case_id, reference: hind.reference, since: hind.start_at } : null };
     }),
   }));
   const worstCell = rows
@@ -431,10 +497,13 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
     byTrade.set(x.trade, b);
   }
   const bars: TradeBar[] = [...byTrade.entries()]
+    .filter(([, b]) => !(b.plan >= b.weight - 1e-9 && b.actual >= b.weight - 1e-9)) // done: nothing to compare
     .map(([trade, b]) => ({ trade, plan: Math.round((b.plan / b.weight) * 100), actual: Math.round((b.actual / b.weight) * 100), worst: false, items: b.items }))
     .sort((a, b) => order(a.trade) - order(b.trade) || a.trade.localeCompare(b.trade));
-  const worstBar = [...bars].sort((a, b) => b.plan - b.actual - (a.plan - a.actual))[0];
-  if (worstBar && worstBar.plan - worstBar.actual > 0) worstBar.worst = true;
+  // Worst trade: most forecast delay days on any site, then the largest gap to plan.
+  const tradeDelay = (t: string) => Math.max(0, ...[...now$.cells.entries()].filter(([k]) => k.endsWith(`|${t}`)).map(([, n]) => n));
+  const worstBar = [...bars].sort((a, b) => tradeDelay(b.trade) - tradeDelay(a.trade) || b.plan - b.actual - (a.plan - a.actual))[0];
+  if (worstBar && (tradeDelay(worstBar.trade) > 0 || worstBar.plan - worstBar.actual > 0)) worstBar.worst = true;
   const barsTitle = worstBar && worstBar.plan - worstBar.actual > 0
     ? `${worstBar.trade} ${worstBar.plan - worstBar.actual} ${worstBar.plan - worstBar.actual === 1 ? "Prozentpunkt" : "Prozentpunkte"} hinter Plan`
     : bars.length
@@ -446,7 +515,6 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
   const site = siteId ? project(siteId) : undefined;
   const from = addCalendarDays(today, -days);
   const to = addCalendarDays(today, days);
-  const siteHind = all.cases.filter((c) => c.project_id === siteId && c.doc_type === "behinderungsanzeige" && c.status !== "abgeschlossen" && c.status !== "entwurf");
   const schedRows: ScheduleRow[] = [...now$.f.values()]
     .filter((x) => x.item.project_id === siteId && x.item.end_date >= from && x.item.start_date <= to)
     .sort((a, b) => a.item.start_date.localeCompare(b.item.start_date) || a.trade.localeCompare(b.trade))
@@ -457,23 +525,18 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
       activity: x.item.activity,
       start: x.item.start_date,
       end: x.item.end_date,
-      forecast_end: x.delay > x.own_delay ? cal.add(x.forecast_end > x.item.end_date ? x.forecast_end : x.item.end_date, x.delay - x.own_delay) : x.forecast_end,
+      forecast_end: x.forecast_end,
       delay: x.delay,
       waits_for: x.delay > x.own_delay ? x.waits_for : null,
       hindrances: [],
     }));
-  for (const c of siteHind) {
-    const area = normArea(typeof c.facts.area === "string" ? c.facts.area : "");
-    const teamTrades = new Set(all.trades.filter((t) => t.team_id && t.team_id === c.team_id).map((t) => t.name));
+  // The red segment sits on the stopped (blocking) trade's row of that floor.
+  for (const h of activeNow.filter((x) => x.project_id === siteId)) {
     const row =
-      schedRows.find((r) => teamTrades.has(r.trade) && (!area || normArea(r.area) === area)) ??
-      schedRows.find((r) => r.trade === caseTrade(c) && (!area || normArea(r.area) === area)) ??
-      schedRows.find((r) => r.trade === caseTrade(c));
-    if (!row) continue;
-    const start = typeof c.facts.start_at === "string" ? dayOf(c.facts.start_at) : dayOf(c.created_at);
-    const n = Number(/(\d+)/.exec(String(c.facts.expected_duration ?? ""))?.[1] ?? 1);
-    const end = cal.add(start, Math.max(0, n - 1));
-    row.hindrances.push({ case_id: c.id, reference: c.reference, start, end: end > today ? end : today });
+      schedRows.find((r) => r.trade === h.trade && sameFloor(h.area, r.area) && r.start <= today && r.forecast_end >= today) ??
+      schedRows.find((r) => r.trade === h.trade && sameFloor(h.area, r.area)) ??
+      schedRows.find((r) => r.trade === h.trade);
+    if (row) row.hindrances.push({ case_id: h.case_id, reference: h.reference, start: h.start, end: h.end });
   }
   const lateRow = [...schedRows].sort((a, b) => b.delay - a.delay)[0];
   const hindRow = schedRows.find((r) => r.hindrances.length);
@@ -528,7 +591,7 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
         const tr = c ? caseTrade(c) : typeof e.payload.trade === "string" ? e.payload.trade : null;
         if (tr !== filters.trade) return false;
       }
-      return !!feedTitle(e);
+      return !!feedTitle(e, undefined, null);
     })
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 60)
@@ -539,7 +602,8 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
         id: e.id,
         at: e.created_at,
         source: feedSource(e),
-        title: feedTitle(e)!,
+        title: feedTitle(e, c, c?.team_id ? teamName(c.team_id) : null)!,
+        ref: c?.reference ?? (typeof e.payload.reference === "string" ? e.payload.reference : null),
         detail: feedDetail(e, c),
         href: c ? `/admin/case/${c.id}` : meetingId ? `/admin/meetings/${meetingId}` : null,
         code: siteCode(project(e.project_id)),
@@ -547,6 +611,58 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
     });
 
   const feed = groupCheckins(items).slice(0, 12);
+
+  // ── Handlungsbedarf ─────────────────────────────────────────────────
+  const short = (id: string) => siteShort(project(id));
+  const cellOf = (pid: string, trade: string) => rows.find((r) => r.project_id === pid)?.cells.find((c) => c.trade === trade);
+  const actions: ActionItem[] = [];
+  for (const h of activeNow) {
+    actions.push({ id: `h-${h.case_id}`, kind: "hindrance", status: "red", severity: 100, text: `${h.trade} · ${short(h.project_id)} · Behinderung offen`, href: `/admin/case/${h.case_id}`, detail: `Behinderung ${h.reference} seit ${fmtSince(h.start_at, today)}` });
+  }
+  for (const r of rows) {
+    for (const c of r.cells) {
+      if (c.hindrance || c.status === "none" || c.status === "green") continue;
+      if (c.delay > 0) {
+        actions.push({ id: `d-${r.project_id}-${c.trade}`, kind: "delay", status: c.status, severity: c.delay > 2 ? 90 : 70, text: `${c.trade} · ${short(r.project_id)} · +${c.delay} ${c.delay === 1 ? "Tag" : "Tage"}`, href: `/admin/vorgaenge?site=${r.project_id}&trade=${encodeURIComponent(c.trade)}`, detail: c.reason });
+      }
+    }
+  }
+  for (const t of missingToday) {
+    const trade = all.trades.find((x) => x.team_id === t.id && tradeIds.has(x.id))?.name ?? t.name.replace(/^Team\s+/, "");
+    actions.push({ id: `r-${t.id}`, kind: "report", status: "amber", severity: 60, text: `Bericht fehlt · ${trade} · ${short(t.project_id)}`, href: `/admin/vorgaenge?site=${t.project_id}`, detail: `${t.name}: heute geplante Arbeit, noch kein Tagesbericht` });
+  }
+  for (const r of rows) {
+    for (const c of r.cells) {
+      if (c.status !== "amber" || c.delay > 0 || c.hindrance) continue;
+      if (actions.some((a) => a.kind === "report" && a.text.includes(`· ${c.trade} · ${short(r.project_id)}`))) continue;
+      actions.push({ id: `n-${r.project_id}-${c.trade}`, kind: "no_data", status: "amber", severity: 55, text: `Keine Mengen · ${c.trade} · ${short(r.project_id)}`, href: `/admin/vorgaenge?site=${r.project_id}&trade=${encodeURIComponent(c.trade)}`, detail: c.reason });
+    }
+  }
+  for (const c of cases.filter((x) => OPEN_STATUSES.has(x.status)).sort((a, b) => b.created_at.localeCompare(a.created_at))) {
+    const text = c.doc_type === "mehrkostenanzeige" ? "Mehrkostenanzeige · vor Ausführung senden" : `${docTitle(c.doc_type)} · ${c.status === "bereit" ? "prüfen" : "ergänzen"}`;
+    actions.push({ id: `l-${c.id}`, kind: "letter", status: "amber", severity: c.doc_type === "mehrkostenanzeige" ? 52 : 50, text, href: `/admin/case/${c.id}`, detail: `${c.reference} · ${short(c.project_id)}` });
+  }
+  actions.sort((a, b) => b.severity - a.severity || a.text.localeCompare(b.text));
+  const ok = rows.flatMap((r) => r.cells.filter((c) => c.status === "green").map((c) => `${c.trade} · ${short(r.project_id)}`));
+
+  // ── Map ─────────────────────────────────────────────────────────────
+  const rankStatus = (st: CellStatus) => (st === "red" ? 3 : st === "amber" ? 2 : st === "green" ? 1 : 0);
+  const siteMap: SiteSummary[] = sites.map((p) => {
+    const cells = rows.find((r) => r.project_id === p.id)?.cells ?? [];
+    const status = cells.reduce<CellStatus>((w, c) => (rankStatus(c.status) > rankStatus(w) ? c.status : w), "none");
+    return {
+      id: p.id,
+      code: siteCode(p),
+      name: p.name,
+      short: siteShort(p),
+      lat: p.lat,
+      lng: p.lng,
+      status: status === "none" ? "green" : status,
+      open: cases.filter((c) => c.project_id === p.id && OPEN_STATUSES.has(c.status)).length,
+      delay: [...now$.cells.entries()].filter(([k]) => k.startsWith(`${p.id}|`)).reduce((n, [, d]) => n + d, 0),
+    };
+  });
+  void cellOf;
 
   return {
     now: now.toISOString(),
@@ -565,6 +681,8 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
     completeness: { days: period, rows: completeness, title: complTitle },
     pipeline: { steps, title: pipeTitle },
     feed,
+    actions: { items: actions, ok },
+    site_map: siteMap,
   };
 }
 
@@ -587,8 +705,26 @@ function groupCheckins(items: FeedItem[]): FeedItem[] {
   return out;
 }
 
+const NUMBER_WORDS: Record<string, number> = { ein: 1, eine: 1, einen: 1, einem: 1, zwei: 2, drei: 3, vier: 4, "fünf": 5, sechs: 6, sieben: 7, acht: 8, neun: 9, zehn: 10, halb: 1 };
+/** "ca. 2 Arbeitstage", "zwei Tage", "eine Woche" → Werktage; 0 = unknown. */
+export function durationDays(v: unknown): number {
+  const s = String(v ?? "").toLowerCase();
+  const n = Number(/(\d+)/.exec(s)?.[1] ?? NUMBER_WORDS[/\b(ein|eine|einen|einem|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|halb)\b/.exec(s)?.[1] ?? ""] ?? 0);
+  return /woche/.test(s) ? n * 6 : n;
+}
+
 const rank = (c: HeatCell) => (c.status === "red" ? 1000 : c.status === "amber" ? 100 : 0) + c.delay * 10 + (c.hindrance ? 5 : 0);
 const normArea = (a: string) => a.replace(/\s+/g, "").toUpperCase();
+/** "2.OG", "2. OG, Achsen A–C", "im 2. Obergeschoss" → the same floor; no floor named → matches. */
+const floorOf = (a: string | null) => {
+  const m = a ? /(\d+)\s*\.?\s*(OG|Obergeschoss)|\b(EG|Erdgeschoss|UG)\b/i.exec(a) : null;
+  return m ? (m[1] ? `${m[1]}OG` : m[3].slice(0, 2).toUpperCase()) : null;
+};
+const sameFloor = (a: string | null, b: string | null) => {
+  const fa = floorOf(a);
+  const fb = floorOf(b);
+  return !fa || !fb || fa === fb;
+};
 
 function feedSource(e: AppEvent): FeedSource {
   const src = typeof e.payload.source === "string" ? e.payload.source : "";
@@ -599,28 +735,31 @@ function feedSource(e: AppEvent): FeedSource {
   return "system";
 }
 
-function feedTitle(e: AppEvent): string | null {
-  const ref = typeof e.payload.reference === "string" ? e.payload.reference : null;
-  const doc = typeof e.payload.doc_type === "string" ? docTitle(e.payload.doc_type) : null;
+function feedTitle(e: AppEvent, c: Case | undefined, team: string | null): string | null {
+  const docType = c?.doc_type ?? (typeof e.payload.doc_type === "string" ? e.payload.doc_type : null);
+  const report = docType === "bautagesbericht";
+  const doc = report ? `Tagesbericht${team ? ` ${team.replace(/^Team\s+/, "")}` : ""}` : docType ? docTitle(docType) : "Schreiben";
   switch (e.kind) {
     case "case_created":
-      return `${doc ?? "Vorgang"} ${ref ?? ""} angelegt`.trim();
+      return `${doc} angelegt`;
     case "case_validated":
-      return `${ref ?? "Schreiben"} validiert`;
+      return `${doc} validiert`;
     case "email_sent":
-      return `${ref ?? "Schreiben"} versendet`;
+      return `${doc} versendet`;
     case "reply_received":
-      return `Antwort zu ${ref ?? "einem Schreiben"}`;
+      return `Antwort zu ${doc}`;
+    case "case_closed":
+      return `${doc} abgeschlossen`;
     case "meeting_processed":
       return "Besprechung ausgewertet";
     case "meeting_case_created":
     case "meeting_case_updated":
     case "meeting_schedule":
+    case "case_confirmed":
+      return EVENT_DE[e.kind] ?? null;
     case "diary_entry":
       return "Check-in";
     case "progress_recorded":
-    case "case_confirmed":
-    case "case_closed":
       return EVENT_DE[e.kind] ?? null;
     default:
       return null;

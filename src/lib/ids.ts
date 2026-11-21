@@ -69,6 +69,13 @@ export const IDS = {
   schedSchwVorsatz: id(523),
   schedSchwSanitaer: id(524),
   schedSchwMaler: id(525),
+  // Dashboard story (dashboard-history.ts)
+  schedEstrich1: id(506),
+  tradeRiemSanitaer: id(216),
+  schedRiemSanitaer: id(517),
+  tradeSchwFassade: id(226),
+  teamSchwFassade: id(323),
+  schedSchwFassade: id(526),
   meetingKw46: id(701),
   meetingKw47: id(702),
 } as const;
