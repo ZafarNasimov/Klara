@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Building2, Check, FileText, Mic, X } from "lucide-react";
+import { AlertCircle, Building2, Check, CircleCheck, FileText, ImageIcon, Mic, Reply, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -80,7 +80,7 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
           <span className="text-sm text-zinc-400">/</span>
           <span className="text-sm text-zinc-600">{opened ? "Wohnanlage Riem / Estrich" : "Muster Bau GmbH"}</span>
           <span className="ml-auto flex items-center gap-2 text-sm text-zinc-600">
-            Site manager
+            Office
             <span className="flex size-7 items-center justify-center rounded-full bg-zinc-900 text-xs font-medium text-white">TB</span>
           </span>
         </header>
@@ -161,24 +161,22 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                     </Button>
                   </div>
                 </div>
-                <div className="relative min-h-0 flex-1 overflow-hidden p-5" style={appScaleVars(1.2)}>
+                <div className="relative min-h-0 flex-1 overflow-hidden p-5" style={appScaleVars(1.35)}>
                   <CaseDocument heardUpTo={CALL_SCRIPT.length - 1} complete={complete} status={status} className="mx-auto max-w-3xl" />
                 </div>
 
+
                 <AnimatePresence>
-                  {beat === B.send && (
+                  {beat === B.transcript && (
                     <motion.div
-                      key="sent"
-                      role="status"
-                      className="absolute top-20 left-1/2 flex w-max -translate-x-1/2 items-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm shadow-lg"
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      key="scrim"
+                      aria-hidden
+                      className="absolute inset-0 bg-white/70"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={ease}
-                    >
-                      <Check className="size-4 text-primary" strokeWidth={2.5} aria-hidden />
-                      Sent to site manager · Klara will ask him in his language.
-                    </motion.div>
+                    />
                   )}
                 </AnimatePresence>
 
@@ -261,8 +259,48 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
               </div>
               <StatusLine status={status} />
 
+              {/* The loop, in the panel: sent → the site manager's reply */}
+              <AnimatePresence mode="popLayout" initial={false}>
+                {beat === B.send && !complete && (
+                  <motion.p
+                    key="sent"
+                    role="status"
+                    className="flex items-start gap-2 rounded-lg border border-zinc-200 p-3 text-sm leading-snug text-zinc-800"
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={ease}
+                  >
+                    <Check className="mt-0.5 size-4 shrink-0 text-primary" strokeWidth={2.5} aria-hidden />
+                    Sent to site manager · Klara will ask him in his language.
+                  </motion.p>
+                )}
+                {complete && (
+                  <motion.div
+                    key="reply"
+                    role="status"
+                    className="flex items-start gap-3 rounded-lg border border-zinc-200 p-3"
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={ease}
+                  >
+                    <span aria-hidden className="flex size-12 shrink-0 items-center justify-center rounded-md bg-zinc-100 text-zinc-400">
+                      <ImageIcon className="size-5" />
+                    </span>
+                    <div className="min-w-0 text-sm leading-snug">
+                      <p className="flex items-center gap-1.5 font-medium text-zinc-900">
+                        <Reply className="size-4 text-primary" aria-hidden /> Site manager replied
+                      </p>
+                      <p className="text-zinc-500">
+                        <span className="font-mono">07:58</span> · {DOC_COMPLETION.dauer} · 1 photo
+                      </p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <section className="flex flex-col gap-2">
-                <h4 className="text-xs text-zinc-500">✓ Present</h4>
+                <h4 className="flex items-center gap-1.5 text-xs text-zinc-500"><CircleCheck className="size-3.5" aria-hidden /> Present</h4>
                 {PRESENT.map((p) => (
                   <CheckRow key={p} ok label={p} />
                 ))}
@@ -270,7 +308,7 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
               </section>
 
               <section className="flex flex-col gap-2">
-                <h4 className="text-xs text-zinc-500">! Missing</h4>
+                <h4 className="flex items-center gap-1.5 text-xs text-zinc-500"><AlertCircle className="size-3.5" aria-hidden /> Missing</h4>
                 {complete ? (
                   <p className="text-sm text-zinc-500">Nothing missing.</p>
                 ) : (
@@ -301,7 +339,7 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                     <ol className="flex flex-col gap-2.5">
                       {CALL_SCRIPT.map((line, i) => (
                         <li key={i} className="grid grid-cols-[3.2em_1fr] gap-2 text-xs leading-snug">
-                          <span className="font-mono text-zinc-400">{TRANSCRIPT_TIMES[i]}</span>
+                          <span className="font-mono text-zinc-500">{TRANSCRIPT_TIMES[i]}</span>
                           <span className="text-zinc-800">
                             <span className="font-medium">{line.who === "klara" ? "Klara" : "Polier (EN)"}:</span> {line.text}
                           </span>

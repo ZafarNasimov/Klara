@@ -83,7 +83,7 @@ export function EcosystemScene({ phase, step, revealMode }: SceneProps) {
           />
         ))}
         <motion.path
-          d={`M ${HUB.x} ${HUB.y + HUB.r} L ${HUB.x} ${PEOPLE_Y - 34}`}
+          d={`M ${HUB.x} ${HUB.y + HUB.r} L ${HUB.x} ${PEOPLE_Y - 52} M ${HUB.x - 470} ${PEOPLE_Y - 52} L ${HUB.x + 470} ${PEOPLE_Y - 52}`}
           stroke="#d4d4d8"
           strokeWidth={2}
           initial={{ pathLength: 0 }}

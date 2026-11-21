@@ -136,7 +136,16 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
     go(index + 1);
   }, [tx, options.reveal, scenes, index, steps, go]);
 
-  const back = useCallback(() => go(index - 1), [go, index]);
+  // Back undoes one beat inside a scene first (an accidental double click in
+  // Scene 3 is one key away), then goes to the previous scene, fully revealed.
+  const back = useCallback(() => {
+    if (tx) return;
+    if (options.reveal === "click" && steps[index] > 0) {
+      setSteps((s) => s.map((v, i) => (i === index ? v - 1 : v)));
+      return;
+    }
+    go(index - 1);
+  }, [tx, options.reveal, steps, index, go]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

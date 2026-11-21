@@ -39,11 +39,12 @@ export function CaseDocument({
   // Fixed for the session, so the date never changes mid-pitch.
   const [today] = useState(todayDE);
   const s = STATUS[status];
+  const title = status === "validated" ? DOC_TITLE.replace(/\s*\(Entwurf\)$/, "") : DOC_TITLE;
 
   return (
     <article
       lang="de"
-      aria-label={DOC_TITLE}
+      aria-label={title}
       className={cn("flex flex-col rounded-md border border-zinc-200 bg-white px-8 py-6", PAPER_SHADOW, className)}
     >
       <header className="flex items-start justify-between gap-4 border-b border-zinc-200 pb-4">
@@ -51,7 +52,7 @@ export function CaseDocument({
           <p className="text-xs text-zinc-500">
             Muster Bau GmbH · <span className="font-mono">{DOC_REFERENCE}</span>
           </p>
-          <h3 className="mt-1 text-base leading-snug font-semibold text-balance text-zinc-900">{DOC_TITLE}</h3>
+          <h3 className="mt-1 text-base leading-snug font-semibold text-balance text-zinc-900">{title}</h3>
         </div>
         <motion.span
           key={status}
@@ -84,7 +85,7 @@ function FieldRow({ field, heardUpTo, complete, today }: { field: DocField; hear
   return (
     <div className="grid grid-cols-[38%_1fr] gap-4 border-b border-zinc-100 py-2 last:border-0">
       <dt className="text-xs leading-relaxed text-zinc-500">{field.label}</dt>
-      <dd className="min-h-[1.5em] text-sm leading-snug">
+      <dd className="min-h-[1.5em] text-sm leading-snug text-pretty">
         {state === "filled" && (
           <motion.span
             key={value}

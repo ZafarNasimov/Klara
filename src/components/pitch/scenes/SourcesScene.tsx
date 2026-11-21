@@ -9,7 +9,7 @@ import { EASE_OUT, u } from "../stage";
 import { PAPER_SHADOW } from "./CaseDocument";
 import { LightScene, PitchHeadline, useBeat, type SceneProps } from "./scene-parts";
 
-const CARD = { top: 320, width: 500, height: 570, lefts: [160, 710, 1260] };
+const CARD = { top: 290, width: 500, height: 650, lefts: [160, 710, 1260] };
 
 /** Scene 4 – more sources. Three cards, one per click. */
 export function SourcesScene({ phase, step, revealMode }: SceneProps) {
@@ -114,7 +114,7 @@ function SourceCard({
       <div lang="de" className="flex min-h-0 flex-1 flex-col gap-3 px-5">
         {children}
       </div>
-      <p className="mt-auto border-t border-zinc-100 bg-zinc-50 text-zinc-900" style={{ fontSize: u(22), lineHeight: 1.35, padding: `${u(18)} ${u(28)}` }}>
+      <p className="mt-auto border-t border-zinc-100 bg-zinc-50 text-pretty text-zinc-900" style={{ fontSize: u(22), lineHeight: 1.35, padding: `${u(18)} ${u(28)}` }}>
         {result}
       </p>
     </motion.article>

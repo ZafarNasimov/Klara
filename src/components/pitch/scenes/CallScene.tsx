@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, Phone } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -65,7 +65,10 @@ export function CallScene({ phase, step, revealMode }: SceneProps) {
         <Badge variant="outline" className="h-auto border-zinc-300 bg-white px-3 py-1 font-mono text-sm text-zinc-900">
           EN → DE
         </Badge>
-        <span className="text-sm text-zinc-500">Team Estrich · Wohnanlage Riem</span>
+        <span className="flex items-center gap-2 text-sm text-zinc-600">
+          <Phone className="size-4 text-primary" aria-hidden />
+          Call · Foreman, Team Estrich · Wohnanlage Riem
+        </span>
       </div>
 
       {/* Chat transcript (left) */}
@@ -96,7 +99,7 @@ export function CallScene({ phase, step, revealMode }: SceneProps) {
 
       {/* After the call: what just happened, one by one */}
       {after && (
-        <ul className="absolute flex flex-col" style={{ left: u(1040), top: u(250), width: u(720), gap: u(34) }}>
+        <ul className="absolute flex flex-col" style={{ left: u(1040), top: u(300), width: u(720), gap: u(34) }}>
           {CALL_CAPABILITIES.map((text, i) => (
             <motion.li
               key={text}
@@ -113,7 +116,7 @@ export function CallScene({ phase, step, revealMode }: SceneProps) {
               >
                 <Check style={{ width: u(24), height: u(24) }} strokeWidth={2.5} />
               </span>
-              <span className="tracking-[-0.01em] text-pretty">{text}</span>
+              <span className="tracking-[-0.01em] text-balance">{text}</span>
             </motion.li>
           ))}
         </ul>
@@ -132,8 +135,13 @@ function Thinking() {
       transition={{ duration: 0.25, ease: EASE_OUT }}
     >
       <KlaraAvatar size={36} className="size-9 self-start" title="Klara" />
-      <p aria-label="Klara is answering" className="rounded-2xl rounded-tl-md border border-zinc-200 bg-white px-4 py-2.5 text-sm leading-snug text-zinc-400">
-        …
+      <p
+        aria-label="Klara is answering"
+        className="flex items-center gap-1.5 rounded-2xl rounded-tl-md border border-zinc-200 bg-white px-4 py-3.5"
+      >
+        {[0, 1, 2].map((i) => (
+          <span key={i} aria-hidden className="size-2 rounded-full bg-zinc-400" />
+        ))}
       </p>
     </motion.div>
   );
@@ -151,7 +159,7 @@ function Message({ line }: { line: CallLine }) {
       {klara ? (
         <>
           <KlaraAvatar size={36} className="size-9 self-start" title="Klara" />
-          <p className="max-w-[88%] rounded-2xl rounded-tl-md border border-zinc-200 bg-white px-4 py-2.5 text-sm leading-snug text-zinc-900">
+          <p className="max-w-[88%] rounded-2xl rounded-tl-md border border-zinc-200 bg-white px-4 py-2.5 text-sm leading-snug text-pretty text-zinc-900">
             {line.text}
           </p>
         </>
@@ -161,7 +169,7 @@ function Message({ line }: { line: CallLine }) {
             Polier
             <span className="rounded-sm border border-zinc-300 bg-white px-1.5 font-mono text-[0.85em] text-zinc-700">EN</span>
           </span>
-          <p lang="en" className="max-w-[88%] rounded-2xl rounded-br-md bg-zinc-100 px-4 py-2.5 text-sm leading-snug text-zinc-900">
+          <p lang="en" className="max-w-[88%] rounded-2xl rounded-br-md bg-zinc-100 px-4 py-2.5 text-sm leading-snug text-pretty text-zinc-900">
             {line.text}
           </p>
         </>

@@ -112,5 +112,5 @@ export function PortfolioScene({ phase, step, revealMode }: SceneProps) {
 }
 
 function Num({ value, className }: { value: number; className?: string }) {
-  return <TableCell className={cn("text-right font-mono", value === 0 ? "text-zinc-400" : "text-zinc-900", className)}>{value}</TableCell>;
+  return <TableCell className={cn("text-right font-mono", value === 0 ? "text-zinc-500" : "text-zinc-900", className)}>{value}</TableCell>;
 }
