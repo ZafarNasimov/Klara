@@ -2,6 +2,7 @@
 
 import { animate, MotionConfig, useReducedMotion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { cn } from "@/lib/utils";
 import { preloadKlaraRobot } from "./klara-robot-loader";
 import { PITCH_SCENES } from "./pitch-scenes";
 import type { PitchSceneDef, RevealMode } from "./scenes/scene-parts";
@@ -36,12 +37,18 @@ const BACK_KEYS = new Set(["ArrowLeft", "ArrowUp", "PageUp", "Backspace"]);
 
 type Options = { start: number; fadeOnly: boolean; reveal: RevealMode };
 
-/** Rehearsal switches: ?scene=6, ?transition=fade, ?reveal=auto */
-function readOptions(sceneCount: number): Options {
+/** Scene for a key like "3" or "6b" (a bare digit picks the first scene starting with it). */
+function sceneIndex(scenes: PitchSceneDef[], key: string | null): number {
+  if (!key) return -1;
+  const exact = scenes.findIndex((s) => s.key === key);
+  return exact >= 0 ? exact : scenes.findIndex((s) => s.key.startsWith(key));
+}
+
+/** Rehearsal switches: ?scene=6b, ?transition=fade, ?reveal=auto */
+function readOptions(scenes: PitchSceneDef[]): Options {
   const params = new URLSearchParams(window.location.search);
-  const scene = Number(params.get("scene"));
   return {
-    start: Number.isInteger(scene) && scene >= 1 && scene <= sceneCount ? scene - 1 : 0,
+    start: Math.max(0, sceneIndex(scenes, params.get("scene"))),
     fadeOnly: params.get("transition") === "fade",
     reveal: params.get("reveal") === "auto" ? "auto" : "click",
   };
@@ -62,7 +69,7 @@ function centerOf(el: Element | undefined) {
 
 /** Client-only (mounted via PitchApp with ssr: false): reads the URL on first render. */
 export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] }) {
-  const [options] = useState(() => readOptions(scenes.length));
+  const [options] = useState(() => readOptions(scenes));
   const reducedMotion = useReducedMotion();
   const [index, setIndex] = useState(options.start);
   const [steps, setSteps] = useState<number[]>(() => scenes.map(() => 0));
@@ -94,9 +101,9 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
   // Keep the scene in the URL so a reload (or a clicker's F5) stays on it.
   useEffect(() => {
     const url = new URL(window.location.href);
-    url.searchParams.set("scene", String(index + 1));
+    url.searchParams.set("scene", scenes[index].key);
     window.history.replaceState(window.history.state, "", url);
-  }, [index]);
+  }, [index, scenes]);
 
   // Start the robot download the moment /pitch mounts.
   useEffect(() => {
@@ -134,7 +141,13 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      if (NEXT_KEYS.has(e.key)) {
+      if (/^[1-9]$/.test(e.key)) {
+        const target = sceneIndex(scenes, e.key);
+        if (target >= 0) {
+          e.preventDefault();
+          if (!e.repeat) go(target);
+        }
+      } else if (NEXT_KEYS.has(e.key)) {
         e.preventDefault();
         if (!e.repeat) advance();
       } else if (BACK_KEYS.has(e.key)) {
@@ -144,7 +157,7 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [advance, back]);
+  }, [advance, back, go, scenes]);
 
   // Run one transition. Input is ignored until it finishes (no double skips).
   useEffect(() => {
@@ -239,7 +252,7 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
     <MotionConfig reducedMotion="user">
       <div
         lang="en"
-        className="fixed inset-0 cursor-none overflow-hidden select-none"
+        className={cn("fixed inset-0 overflow-hidden select-none", !current.pointer && "cursor-none")}
         style={{ "--pitch-u": PITCH_UNIT, background: current.theme === "dark" ? DARK_BG : LIGHT_BG } as CSSProperties}
         onClick={(e) => e.button === 0 && advance()}
       >
@@ -285,7 +298,7 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
         )}
 
         <p className="sr-only" aria-live="polite">
-          {`${current.label}, scene ${(tx ? tx.to : index) + 1} of ${scenes.length}`}
+          {`${current.label}, scene ${current.key}`}
         </p>
       </div>
     </MotionConfig>

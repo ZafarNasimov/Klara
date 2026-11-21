@@ -1,10 +1,18 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Fragment, type ComponentType, type CSSProperties, type ReactNode, type RefCallback } from "react";
+import {
+  Fragment,
+  useEffect,
+  useState,
+  type ComponentType,
+  type CSSProperties,
+  type ReactNode,
+  type RefCallback,
+} from "react";
 import { cn } from "@/lib/utils";
 import type { KlaraRobotHandle } from "../KlaraRobot";
-import { EASE_OUT, type ScenePhase, type SceneTheme, u } from "../stage";
+import { EASE_OUT, LIGHT_BG, type ScenePhase, type SceneTheme, u } from "../stage";
 
 export type RevealMode = "click" | "auto";
 
@@ -21,8 +29,12 @@ export type SceneProps = {
 
 export type PitchSceneDef = {
   id: string;
+  /** Number-key / URL key: "1"…"5", "6a", "6b". Keys 1–6 jump to the first scene starting with that digit. */
+  key: string;
   label: string;
   theme: SceneTheme;
+  /** Shows the mouse pointer (scenes the presenter clicks into). */
+  pointer?: boolean;
   /** Clicks a scene consumes before the next click changes scene (click mode). */
   steps: number;
   Component: ComponentType<SceneProps>;
@@ -195,3 +207,75 @@ export function scheduleGlances(
 
 /** Silver text from the brief: neutral-50 → neutral-400, top to bottom. */
 export const SILVER_TEXT = "bg-linear-to-b from-neutral-50 to-neutral-400 bg-clip-text text-transparent";
+
+// ── Light scenes ─────────────────────────────────────────────────────────
+
+/** App mocks render at 150 % so app-sized type (text-sm) reads on a projector. */
+export const APP_ZOOM = 1.5;
+const TEXT_PX: Record<string, number> = { xs: 12, sm: 14, base: 16, lg: 18, xl: 20, "2xl": 24, "3xl": 30, "4xl": 36, "5xl": 48 };
+
+/**
+ * Re-bases Tailwind's spacing, type and radius on the 1920×1080 grid, so shadcn
+ * components (which read --spacing, --text-*, --radius) scale with the stage
+ * like everything else in the pitch.
+ */
+export function appScaleVars(zoom = APP_ZOOM): CSSProperties {
+  const vars: Record<string, string> = { "--spacing": u(4 * zoom), "--radius": u(10 * zoom) };
+  for (const [name, px] of Object.entries(TEXT_PX)) vars[`--text-${name}`] = u(px * zoom);
+  return vars as CSSProperties;
+}
+
+/** Shell for a light scene: #FAFAFA, the stage, app-scaled tokens, enter/exit fade. */
+export function LightScene({
+  label,
+  phase,
+  children,
+}: {
+  label: string;
+  phase: ScenePhase;
+  children: ReactNode;
+}) {
+  return (
+    <section aria-label={label} className="absolute inset-0 overflow-hidden text-zinc-900" style={{ background: LIGHT_BG }}>
+      <Stage>
+        <SceneContent phase={phase} className="absolute inset-0" style={appScaleVars()}>
+          {children}
+        </SceneContent>
+      </Stage>
+    </section>
+  );
+}
+
+/** English pitch headline on the light scenes. */
+export function PitchHeadline({ children, className, style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
+  return (
+    <h2
+      className={cn("absolute font-semibold leading-[1.05] tracking-[-0.03em] text-zinc-900", className)}
+      style={{ left: u(160), top: u(104), fontSize: u(60), ...style }}
+    >
+      {children}
+    </h2>
+  );
+}
+
+/**
+ * The scene's current beat. Click mode: PitchFlow's step. Auto mode
+ * (?reveal=auto): beats advance on their own at the given times (ms after enter).
+ */
+export function useBeat(phase: ScenePhase, step: number, revealMode: RevealMode, autoTimes: number[]) {
+  const [autoBeat, setAutoBeat] = useState(0);
+  const auto = revealMode === "auto";
+  const timesKey = autoTimes.join(",");
+  useEffect(() => {
+    if (!auto || phase !== "enter") return;
+    const timers = timesKey
+      .split(",")
+      .filter(Boolean)
+      .map((t, i) => window.setTimeout(() => setAutoBeat(i + 1), Number(t)));
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [auto, phase, timesKey]);
+  return auto ? autoBeat : step;
+}
+
+/** Ring that tells the presenter (and the jury) which control comes next. */
+export const NEXT_ACTION = "ring-[3px] ring-primary/35 ring-offset-2 ring-offset-white";

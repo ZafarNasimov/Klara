@@ -10,9 +10,9 @@ import { ROBOT_BOX } from "./TitleScene";
 const SPOT = { x: 77, y: 30 };
 
 /**
- * Scene 6 – close. Same Klara and light as the title; the text arrives line by
- * line. Line 1 comes with the scene; in click mode lines 2 and 3 follow on
- * clicks (steps 1–2), in auto mode on a reading-pace timer.
+ * Scene 6b – close. Same Klara and light as the title; the text arrives line
+ * by line. Line 1 comes with the scene; in click mode lines 2–4 follow on
+ * clicks (steps 1–3), in auto mode on a reading-pace timer.
  *
  * The robot is never faded in here: the light→dark wipe collapses onto it,
  * so it must already stand there when the wipe starts.
@@ -22,6 +22,7 @@ export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: 
   const auto = revealMode === "auto";
   const line2 = show && (auto || step >= 1);
   const line3 = show && (auto || step >= 2);
+  const line4 = show && (auto || step >= 3);
   const rootRef = useRef<HTMLElement>(null);
   const robotRef = useRef<KlaraRobotHandle>(null);
 
@@ -83,9 +84,19 @@ export function ClosingScene({ phase, step, revealMode, headRef, robotPaused }: 
             as="p"
             show={line3}
             delay={auto ? 2.2 : 0.1}
+            className="tracking-[-0.02em] text-neutral-300"
+            style={{ fontSize: u(36), marginTop: u(36), lineHeight: 1.2 }}
+          >
+            The operating system for construction companies.
+          </FadeUp>
+
+          <FadeUp
+            as="p"
+            show={line4}
+            delay={auto ? 3.2 : 0.1}
             duration={0.5}
             className="text-zinc-400"
-            style={{ fontSize: u(20), marginTop: u(64) }}
+            style={{ fontSize: u(20), marginTop: u(56) }}
           >
             Ask Klara · Team Build Different
           </FadeUp>
