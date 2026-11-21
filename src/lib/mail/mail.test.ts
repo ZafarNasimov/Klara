@@ -46,11 +46,11 @@ async function sentHindrance(): Promise<Case> {
 
 describe("subject (SPEC §8)", () => {
   it("names the VOB/B basis for plain bases only", () => {
-    expect(mailSubject({ doc_type: "behinderungsanzeige", reference: "KL-2026-0042" }, "Neubau Bürogebäude München")).toBe(
-      "Behinderungsanzeige gem. § 6 Abs. 1 VOB/B – BV Neubau Bürogebäude München – Zeichen KL-2026-0042",
+    expect(mailSubject({ doc_type: "behinderungsanzeige", reference: "KL-2026-0042" }, "Wohnanlage Riem, Haus 2")).toBe(
+      "Behinderungsanzeige gem. § 6 Abs. 1 VOB/B – BV Wohnanlage Riem, Haus 2 – Zeichen KL-2026-0042",
     );
-    expect(mailSubject({ doc_type: "stellungnahme_zurueckweisung", reference: "KL-2026-0043" }, "Neubau Bürogebäude München")).toBe(
-      "Stellungnahme zur Zurückweisung – BV Neubau Bürogebäude München – Zeichen KL-2026-0043",
+    expect(mailSubject({ doc_type: "stellungnahme_zurueckweisung", reference: "KL-2026-0043" }, "Wohnanlage Riem, Haus 2")).toBe(
+      "Stellungnahme zur Zurückweisung – BV Wohnanlage Riem, Haus 2 – Zeichen KL-2026-0043",
     );
   });
 });
@@ -60,7 +60,7 @@ describe("draft and send", () => {
     const c = await readyHindrance();
     const draft = await createDraft(c.id, tick());
     // Architect has no authority: the letter and the e-mail go to the client (Bauherr).
-    expect(draft.to).toEqual(["petra.lang@immobilien-isar.example"]);
+    expect(draft.to).toEqual(["petra.lang@wohnbau-riem.example"]);
     expect(draft.subject).toContain("Zeichen KL-2026-0042");
     expect(draft.body).toMatch(/^Sehr geehrte Damen und Herren,/);
     expect(draft.body).toContain("KL-2026-0042");
@@ -105,8 +105,8 @@ describe("addressee and one-step approval", () => {
     // Only the architect (no Vollmacht): the letter is addressed to the Bauherr.
     await updateDraft(draft.id, { to: ["t.weber@buero-weber.example"] });
     const view = await draftView(draft.id);
-    expect(view.addressee).toMatchObject({ email: "petra.lang@immobilien-isar.example", name: "Dr. Petra Lang" });
-    expect(view.send_blocker).toBe("Das Schreiben ist an Dr. Petra Lang, Immobilien Isar GmbH adressiert. Diese Adresse muss unter „An“ stehen.");
+    expect(view.addressee).toMatchObject({ email: "petra.lang@wohnbau-riem.example", name: "Dr. Petra Lang" });
+    expect(view.send_blocker).toBe("Das Schreiben ist an Dr. Petra Lang, Wohnbau Riem GmbH adressiert. Diese Adresse muss unter „An“ stehen.");
     await expect(sendDraft(draft.id, { userId: IDS.userBauleiter }, tick())).rejects.toThrow(/adressiert/);
     expect(view.contacts.find((k) => k.email === "t.weber@buero-weber.example")?.has_authority).toBe(false);
   });
@@ -155,7 +155,7 @@ describe("scenario 7: rejection → Stellungnahme (SPEC §6.4, §10)", () => {
     const c = await sentHindrance();
     const mail = (await store().list("email_out", { where: { case_id: c.id } }))[0];
     const payload = {
-      From: "Dr. Petra Lang <petra.lang@immobilien-isar.example>",
+      From: "Dr. Petra Lang <petra.lang@wohnbau-riem.example>",
       Subject: `AW: ${mail.subject}`,
       TextBody: "Sehr geehrte Damen und Herren,\n\nwir weisen Ihre Behinderungsanzeige zurück. Die Elektroarbeiten liegen im Zeitplan.",
       MessageID: "pm-inbound-1",
@@ -182,7 +182,7 @@ describe("scenario 7: rejection → Stellungnahme (SPEC §6.4, §10)", () => {
 });
 
 describe("other answers (SPEC §6.4 step 4)", () => {
-  const PETRA = "petra.lang@immobilien-isar.example";
+  const PETRA = "petra.lang@wohnbau-riem.example";
   const body = (v: { body: unknown }) => JSON.stringify(v.body);
 
   it("request_info: drafts Ergänzende Angaben and asks the Polier, whose answer fills the letter", async () => {

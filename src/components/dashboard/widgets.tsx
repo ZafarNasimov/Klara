@@ -1,14 +1,16 @@
 "use client";
-// Dashboard widgets. Titles state the finding; values are labelled on the
-// chart; status colours only for the traffic light (with a shape and a reason).
+// Dashboard widgets. Short titles; insights live in "Handlungsbedarf"; exact
+// values in tooltips. Status colours only for the traffic light, always with
+// a shape (● ◆ ■) and a reason.
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from "react";
-import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
-import { Building2, ClipboardCheck, Mail, Phone, Users } from "lucide-react";
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
+import { ArrowDown, ArrowUp, Building2, ChevronRight, ClipboardCheck, Info, Mail, Phone, Users } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { CellStatus, DashboardView, FeedSource, Kpi } from "@/lib/dashboard/compute";
 import { fmtDayDe } from "@/lib/deadlines";
 import { cn } from "@/lib/utils";
+import { DISTRICTS, ISAR, MAP_H, MAP_W, OUTLINE, project } from "./munich-map";
 
 const EASE = [0.23, 1, 0.32, 1] as const;
 
@@ -22,14 +24,22 @@ export function Tip({ content, children }: { content: ReactNode; children: React
   );
 }
 
-export function Card({ title, topic, children, className, action }: { title: string; topic: string; children: ReactNode; className?: string; action?: ReactNode }) {
+export function InfoTip({ text, label }: { text: ReactNode; label: string }) {
   return (
-    <section className={cn("flex min-w-0 flex-col rounded-xl border border-border bg-background", className)} aria-label={topic}>
-      <header className="flex items-start justify-between gap-3 px-5 pt-4 pb-3">
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">{topic}</p>
-          <h2 className="mt-0.5 text-[15px] leading-snug font-semibold tracking-tight text-foreground">{title}</h2>
-        </div>
+    <Tip content={<span>{text}</span>}>
+      <button type="button" aria-label={label} className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+        <Info className="size-3.5" aria-hidden />
+      </button>
+    </Tip>
+  );
+}
+
+/** A card with a one-line title (max five words). */
+export function Card({ title, children, className, action }: { title: string; children: ReactNode; className?: string; action?: ReactNode }) {
+  return (
+    <section className={cn("flex min-w-0 flex-col rounded-xl border border-border bg-background", className)} aria-label={title}>
+      <header className="flex h-12 items-center justify-between gap-3 px-5">
+        <h2 className="text-sm font-semibold whitespace-nowrap text-foreground">{title}</h2>
         {action}
       </header>
       <div className="min-h-0 flex-1 px-5 pb-5">{children}</div>
@@ -39,10 +49,28 @@ export function Card({ title, topic, children, className, action }: { title: str
 
 export const Empty = ({ children }: { children: ReactNode }) => <p className="py-6 text-center text-sm text-muted-foreground">{children}</p>;
 
+/** ● im Plan, ◆ bis 2 Tage, ■ über 2 Tage / Behinderung. */
+const SHAPE: Record<Exclude<CellStatus, "none">, string> = {
+  green: "rounded-full bg-light-green",
+  amber: "rotate-45 rounded-[1px] bg-light-yellow",
+  red: "rounded-[1px] bg-light-red",
+};
+const Shape = ({ status, className }: { status: Exclude<CellStatus, "none">; className?: string }) => (
+  <span aria-hidden className={cn("inline-block size-2 shrink-0", SHAPE[status], className)} />
+);
+
 // ── KPI ─────────────────────────────────────────────────────────────────
 
-const fmtValue = (v: number, format: Kpi["format"]) =>
-  format === "eur" ? `${Math.round(v).toLocaleString("de-DE")} €` : Math.round(v).toLocaleString("de-DE");
+/** Labels of at most two words. */
+const KPI_LABEL: Record<Kpi["key"], string> = {
+  open: "Offene Vorgänge",
+  missing: "Fehlende Berichte",
+  sent: "Anzeigen",
+  delay: "Verzugstage",
+  claims: "Anspruchsgrundlage",
+};
+
+const fmtValue = (v: number, format: Kpi["format"]) => (format === "eur" ? `${Math.round(v).toLocaleString("de-DE")} €` : Math.round(v).toLocaleString("de-DE"));
 
 function AnimatedNumber({ value, format }: { value: number; format: Kpi["format"] }) {
   const reduce = useReducedMotion();
@@ -60,15 +88,24 @@ function AnimatedNumber({ value, format }: { value: number; format: Kpi["format"
 
 export function KpiCard({ kpi, index }: { kpi: Kpi; index: number }) {
   const reduce = useReducedMotion();
-  // A changed value (realtime) flashes blue-50 once.
+  // A value that changes live flashes blue-50 once.
   const [prev, setPrev] = useState(kpi.value);
   const [flash, setFlash] = useState(0);
   if (kpi.value !== prev) {
     setPrev(kpi.value);
     setFlash((n) => n + 1);
   }
+  const Arrow = kpi.delta > 0 ? ArrowUp : ArrowDown;
   return (
-    <Tip content={<span>{kpi.basis}</span>}>
+    <Tip
+      content={
+        <span className="flex flex-col gap-1">
+          <span>{kpi.basis}</span>
+          <span className="opacity-80">{kpi.delta_label}</span>
+          {kpi.note && kpi.key === "missing" ? <span className="opacity-80">{kpi.note}</span> : null}
+        </span>
+      }
+    >
       <motion.div
         initial={reduce ? false : { opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
@@ -87,19 +124,25 @@ export function KpiCard({ kpi, index }: { kpi: Kpi; index: number }) {
             transition={{ duration: 1.6, ease: "easeOut", delay: 0.2 }}
           />
         ) : null}
-        <p className="relative flex items-baseline gap-1.5 text-xs text-muted-foreground">
-          <span className="truncate">{kpi.label}</span>
+        <p className="relative flex items-center gap-1.5 text-xs whitespace-nowrap text-muted-foreground">
+          {KPI_LABEL[kpi.key]}
           {kpi.note && kpi.key === "claims" ? <span className="rounded border border-border px-1 text-[10px]">{kpi.note}</span> : null}
         </p>
         <div className="relative mt-1.5 flex items-end justify-between gap-3">
-          <p className="font-mono text-[28px] leading-none font-medium tracking-tight text-foreground tabular-nums">
+          <p className="font-mono text-[28px] leading-none font-medium tracking-tight whitespace-nowrap text-foreground tabular-nums">
             <AnimatedNumber value={kpi.value} format={kpi.format} />
           </p>
           <Sparkline values={kpi.spark} />
         </div>
-        <p className="relative mt-2 truncate text-xs text-muted-foreground">
-          {kpi.delta_label}
-          {kpi.note && kpi.key !== "claims" ? <span className="text-foreground"> · {kpi.note}</span> : null}
+        <p className="relative mt-2 flex h-4 items-center gap-1 font-mono text-xs text-muted-foreground tabular-nums">
+          {kpi.delta === 0 ? (
+            <span aria-label="unverändert gegenüber der Vorwoche">±0</span>
+          ) : (
+            <>
+              <Arrow className="size-3 text-blue-600" aria-hidden />
+              <span aria-label={kpi.delta_label}>{fmtValue(Math.abs(kpi.delta), kpi.format)}</span>
+            </>
+          )}
         </p>
       </motion.div>
     </Tip>
@@ -124,150 +167,259 @@ function Sparkline({ values }: { values: number[] }) {
   );
 }
 
+// ── Map ─────────────────────────────────────────────────────────────────
+
+const PIN: Record<Exclude<CellStatus, "none">, string> = { green: "bg-light-green", amber: "bg-light-yellow", red: "bg-light-red" };
+
+export function SiteMap({ v, onPick }: { v: DashboardView; onPick: ((id: string) => void) | null }) {
+  return (
+    <div className="relative mx-auto" style={{ aspectRatio: `${MAP_W} / ${MAP_H}`, height: 320, maxWidth: "100%" }}>
+      <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} className="absolute inset-0 size-full" aria-hidden>
+        <path d={OUTLINE} fill="var(--color-zinc-50)" stroke="var(--color-zinc-300)" strokeWidth={1.5} />
+        {DISTRICTS.map((d, i) => (
+          <path key={i} d={d} fill="none" stroke="var(--color-zinc-200)" strokeWidth={1} />
+        ))}
+        <path d={ISAR} fill="none" stroke="var(--color-blue-200)" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {v.site_map.map((s) => {
+        const [x, y] = project(s.lat, s.lng);
+        const status = s.status === "none" ? "green" : s.status;
+        const label = `Baustelle ${s.code} · ${s.name}: ${s.open} ${s.open === 1 ? "offener Vorgang" : "offene Vorgänge"}, ${s.delay} Verzugstage`;
+        const pin = (
+          <span className="relative flex items-center gap-1.5" data-pin={s.code} data-status={status}>
+            <Pulse status={status} />
+            <span
+              className={cn(
+                "relative flex size-7 items-center justify-center rounded-full border-2 border-white font-mono text-xs font-semibold text-white shadow-sm transition-colors duration-300",
+                PIN[status],
+                status === "red" && "shadow-[0_0_0_6px_rgb(220_38_38_/_0.12)]",
+              )}
+            >
+              {s.code}
+            </span>
+            <span className="text-xs font-medium whitespace-nowrap text-foreground">{s.short}</span>
+          </span>
+        );
+        return (
+          <div key={s.id} className="absolute -translate-y-1/2" style={{ left: `${(x / MAP_W) * 100}%`, top: `${(y / MAP_H) * 100}%`, marginLeft: -14 }}>
+            <Tip content={<span>{label}</span>}>
+              {onPick ? (
+                <button type="button" onClick={() => onPick(s.id)} aria-label={`${label}. Filter setzen`} className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  {pin}
+                </button>
+              ) : (
+                <span role="img" aria-label={label}>
+                  {pin}
+                </span>
+              )}
+            </Tip>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** A red pin pulses twice when it turns red, then keeps a soft glow. */
+function Pulse({ status }: { status: Exclude<CellStatus, "none"> }) {
+  const reduce = useReducedMotion();
+  const [prev, setPrev] = useState(status);
+  const [n, setN] = useState(0);
+  if (status !== prev) {
+    setPrev(status);
+    if (status === "red") setN((x) => x + 1);
+  }
+  if (!n || reduce || status !== "red") return null;
+  return (
+    <motion.span
+      key={n}
+      aria-hidden
+      className="absolute top-0 left-0 size-7 rounded-full bg-light-red"
+      initial={{ scale: 1, opacity: 0.5 }}
+      animate={{ scale: 2.4, opacity: 0 }}
+      transition={{ duration: 0.9, ease: "easeOut", repeat: 1 }}
+    />
+  );
+}
+
+// ── Handlungsbedarf ─────────────────────────────────────────────────────
+
+export function Actions({ v, linkable }: { v: DashboardView; linkable: boolean }) {
+  const reduce = useReducedMotion();
+  const top = v.actions.items.slice(0, 3);
+  return (
+    <div className="flex flex-col gap-2">
+      {top.length ? null : <Empty>Nichts zu tun.</Empty>}
+      <ul className="flex flex-col gap-2">
+        <AnimatePresence initial={false} mode="popLayout">
+          {top.map((a) => {
+            const body = (
+              <span className="flex h-12 items-center gap-3 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted">
+                <Shape status={a.status} />
+                <span className="min-w-0 flex-1 whitespace-nowrap">{a.text}</span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              </span>
+            );
+            return (
+              <motion.li
+                key={a.id}
+                layout={!reduce}
+                initial={reduce ? false : { opacity: 0, y: -12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35, ease: EASE }}
+                data-action={a.kind}
+              >
+                <Tip content={<span>{a.detail}</span>}>
+                  {linkable ? (
+                    <Link href={a.href} className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      {body}
+                    </Link>
+                  ) : (
+                    <span className="block">{body}</span>
+                  )}
+                </Tip>
+              </motion.li>
+            );
+          })}
+        </AnimatePresence>
+      </ul>
+      {v.actions.ok.length ? (
+        <details className="group mt-1 text-sm">
+          <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-1 py-1 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
+            <Shape status="green" />
+            Alles im Plan ({v.actions.ok.length})
+            <ChevronRight className="ml-auto size-4 transition-transform group-open:rotate-90" aria-hidden />
+          </summary>
+          <p className="mt-1 px-1 text-xs leading-relaxed text-muted-foreground">{v.actions.ok.join(", ")}</p>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 // ── Heatmap ─────────────────────────────────────────────────────────────
 
 const CELL: Record<CellStatus, string> = {
   green: "bg-light-green/12 text-light-green-text",
   amber: "bg-light-yellow/18 text-light-yellow-text",
   red: "bg-light-red text-white",
-  none: "bg-zinc-50 text-zinc-300",
+  none: "",
 };
-const SHAPE: Record<Exclude<CellStatus, "none">, string> = {
-  green: "rounded-full bg-light-green",
-  amber: "rotate-45 rounded-[1px] bg-light-yellow",
-  red: "rounded-[1px] bg-white",
-};
+
+const timeFmt = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" });
+const dayKey = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" });
+const since = (iso: string, today: string) => (dayKey.format(new Date(iso)) === today ? timeFmt.format(new Date(iso)) : fmtDayDe(dayKey.format(new Date(iso))));
 
 export function Heatmap({ v, linkable }: { v: DashboardView; linkable: boolean }) {
   const reduce = useReducedMotion();
   const { trades, rows } = v.heatmap;
-  if (!rows.length) return <Empty>Keine Baustelle im Filter.</Empty>;
+  if (!rows.length || !trades.length) return <Empty>Keine laufenden Arbeiten im Filter.</Empty>;
+  const short = (pid: string) => v.site_map.find((s) => s.id === pid)?.short ?? "";
   return (
-    <div role="table" aria-label="Baustelle × Gewerk" className="grid gap-1.5" style={{ gridTemplateColumns: `minmax(9.5rem,1.5fr) repeat(${trades.length}, minmax(0,1fr))` }}>
-      <span role="columnheader" />
-      {trades.map((t) => (
-        <span key={t} role="columnheader" className="truncate pb-1 text-center text-xs text-muted-foreground">
-          {t}
+    <div>
+      <div role="table" aria-label="Gewerke je Baustelle" className="grid gap-1.5" style={{ gridTemplateColumns: `7rem repeat(${trades.length}, minmax(3.25rem,1fr))` }}>
+        <span role="columnheader" />
+        {trades.map((t) => (
+          <span key={t} role="columnheader" className="pb-1 text-center text-xs whitespace-nowrap text-muted-foreground">
+            {t}
+          </span>
+        ))}
+        {rows.map((r, ri) => {
+          const fade = { initial: reduce ? false : { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.35, delay: 0.1 + ri * 0.03 } } as const;
+          return (
+            <div key={r.project_id} role="row" className="contents">
+              <motion.span role="rowheader" aria-label={`Baustelle ${r.code} · ${r.name}`} className="flex items-center text-sm whitespace-nowrap text-foreground" {...fade}>
+                {short(r.project_id)}
+              </motion.span>
+              {r.cells.map((c) => {
+                if (c.status === "none") return <span key={c.trade} role="cell" aria-label={`${r.code} ${c.trade}: keine laufenden Arbeiten`} />;
+                const text = c.delay > 0 ? `+${c.delay}` : c.status === "red" ? "!" : "0";
+                const tip = c.hindrance ? `Behinderung ${c.hindrance.reference} · seit ${since(c.hindrance.since, v.today)}${c.delay ? ` · Prognose +${c.delay} Tage` : ""}` : `${r.code} ${c.trade}: ${c.reason}`;
+                const body = (
+                  <span className={cn("flex h-10 items-center justify-center gap-1.5 rounded-md font-mono text-sm tabular-nums transition-colors duration-300", CELL[c.status])}>
+                    <Shape status={c.status} className={c.status === "red" ? "bg-white" : undefined} />
+                    {text}
+                  </span>
+                );
+                return (
+                  <motion.span key={c.trade} {...fade}>
+                    <Tip content={<span>{tip}</span>}>
+                      {linkable ? (
+                        <Link
+                          href={c.hindrance ? `/admin/case/${c.hindrance.id}` : `/admin/vorgaenge?site=${r.project_id}&trade=${encodeURIComponent(c.trade)}`}
+                          aria-label={`${tip}. Öffnen`}
+                          data-cell={`${r.code}-${c.trade}`}
+                          data-status={c.status}
+                          className="block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {body}
+                        </Link>
+                      ) : (
+                        <span role="cell" aria-label={tip} data-cell={`${r.code}-${c.trade}`} data-status={c.status} className="block">
+                          {body}
+                        </span>
+                      )}
+                    </Tip>
+                  </motion.span>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-3 flex items-center gap-4 text-xs whitespace-nowrap text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <Shape status="green" /> im Plan
         </span>
-      ))}
-      {rows.map((r, ri) => (
-        <motion.div
-          key={r.project_id}
-          role="row"
-          className="contents"
-          initial={reduce ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.35, delay: 0.1 + ri * 0.03 }}
-        >
-          <motion.span role="rowheader" className="flex min-w-0 items-center gap-2 text-sm" initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35, delay: 0.1 + ri * 0.03 }}>
-            <span className="font-mono text-xs text-muted-foreground">{r.code}</span>
-            <span className="text-[13px] leading-tight text-foreground">{r.name}</span>
-          </motion.span>
-          {r.cells.map((c) => {
-            const body = (
-              <span className={cn("flex h-11 items-center justify-center gap-1.5 rounded-md font-mono text-sm tabular-nums transition-colors duration-300", CELL[c.status])}>
-                {c.status === "none" ? (
-                  "–"
-                ) : (
-                  <>
-                    <span aria-hidden className={cn("size-2", SHAPE[c.status])} />
-                    {c.delay > 0 ? `+${c.delay}` : "0"}
-                  </>
-                )}
-              </span>
-            );
-            const label = `${r.code} ${c.trade}: ${c.reason}`;
-            return (
-              <Tip key={c.trade} content={<span>{label}</span>}>
-                {linkable && c.status !== "none" ? (
-                  <motion.span initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.35, delay: 0.1 + ri * 0.03 }}>
-                    <Link
-                      href={`/admin/vorgaenge?site=${r.project_id}&trade=${encodeURIComponent(c.trade)}`}
-                      aria-label={`${label}. Vorgänge anzeigen`}
-                      data-cell={`${r.code}-${c.trade}`}
-                      data-status={c.status}
-                      className="block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {body}
-                    </Link>
-                  </motion.span>
-                ) : (
-                  <motion.span
-                    role="cell"
-                    aria-label={label}
-                    data-cell={`${r.code}-${c.trade}`}
-                    data-status={c.status}
-                    initial={reduce ? false : { opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.35, delay: 0.1 + ri * 0.03 }}
-                  >
-                    {body}
-                  </motion.span>
-                )}
-              </Tip>
-            );
-          })}
-        </motion.div>
-      ))}
-      <p className="col-span-full mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <Legend shape={SHAPE.green} text="im Plan" />
-        <Legend shape={SHAPE.amber} text="bis 2 Tage Verzug oder keine Meldung" />
-        <Legend shape="rounded-[1px] bg-light-red" text="über 2 Tage oder offene Behinderung" />
-        <span>Zahl = prognostizierte Verzugstage</span>
+        <span className="flex items-center gap-1.5">
+          <Shape status="amber" /> ≤ 2 Tage
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Shape status="red" /> &gt; 2 Tage / Behinderung
+        </span>
+        <InfoTip label="Was die Zahl bedeutet" text="Zahl = prognostizierte Verzugstage. Ohne Mengenmeldung seit zwei Arbeitstagen: ◆." />
       </p>
     </div>
   );
 }
 
-const Legend = ({ shape, text }: { shape: string; text: string }) => (
-  <span className="flex items-center gap-1.5">
-    <span aria-hidden className={cn("size-2", shape)} />
-    {text}
-  </span>
-);
-
 // ── Plan vs. Ist (bullet) ───────────────────────────────────────────────
 
 export function TradeBullets({ v }: { v: DashboardView }) {
   const reduce = useReducedMotion();
-  const bars = v.trade_bars.bars;
+  // The trades the site reports quantities for, worst first in the list order; at most four on the Überblick.
+  const bars = v.trade_bars.bars.slice(0, 4);
   if (!bars.length) return <Empty>Für diesen Filter sind keine Mengen geplant.</Empty>;
   return (
-    <ul className="flex flex-col gap-3.5">
-      {bars.map((b, i) => (
-        <li key={b.trade} className="grid grid-cols-[5.5rem_minmax(0,1fr)_auto] items-center gap-3">
-          <span className={cn("truncate text-sm", b.worst ? "font-medium text-foreground" : "text-foreground")}>{b.trade}</span>
-          <Tip content={<span>{`${b.trade}: Ist ${b.actual} % fertig, Soll bis gestern ${b.plan} % (${b.items} ${b.items === 1 ? "Vorgang" : "Vorgänge"} im Zeitraum)`}</span>}>
-            <span className="relative block h-6" role="img" aria-label={`${b.trade}: Ist ${b.actual} Prozent, Soll ${b.plan} Prozent`}>
-              <span className="absolute inset-y-1.5 left-0 w-full rounded-sm bg-zinc-100" />
-              <motion.span
-                className={cn("absolute inset-y-1.5 left-0 origin-left rounded-sm", b.worst ? "bg-blue-600" : "bg-zinc-400")}
-                style={{ width: `${b.actual}%` }}
-                initial={reduce ? false : { scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ duration: 0.6, ease: EASE, delay: 0.15 + i * 0.04 }}
-              />
-              <span aria-hidden className="absolute inset-y-0 w-0.5 -translate-x-1/2 rounded-full bg-zinc-900" style={{ left: `${b.plan}%` }} />
-            </span>
-          </Tip>
-          <span className="text-right font-mono text-xs whitespace-nowrap text-muted-foreground tabular-nums">
-            <span className={b.worst ? "text-foreground" : ""}>{b.actual} %</span> / Soll {b.plan} %
-          </span>
-        </li>
-      ))}
-      <li className="mt-1 flex items-center gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-2 w-4 rounded-sm bg-zinc-400" /> Ist fertig
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-3 w-0.5 rounded-full bg-zinc-900" /> Soll bis gestern
-        </span>
-      </li>
+    <ul className="flex flex-col gap-3">
+      {bars.map((b, i) => {
+        const d = b.actual - b.plan;
+        return (
+          <li key={b.trade} className="grid grid-cols-[5.75rem_minmax(0,1fr)_2.25rem] items-center gap-3">
+            <span className={cn("text-sm whitespace-nowrap", b.worst ? "font-medium text-foreground" : "text-foreground")}>{b.trade}</span>
+            <Tip content={<span>{`${b.trade}: Ist ${b.actual} % fertig, Soll bis gestern ${b.plan} %`}</span>}>
+              <span className="relative block h-6" role="img" aria-label={`${b.trade}: Ist ${b.actual} Prozent, Soll ${b.plan} Prozent`}>
+                <span className="absolute inset-y-1.5 left-0 w-full rounded-sm bg-zinc-100" />
+                <motion.span
+                  className={cn("absolute inset-y-1.5 left-0 origin-left rounded-sm", b.worst ? "bg-blue-600" : "bg-zinc-400")}
+                  style={{ width: `${b.actual}%` }}
+                  initial={reduce ? false : { scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ duration: 0.6, ease: EASE, delay: 0.15 + i * 0.04 }}
+                />
+                <span aria-hidden className="absolute inset-y-0 w-0.5 -translate-x-1/2 rounded-full bg-zinc-900" style={{ left: `${b.plan}%` }} />
+              </span>
+            </Tip>
+            <span className={cn("text-right font-mono text-xs tabular-nums", b.worst ? "text-foreground" : "text-muted-foreground")}>{d === 0 ? "±0" : d > 0 ? `+${d}` : `−${Math.abs(d)}`}</span>
+          </li>
+        );
+      })}
     </ul>
   );
 }
 
-// ── Mini-Bauablauf ──────────────────────────────────────────────────────
+// ── Details: Mini-Bauablauf ────────────────────────────────────────────
 
 const dayIndex = (d: string) => Math.round(Date.parse(`${d}T12:00:00Z`) / 86_400_000);
 
@@ -285,11 +437,11 @@ export function MiniSchedule({ v, linkable }: { v: DashboardView; linkable: bool
     if (new Date(`${d}T12:00:00Z`).getUTCDay() === 1) ticks.push(d);
   }
   return (
-    <div className="grid grid-cols-[10rem_minmax(0,1fr)] gap-x-3">
+    <div className="grid grid-cols-[9rem_minmax(0,1fr)] gap-x-3">
       <span />
       <div className="relative h-5 text-[11px] text-muted-foreground">
         {ticks.map((t) => (
-          <span key={t} className="absolute -translate-x-1/2 font-mono" style={{ left: x(t) }}>
+          <span key={t} className="absolute -translate-x-1/2 font-mono whitespace-nowrap" style={{ left: x(t) }}>
             {fmtDayDe(t).slice(0, 6)}
           </span>
         ))}
@@ -297,7 +449,7 @@ export function MiniSchedule({ v, linkable }: { v: DashboardView; linkable: bool
       {s.rows.map((r, i) => (
         <div key={r.id} className="contents">
           <Tip content={<span>{r.activity}</span>}>
-            <span className="truncate py-2 text-sm text-foreground">
+            <span className="py-2 text-sm whitespace-nowrap text-foreground">
               {r.trade} <span className="text-muted-foreground">{r.area}</span>
             </span>
           </Tip>
@@ -330,10 +482,7 @@ export function MiniSchedule({ v, linkable }: { v: DashboardView; linkable: bool
             ) : null}
             {r.hindrances.map((h) => {
               const seg = (
-                <span
-                  className="absolute top-0.5 flex h-5 items-center overflow-visible rounded-sm bg-light-red px-1 text-[11px] font-medium whitespace-nowrap text-white"
-                  style={{ left: x(h.start), width: w(h.start, h.end) }}
-                >
+                <span className="absolute top-0.5 flex h-5 items-center rounded-sm bg-light-red px-1 font-mono text-[11px] font-medium whitespace-nowrap text-white" style={{ left: x(h.start), minWidth: w(h.start, h.end) }}>
                   {h.reference}
                 </span>
               );
@@ -355,36 +504,34 @@ export function MiniSchedule({ v, linkable }: { v: DashboardView; linkable: bool
       ))}
       <span />
       <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-2.5 w-4 rounded-sm bg-zinc-200" /> Soll
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-2 w-4 rounded-sm bg-zinc-500" /> Prognose
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-2.5 w-4 rounded-sm bg-light-red" /> Behinderung
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="h-3 w-0.5 bg-blue-600" /> heute
-        </span>
+        <Key className="h-2.5 w-4 rounded-sm bg-zinc-200" text="Soll" />
+        <Key className="h-2 w-4 rounded-sm bg-zinc-500" text="Prognose" />
+        <Key className="h-2.5 w-4 rounded-sm bg-light-red" text="Behinderung" />
+        <Key className="h-3 w-0.5 bg-blue-600" text="heute" />
       </p>
     </div>
   );
 }
 
-// ── Berichtsvollständigkeit ─────────────────────────────────────────────
+const Key = ({ className, text }: { className: string; text: string }) => (
+  <span className="flex items-center gap-1.5 whitespace-nowrap">
+    <span aria-hidden className={className} />
+    {text}
+  </span>
+);
+
+// ── Details: Tagesberichte ──────────────────────────────────────────────
 
 export function CompletenessGrid({ v }: { v: DashboardView }) {
-  const reduce = useReducedMotion();
   const { rows, days } = v.completeness;
   if (!rows.length) return <Empty>Keine Teams mit geplanter Arbeit im Zeitraum.</Empty>;
   const small = days.length > 14;
   return (
     <div className="overflow-x-auto">
       <div className="grid items-center gap-x-3 gap-y-1.5" style={{ gridTemplateColumns: "9rem minmax(0,1fr)" }}>
-        {rows.map((r, ri) => (
-          <motion.div key={r.team_id} className="contents" initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 + ri * 0.03 }}>
-            <span className="truncate text-sm text-foreground">
+        {rows.map((r) => (
+          <div key={r.team_id} className="contents">
+            <span className="text-sm whitespace-nowrap text-foreground">
               <span className="font-mono text-xs text-muted-foreground">{r.code}</span> {r.team.replace(/^Team\s+/, "")}
             </span>
             <span className="flex gap-1">
@@ -403,30 +550,22 @@ export function CompletenessGrid({ v }: { v: DashboardView }) {
                 </Tip>
               ))}
             </span>
-          </motion.div>
+          </div>
         ))}
       </div>
       <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="size-3 rounded-[3px] bg-zinc-700" /> Bericht
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="size-3 rounded-[3px] border-2 border-light-red" /> fehlt
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span aria-hidden className="size-3 rounded-[3px] bg-zinc-100" /> keine Arbeit
-        </span>
-        <span>
-          {fmtDayDe(days[0]).slice(0, 6)} – heute
-        </span>
+        <Key className="size-3 rounded-[3px] bg-zinc-700" text="Bericht" />
+        <Key className="size-3 rounded-[3px] border-2 border-light-red" text="fehlt" />
+        <Key className="size-3 rounded-[3px] bg-zinc-100" text="keine Arbeit" />
       </p>
     </div>
   );
 }
 
-// ── Dokumenten-Pipeline ─────────────────────────────────────────────────
+// ── Details: Dokumente ──────────────────────────────────────────────────
 
 const PIPE_TONE = ["bg-zinc-200", "bg-zinc-300", "bg-zinc-400", "bg-zinc-600", "bg-zinc-800"];
+const PIPE_LABEL: Record<string, string> = { entwurf: "Entwurf", unvollstaendig: "Unvollst.", bereit: "Bereit", validiert: "Validiert", versendet: "Versendet" };
 
 export function Pipeline({ v }: { v: DashboardView }) {
   const reduce = useReducedMotion();
@@ -435,7 +574,7 @@ export function Pipeline({ v }: { v: DashboardView }) {
   if (!total) return <Empty>Noch keine Schreiben in diesem Filter.</Empty>;
   return (
     <div>
-      <div className="flex h-3 w-full overflow-hidden rounded-sm bg-zinc-100" role="img" aria-label={steps.map((s) => `${s.label} ${s.count}`).join(", ")}>
+      <div className="flex h-3 w-full overflow-hidden rounded-sm bg-zinc-100" role="img" aria-label={steps.map((s) => `${PIPE_LABEL[s.status]} ${s.count}`).join(", ")}>
         {steps.map((s, i) =>
           s.count ? (
             <motion.span
@@ -449,22 +588,28 @@ export function Pipeline({ v }: { v: DashboardView }) {
           ) : null,
         )}
       </div>
-      <ol lang="de" className="mt-4 grid grid-cols-5 gap-x-2 hyphens-auto">
-        {steps.map((s, i) => (
-          <li key={s.status} className="min-w-0">
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span aria-hidden className={cn("size-2 shrink-0 rounded-[2px]", PIPE_TONE[i])} />
-              <span className="min-w-0 leading-tight break-words">{s.label}</span>
-            </p>
-            <p className="mt-1 font-mono text-xl font-medium text-foreground tabular-nums">{s.count}</p>
-          </li>
-        ))}
+      <ol className="mt-3 flex flex-wrap items-end gap-x-5 gap-y-2">
+        {steps.map((s, i) =>
+          s.count ? (
+            <li key={s.status} className="whitespace-nowrap">
+              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span aria-hidden className={cn("size-2 shrink-0 rounded-[2px]", PIPE_TONE[i])} />
+                {PIPE_LABEL[s.status]}
+              </p>
+              <p className="mt-0.5 font-mono text-xl font-medium text-foreground tabular-nums">{s.count}</p>
+            </li>
+          ) : (
+            <li key={s.status} className="pb-1 text-xs whitespace-nowrap text-zinc-400">
+              {PIPE_LABEL[s.status]} 0
+            </li>
+          ),
+        )}
       </ol>
     </div>
   );
 }
 
-// ── Aktivitäten ─────────────────────────────────────────────────────────
+// ── Details: Aktivitäten ────────────────────────────────────────────────
 
 const SOURCE: Record<FeedSource, { icon: typeof Phone; label: string }> = {
   call: { icon: Phone, label: "Telefonat" },
@@ -473,10 +618,7 @@ const SOURCE: Record<FeedSource, { icon: typeof Phone; label: string }> = {
   checkin: { icon: ClipboardCheck, label: "Check-in" },
   system: { icon: Building2, label: "Büro" },
 };
-
-const timeFmt = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", hour: "2-digit", minute: "2-digit" });
 const dateFmt = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit" });
-const dayKey = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" });
 
 export function ActivityFeed({ v, linkable }: { v: DashboardView; linkable: boolean }) {
   if (!v.feed.length) return <Empty>Im Zeitraum ist nichts passiert.</Empty>;
@@ -487,20 +629,16 @@ export function ActivityFeed({ v, linkable }: { v: DashboardView; linkable: bool
         const at = new Date(f.at);
         const when = dayKey.format(at) === v.today ? timeFmt.format(at) : dateFmt.format(at);
         const body = (
-          <span className="flex gap-3 rounded-lg px-2 py-2.5">
+          <span className="flex gap-3 rounded-lg px-2 py-2">
             <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground" title={S.label}>
-              <S.icon className="size-3.5" aria-hidden />
+              <S.icon className="size-3.5" aria-label={S.label} />
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-sm font-medium text-foreground">{f.title}</span>
+                <span className="text-sm font-medium text-foreground">{f.title}</span>
                 <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{when}</span>
               </span>
-              {f.detail ? <span className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{f.detail}</span> : null}
-              <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                {S.label}
-                {f.code ? ` · Baustelle ${f.code}` : " · mehrere Baustellen"}
-              </span>
+              <span className="mt-0.5 block font-mono text-[11px] text-muted-foreground">{[f.ref, f.code ? `Baustelle ${f.code}` : null].filter(Boolean).join(" · ")}</span>
             </span>
           </span>
         );

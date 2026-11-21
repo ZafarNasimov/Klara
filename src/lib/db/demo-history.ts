@@ -77,7 +77,7 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
   const P3 = IDS.projectSchwabing;
 
   const specs: Spec[] = [
-    // ── Neubau Bürogebäude München ──────────────────────────────────
+    // ── B Wohnanlage Riem, Haus 2 (the demo site) ───────────────────
     {
       n: 31,
       project: P1,
@@ -90,7 +90,7 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
       facts: {
         instruction_date: wt(-14),
         instructed_by: "Thomas Weber (Architekt)",
-        description: "Herstellen von 6 zusätzlichen Aussparungen für Bodentanks im 1.OG, Achsen D–F",
+        description: "Herstellen von 6 zusätzlichen Deckendurchbrüchen für Lüftungsleitungen im 1.OG, Achsen D–F",
         work_started: false,
         planned_start: wt(-12),
         estimate_eur: 1850,
@@ -100,10 +100,10 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
         lang: "ru",
         kind: "call",
         lines: [
-          ["user", "Архитектор Вебер сказал устно: на первом этаже нужно ещё шесть отверстий под напольные лючки, оси D–F.", "Architekt Weber hat mündlich gesagt: Im 1.OG werden noch sechs Aussparungen für Bodentanks gebraucht, Achsen D bis F."],
+          ["user", "Архитектор Вебер сказал устно: на первом этаже нужно ещё шесть проёмов в перекрытии под вентиляцию, оси D–F.", "Architekt Weber hat mündlich gesagt: Im 1.OG werden noch sechs Deckendurchbrüche für die Lüftung gebraucht, Achsen D bis F."],
           ["klara", "Вы уже начали эту дополнительную работу?", "Haben Sie mit dieser Zusatzleistung schon begonnen?"],
           ["user", "Нет, ещё не начали, планируем послезавтра. По деньгам примерно тысяча восемьсот пятьдесят.", "Nein, noch nicht, wir planen übermorgen. Vom Geld her etwa 1.850."],
-          ["klara", "Подытожу: шесть дополнительных отверстий, 1-й этаж, оси D–F, указание архитектора Вебера, начало послезавтра, около 1 850 евро. Всё верно?", "Ich fasse zusammen: sechs zusätzliche Aussparungen, 1.OG, Achsen D–F, angeordnet von Architekt Weber, Beginn übermorgen, ca. 1.850 €. Stimmt das so?"],
+          ["klara", "Подытожу: шесть дополнительных проёмов, 1-й этаж, оси D–F, указание архитектора Вебера, начало послезавтра, около 1 850 евро. Всё верно?", "Ich fasse zusammen: sechs zusätzliche Deckendurchbrüche, 1.OG, Achsen D–F, angeordnet von Architekt Weber, Beginn übermorgen, ca. 1.850 €. Stimmt das so?"],
           ["user", "Да, верно.", "Ja, richtig."],
         ],
       },
@@ -132,7 +132,7 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
         instruction_time: "07:30",
         place: "1.OG, Achsen D–F",
         instructed_by: "Thomas Weber (Architekt)",
-        instruction_text: "Im 1.OG sechs zusätzliche Aussparungen für Bodentanks herstellen, Achsen D bis F.",
+        instruction_text: "Im 1.OG sechs zusätzliche Deckendurchbrüche für Lüftungsleitungen herstellen, Achsen D bis F.",
         witnesses: "Sergej Iwanow (Polier)",
         verbal: true,
       },
@@ -171,7 +171,7 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
       sent: at(-8, "10:05"),
     },
 
-    // ── Wohnanlage Riem, Haus B ─────────────────────────────────────
+    // ── A Neubau Bürogebäude Schwabing ──────────────────────────────
     {
       n: 33,
       project: P2,
@@ -184,7 +184,7 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
       flags: ["no_cost_reservation"],
       facts: {
         start_at: at(-11, "07:00").toISOString(),
-        area: "Haus B, 3.OG",
+        area: "Bauteil B, 3.OG",
         cause: "Sturm mit Böen über 60 km/h, der Turmdrehkran ist außer Betrieb",
         affected_works: "Schalung und Bewehrung der Decke über 3.OG",
         idle_staff: 6,
@@ -217,7 +217,7 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
       confidence: 0.95,
       facts: {
         start_at: at(-7, "07:00").toISOString(),
-        area: "Haus B, Nordseite, 1.–3.OG",
+        area: "Bauteil B, Nordseite, 1.–3.OG",
         cause: "Die Fenster der Nordseite sind nicht eingebaut; ohne Fenster keine Laibungsdämmung und kein WDVS-Anschluss",
         affected_works: "WDVS Nordseite",
         idle_staff: 4,
@@ -241,7 +241,7 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
         at: at(-5, "14:12"),
         from: IDS.contactRiemBauherr,
         kind: "rejection",
-        text: "Sehr geehrte Damen und Herren,\n\nwir weisen Ihre Behinderungsanzeige zurück. Die Fenstermontage ist laut Terminplan erst bis Ende dieser Woche geschuldet.\n\nMit freundlichen Grüßen\nStefan Maier\nWohnbau Riem GmbH & Co. KG",
+        text: "Sehr geehrte Damen und Herren,\n\nwir weisen Ihre Behinderungsanzeige zurück. Die Fenstermontage ist laut Terminplan erst bis Ende dieser Woche geschuldet.\n\nMit freundlichen Grüßen\nStefan Maier\nSchwabing Office Campus GmbH",
         quote: "Die Fenstermontage ist laut Terminplan erst bis Ende dieser Woche geschuldet.",
         summary_de: "Der Bauherr weist die Anzeige zurück: Die Fenster seien erst Ende der Woche geschuldet.",
       },
@@ -261,10 +261,10 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
         orig_reference: ref(36),
         orig_date: wt(-7),
         evidence_bullets: [
-          `Beginn der Behinderung: ${dateDe(wt(-7))}, 07:00 Uhr, Bereich Haus B, Nordseite, 1.–3.OG`,
+          `Beginn der Behinderung: ${dateDe(wt(-7))}, 07:00 Uhr, Bereich Bauteil B, Nordseite, 1.–3.OG`,
           "Ursache laut Meldung von der Baustelle: Die Fenster der Nordseite sind nicht eingebaut",
           "Betroffen: WDVS Nordseite; 4 Arbeitskräfte ohne Einsatz",
-          `Laut Bauzeitenplan war „Fenstermontage 1.–3.OG“ in Haus B, Nordseite bis ${dateDe(wt(-4))} abzuschließen; der WDVS-Beginn war für ${dateDe(wt(-4))} vorgesehen`,
+          `Laut Bauzeitenplan war „Fenstermontage 1.–3.OG“ in Bauteil B, Nordseite bis ${dateDe(wt(-4))} abzuschließen; der WDVS-Beginn war für ${dateDe(wt(-4))} vorgesehen`,
           `Meldung durch Liam O'Connor am ${dateDe(wt(-7))}, 07:36 Uhr; Gesprächsprotokoll mit Zeitstempeln liegt vor`,
         ],
         _hint_de: REJECTION_HINT_DE,
@@ -286,7 +286,7 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
       facts: {
         end_at: at(-1, "07:00").toISOString(),
         resumed_at: at(-1, "07:30").toISOString(),
-        still_affected: "WDVS Nordseite ca. 5 Arbeitstage hinter dem Bauzeitenplan",
+        still_affected: "WDVS Nordseite: Rückstand wird mit Samstagsarbeit bis Ende nächster Woche aufgeholt",
         _trade: "Fenster",
       },
       transcript: {
@@ -295,14 +295,14 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
         lines: [
           ["user", "Windows on the north side are finally in. We started the insulation again this morning at half seven.", "Die Fenster auf der Nordseite sind endlich drin. Wir haben heute früh um halb acht wieder mit der Dämmung angefangen."],
           ["klara", "Good. Is anything still affected by the delay?", "Gut. Wirkt sich die Verzögerung noch auf etwas aus?"],
-          ["user", "We're about a week behind on the north side.", "Wir liegen auf der Nordseite etwa eine Woche zurück."],
-          ["klara", "Let me sum up: hindrance ended today 7:00, work resumed 7:30, north side about 5 working days behind. Is that right?", "Ich fasse zusammen: Behinderung heute 7:00 beendet, Wiederaufnahme 7:30, Nordseite ca. 5 Arbeitstage im Verzug. Stimmt das so?"],
+          ["user", "We'll catch up the lost week by working Saturdays until the end of next week.", "Den Rückstand holen wir mit Samstagsarbeit bis Ende nächster Woche auf."],
+          ["klara", "Let me sum up: hindrance ended today 7:00, work resumed 7:30, the north side catches up by working Saturdays. Is that right?", "Ich fasse zusammen: Behinderung heute 7:00 beendet, Wiederaufnahme 7:30, die Nordseite holt den Rückstand mit Samstagsarbeit auf. Stimmt das so?"],
           ["user", "Yep.", "Ja."],
         ],
       },
     },
 
-    // ── Sanierung Wohnhaus Schwabing (BGB) ──────────────────────────
+    // ── C Schule Pasing (BGB) ───────────────────────────────────────
     {
       n: 34,
       project: P3,
@@ -315,7 +315,7 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
       facts: {
         instruction_date: wt(-10),
         instructed_by: "Dr. Claudia Ritter (Bauherr)",
-        description: "Fußbodenheizung mit Heizestrich im Bad der Wohnung 6 statt Fliesen auf dem Bestandsestrich",
+        description: "Fußbodenheizung mit Heizestrich im Lehrerzimmer 2.OG statt Belag auf dem Bestandsestrich",
         work_started: false,
         planned_start: wt(-3),
         estimate_eur: 2400,
@@ -325,10 +325,10 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
         lang: "de",
         kind: "call",
         lines: [
-          ["user", "Frau Dr. Ritter war heute da und will im Bad von Wohnung 6 jetzt doch eine Fußbodenheizung.", "Frau Dr. Ritter war heute da und will im Bad von Wohnung 6 jetzt doch eine Fußbodenheizung."],
+          ["user", "Frau Dr. Ritter war heute da und will im Lehrerzimmer jetzt doch eine Fußbodenheizung.", "Frau Dr. Ritter war heute da und will im Lehrerzimmer jetzt doch eine Fußbodenheizung."],
           ["klara", "Haben Sie mit dieser Zusatzleistung schon begonnen?", "Haben Sie mit dieser Zusatzleistung schon begonnen?"],
           ["user", "Nein, frühestens nächste Woche, wenn der Rückbau durch ist. Kosten so um die 2.400.", "Nein, frühestens nächste Woche, wenn der Rückbau durch ist. Kosten so um die 2.400."],
-          ["klara", "Ich fasse zusammen: Fußbodenheizung im Bad Wohnung 6, angeordnet von Dr. Ritter, noch nicht begonnen, ca. 2.400 € netto. Stimmt das so?", "Ich fasse zusammen: Fußbodenheizung im Bad Wohnung 6, angeordnet von Dr. Ritter, noch nicht begonnen, ca. 2.400 € netto. Stimmt das so?"],
+          ["klara", "Ich fasse zusammen: Fußbodenheizung im Lehrerzimmer 2.OG, angeordnet von Dr. Ritter, noch nicht begonnen, ca. 2.400 € netto. Stimmt das so?", "Ich fasse zusammen: Fußbodenheizung im Lehrerzimmer 2.OG, angeordnet von Dr. Ritter, noch nicht begonnen, ca. 2.400 € netto. Stimmt das so?"],
           ["user", "Ja, passt.", "Ja, passt."],
         ],
       },
@@ -339,7 +339,7 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
         kind: "acceptance",
         text: "Guten Abend,\n\nwir sind einverstanden, bitte schicken Sie uns das Angebot für die Fußbodenheizung.\n\nViele Grüße\nClaudia Ritter",
         quote: "Wir sind einverstanden, bitte schicken Sie uns das Angebot für die Fußbodenheizung.",
-        summary_de: "Die Eigentümergemeinschaft ist einverstanden und bittet um das Angebot.",
+        summary_de: "Der Schulträger ist einverstanden und bittet um das Angebot.",
       },
     },
     {
@@ -353,8 +353,8 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
       confidence: 0.94,
       facts: {
         start_at: at(-4, "07:00").toISOString(),
-        area: "2.OG, Bäder Wohnungen 5 und 6",
-        cause: "Die Elektro-Altinstallation in den Bädern ist nicht zurückgebaut, die Leitungen liegen noch offen in den Wänden",
+        area: "2.OG, WC-Anlagen",
+        cause: "Die Elektro-Altinstallation in den WC-Anlagen ist nicht zurückgebaut, die Leitungen liegen noch offen in den Wänden",
         affected_works: "GK-Vorsatzschalen und Installationswände",
         idle_staff: 3,
         expected_duration: "ca. 3 Arbeitstage",
@@ -365,10 +365,10 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
         lang: "ro",
         kind: "call",
         lines: [
-          ["user", "Electricienii n-au scos instalația veche din băi, firele sunt încă în pereți. Nu putem monta pereții de rigips. Trei oameni așteaptă de la șapte.", "Die Elektriker haben die alte Installation in den Bädern nicht ausgebaut, die Leitungen sind noch in den Wänden. Wir können die Gipskartonwände nicht montieren. Drei Leute warten seit sieben."],
+          ["user", "Electricienii n-au scos instalația veche din toalete, firele sunt încă în pereți. Nu putem monta pereții de rigips. Trei oameni așteaptă de la șapte.", "Die Elektriker haben die alte Installation in den WC-Anlagen nicht ausgebaut, die Leitungen sind noch in den Wänden. Wir können die Gipskartonwände nicht montieren. Drei Leute warten seit sieben."],
           ["klara", "Cât va dura probabil?", "Wie lange wird das voraussichtlich dauern?"],
           ["user", "Cam trei zile, zic ei.", "Etwa drei Tage, sagen sie."],
-          ["klara", "Rezum: etajul 2, băile apartamentelor 5 și 6, instalația electrică veche nu e demontată, trei oameni fără lucru de la 7:00, cam 3 zile lucrătoare. E corect?", "Ich fasse zusammen: 2.OG, Bäder der Wohnungen 5 und 6, Elektro-Altinstallation nicht zurückgebaut, drei Leute ohne Einsatz seit 7:00, ca. 3 Arbeitstage. Stimmt das so?"],
+          ["klara", "Rezum: etajul 2, toaletele, instalația electrică veche nu e demontată, trei oameni fără lucru de la 7:00, cam 3 zile lucrătoare. E corect?", "Ich fasse zusammen: 2.OG, WC-Anlagen, Elektro-Altinstallation nicht zurückgebaut, drei Leute ohne Einsatz seit 7:00, ca. 3 Arbeitstage. Stimmt das so?"],
           ["user", "Da, corect.", "Ja, richtig."],
         ],
       },
@@ -377,10 +377,10 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
         at: at(-3, "11:34"),
         from: IDS.contactSchwBauherr,
         kind: "request_info",
-        text: "Sehr geehrte Damen und Herren,\n\nbitte teilen Sie uns mit, welche Leitungen konkret betroffen sind und ob beide Wohnungen gleichermaßen betroffen sind. Wir klären das dann mit dem Elektriker.\n\nMit freundlichen Grüßen\nDr. Claudia Ritter",
-        quote: "Bitte teilen Sie uns mit, welche Leitungen konkret betroffen sind und ob beide Wohnungen gleichermaßen betroffen sind.",
-        summary_de: "Die Eigentümergemeinschaft fragt, welche Leitungen betroffen sind und ob beide Wohnungen betroffen sind.",
-        requested_items: ["Welche Leitungen konkret betroffen sind", "Ob beide Wohnungen gleichermaßen betroffen sind"],
+        text: "Sehr geehrte Damen und Herren,\n\nbitte teilen Sie uns mit, welche Leitungen konkret betroffen sind und ob beide WC-Anlagen gleichermaßen betroffen sind. Wir klären das dann mit dem Elektriker.\n\nMit freundlichen Grüßen\nDr. Claudia Ritter",
+        quote: "Bitte teilen Sie uns mit, welche Leitungen konkret betroffen sind und ob beide WC-Anlagen gleichermaßen betroffen sind.",
+        summary_de: "Der Schulträger fragt, welche Leitungen betroffen sind und ob beide WC-Anlagen betroffen sind.",
+        requested_items: ["Welche Leitungen konkret betroffen sind", "Ob beide WC-Anlagen gleichermaßen betroffen sind"],
       },
     },
     {
@@ -396,19 +396,19 @@ export function withDemoHistory(seed: SeedData, now: Date): SeedData {
         reply_date: wt(-3),
         orig_reference: ref(38),
         orig_date: wt(-4),
-        requested_items: ["Welche Leitungen konkret betroffen sind", "Ob beide Wohnungen gleichermaßen betroffen sind"],
+        requested_items: ["Welche Leitungen konkret betroffen sind", "Ob beide WC-Anlagen gleichermaßen betroffen sind"],
         answers:
-          "Betroffen sind die alten Steig- und Verteilerleitungen der Elektroinstallation hinter den Badwänden sowie die Zuleitung der Lüfter. Beide Wohnungen sind gleichermaßen betroffen.",
+          "Betroffen sind die alten Steig- und Verteilerleitungen der Elektroinstallation hinter den WC-Wänden sowie die Zuleitung der Lüfter. Beide WC-Anlagen sind gleichermaßen betroffen.",
         _hint_de: "Der Auftraggeber bittet um ergänzende Angaben. Klara hat Andrei Popescu im Team-Chat danach gefragt; die Antwort kommt direkt in das Schreiben.",
-        _reply_quote: "Bitte teilen Sie uns mit, welche Leitungen konkret betroffen sind und ob beide Wohnungen gleichermaßen betroffen sind.",
+        _reply_quote: "Bitte teilen Sie uns mit, welche Leitungen konkret betroffen sind und ob beide WC-Anlagen gleichermaßen betroffen sind.",
         _reply_date: wt(-3),
       },
       transcript: {
         lang: "ro",
         kind: "chat",
         lines: [
-          ["klara", "Șeful de șantier mai are nevoie de o informație. „Beneficiarul întreabă ce conducte sunt afectate și dacă ambele apartamente sunt afectate.” Ce să răspund?", "Die Bauleitung braucht noch eine Angabe. „Der Auftraggeber fragt, welche Leitungen betroffen sind und ob beide Wohnungen betroffen sind.“ Was soll ich antworten?"],
-          ["user", "Coloanele vechi și distribuția din spatele pereților din baie, plus alimentarea ventilatoarelor. Ambele apartamente la fel.", "Die alten Steig- und Verteilerleitungen hinter den Badwänden, dazu die Zuleitung der Lüfter. Beide Wohnungen gleich."],
+          ["klara", "Șeful de șantier mai are nevoie de o informație. „Beneficiarul întreabă ce conducte sunt afectate și dacă ambele toalete sunt afectate.” Ce să răspund?", "Die Bauleitung braucht noch eine Angabe. „Der Auftraggeber fragt, welche Leitungen betroffen sind und ob beide WC-Anlagen betroffen sind.“ Was soll ich antworten?"],
+          ["user", "Coloanele vechi și distribuția din spatele pereților din toalete, plus alimentarea ventilatoarelor. Ambele toalete la fel.", "Die alten Steig- und Verteilerleitungen hinter den WC-Wänden, dazu die Zuleitung der Lüfter. Beide WC-Anlagen gleich."],
           ["klara", "Rezum răspunsul pentru beneficiar. E corect?", "Ich fasse die Antwort für den Auftraggeber zusammen. Stimmt das so?"],
           ["user", "Da.", "Ja."],
         ],

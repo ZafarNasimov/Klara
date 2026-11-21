@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ProjectContext } from "@/lib/db/repo";
 import { fmtDate, ROLE_DE } from "@/lib/labels";
 import { defaultTitle, fmtClock, MEETING_TYPE_DE, MEETING_TYPES, outcomeChips, type MeetingType, type MeetingView, type Participant } from "@/lib/meetings/model";
+import { useProjectId } from "@/lib/project-choice";
 import { ApiError, postJson, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 
@@ -18,8 +19,10 @@ type ProjectResponse = ProjectContext & { now: string };
 
 /** "Besprechungen" tab: the project's meetings and "Meeting starten". */
 export function MeetingsList() {
-  const { data: meetings, error } = useApi<MeetingView[]>("/api/meetings");
-  const { data: ctx } = useApi<ProjectResponse>("/api/project");
+  // The site chosen in the office (top bar / Vorgänge), like the case board.
+  const [projectId] = useProjectId();
+  const { data: meetings, error } = useApi<MeetingView[]>(`/api/meetings?project=${projectId}`);
+  const { data: ctx } = useApi<ProjectResponse>(`/api/project?id=${projectId}`);
   const [starting, setStarting] = useState(false);
 
   return (
@@ -125,6 +128,7 @@ function StartMeetingDialog({ open, onOpenChange, ctx }: { open: boolean; onOpen
     setError(null);
     try {
       const m = await postJson<MeetingView>("/api/meetings", {
+        project: ctx.project.id,
         title,
         type,
         team_id: type === "intern" ? team : null,

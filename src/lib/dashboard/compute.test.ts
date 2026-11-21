@@ -9,7 +9,13 @@ const seed = demoSeed(now); // what "Demo zurücksetzen" loads
 type View = ReturnType<typeof dashboardFromSeed>;
 const kpi = (v: View, key: string) => v.kpis.find((k) => k.key === key)!;
 const cell = (v: View, code: string, trade: string) => v.heatmap.rows.find((r) => r.code === code)!.cells.find((c) => c.trade === trade)!;
+const shown = (v: View, code: string) =>
+  v.heatmap.rows
+    .find((r) => r.code === code)!
+    .cells.filter((c) => c.status !== "none")
+    .map((c) => `${c.trade}:${c.status}:${c.delay}`);
 
+/** The Behinderungsanzeige of the golden-path call (Scene 2). */
 const callCase: Case = {
   ...seed.case![0],
   id: "call-case",
@@ -18,74 +24,79 @@ const callCase: Case = {
   doc_type: "behinderungsanzeige",
   status: "bereit",
   reference: "KL-2026-0042",
+  parent_case_id: null,
   facts: { _trade: "Elektro", area: "2.OG", start_at: berlinTime("2026-11-20", 7, 0).toISOString(), expected_duration: "ca. 2 Arbeitstage" },
   created_at: now.toISOString(),
   updated_at: now.toISOString(),
 };
+const before = dashboardFromSeed(seed, now);
+const after = dashboardFromSeed({ ...seed, case: [...seed.case!, callCase] }, now);
 
 describe("dashboard of the reset demo (all numbers computed)", () => {
-  const v = dashboardFromSeed(seed, now);
-
-  it("three sites with their codes", () => {
-    expect(v.sites.map((s) => `${s.code} ${s.name}`)).toEqual(["A Neubau Bürogebäude München", "B Wohnanlage Riem, Haus B", "C Sanierung Wohnhaus Schwabing"]);
+  it("three sites as in the pitch", () => {
+    expect(before.sites.map((s) => `${s.code} ${s.name}`)).toEqual(["A Neubau Bürogebäude Schwabing", "B Wohnanlage Riem, Haus 2", "C Schule Pasing"]);
+    expect(before.site_map.map((s) => `${s.code} ${s.short}`)).toEqual(["A Schwabing", "B Riem", "C Pasing"]);
   });
 
-  it("KPIs come from the letters, reports, schedule and estimates", () => {
-    const open = seed.case!.filter((c) => c.doc_type !== "bautagesbericht" && (c.status === "unvollstaendig" || c.status === "bereit")).length;
-    expect(kpi(v, "open").value).toBe(open);
-    expect(kpi(v, "missing")).toMatchObject({ value: 3, note: "A Estrich, B Fassade, C Innenausbau" });
-    expect(kpi(v, "claims").note).toBe("vorläufig");
-    expect(kpi(v, "claims").value).toBeGreaterThan(0);
-    expect(kpi(v, "delay").value).toBeGreaterThanOrEqual(4);
-    for (const k of v.kpis) expect(k.spark).toHaveLength(14);
+  it("before the call: Elektro × Riem +1 (amber), Estrich green, A on plan, C only Fassade amber", () => {
+    expect(cell(before, "B", "Elektro")).toMatchObject({ status: "amber", delay: 1, hindrance: null });
+    expect(cell(before, "B", "Estrich")).toMatchObject({ status: "green", delay: 0 });
+    expect(shown(before, "A").every((c) => c.includes(":green:"))).toBe(true);
+    expect(shown(before, "C").filter((c) => !c.includes(":green:"))).toEqual(["Fassade:amber:0"]);
+    expect(cell(before, "C", "Fassade").reason).toBe("Keine Mengenmeldung seit 2 Arbeitstagen");
+    expect(before.site_map.map((s) => s.status)).toEqual(["green", "amber", "amber"]);
   });
 
-  it("A: Elektro 2.OG two days late, the Estrich that waits for it inherits the delay", () => {
-    expect(cell(v, "A", "Elektro")).toMatchObject({ status: "amber", delay: 2, hindrance: null });
-    expect(cell(v, "A", "Estrich")).toMatchObject({ status: "amber", delay: 2 });
-    expect(cell(v, "A", "Estrich").reason).toMatch(/wartet auf Elektro 2\.OG/);
-    expect(cell(v, "A", "Trockenbau").status).toBe("green");
-    const estrich = v.schedule.rows.find((r) => r.trade === "Estrich" && r.area === "2.OG")!;
-    expect(estrich).toMatchObject({ delay: 2, waits_for: "Elektro 2.OG" });
+  it("after the call: Elektro × Riem red +3, Estrich amber +2, one more open case, more delay days", () => {
+    expect(cell(after, "B", "Elektro")).toMatchObject({ status: "red", delay: 3, hindrance: { reference: "KL-2026-0042" } });
+    expect(cell(after, "B", "Estrich")).toMatchObject({ status: "amber", delay: 2 });
+    expect(cell(after, "B", "Estrich").reason).toMatch(/wartet auf Elektro 2\.OG/);
+    expect(kpi(after, "open").value).toBe(kpi(before, "open").value + 1);
+    expect(kpi(after, "delay").value).toBeGreaterThan(kpi(before, "delay").value);
+    expect(after.site_map.find((s) => s.code === "B")!.status).toBe("red");
+    expect(after.actions.items[0]).toMatchObject({ kind: "hindrance", text: "Elektro · Riem · Behinderung offen", href: "/admin/case/call-case" });
+    const row = after.schedule.rows.find((r) => r.trade === "Elektro" && r.area === "2.OG")!;
+    expect(row.hindrances[0]).toMatchObject({ reference: "KL-2026-0042", start: "2026-11-20" });
   });
 
-  it("open hindrances of the history are red (Riem Fenster)", () => {
-    expect(cell(v, "B", "Fenster")).toMatchObject({ status: "red", hindrance: { reference: "KL-2026-0036" } });
+  it("plan vs. Ist: Elektro 85/72 (worst), Sanitär 60/64, Trockenbau 45/40, Estrich 55/38", () => {
+    const bar = (t: string) => before.trade_bars.bars.find((b) => b.trade === t)!;
+    expect([bar("Elektro").plan, bar("Elektro").actual]).toEqual([85, 72]);
+    expect([bar("Sanitär").plan, bar("Sanitär").actual]).toEqual([60, 64]);
+    expect([bar("Trockenbau").plan, bar("Trockenbau").actual]).toEqual([45, 40]);
+    expect([bar("Estrich").plan, bar("Estrich").actual]).toEqual([55, 38]);
+    expect(before.trade_bars.bars.filter((b) => b.worst).map((b) => b.trade)).toEqual(["Elektro"]);
   });
 
-  it("reports grid, pipeline and feed", () => {
-    const fassade = v.completeness.rows.find((r) => r.code === "B" && r.team === "Team Fassade")!;
-    expect(fassade.cells.at(-1)!.state).toBe("missing");
+  it("history hindrances that ended (Behinderung-Ende, expected duration over) are not red", () => {
+    expect(after.heatmap.rows.flatMap((r) => r.cells).filter((c) => c.status === "red").map((c) => c.hindrance?.reference)).toEqual(["KL-2026-0042"]);
+  });
+
+  it("KPIs, reports grid, pipeline, feed", () => {
+    expect(kpi(before, "missing")).toMatchObject({ value: 3 });
+    expect(kpi(before, "claims").note).toBe("vorläufig");
+    for (const k of before.kpis) expect(k.spark).toHaveLength(14);
     const letters = seed.case!.filter((c) => c.doc_type !== "bautagesbericht").length;
-    expect(v.pipeline.steps.reduce((s, x) => s + x.count, 0)).toBe(letters);
-    expect(v.feed.length).toBeGreaterThan(5);
-    expect(v.feed.some((f) => f.source === "checkin")).toBe(true);
-    expect(v.feed.filter((f) => f.href).every((f) => f.href!.startsWith("/admin/"))).toBe(true);
+    expect(before.pipeline.steps.reduce((s, x) => s + x.count, 0)).toBe(letters);
+    expect(before.feed.length).toBeGreaterThan(5);
+    expect(before.feed.every((f) => !/^BTB-/.test(f.title))).toBe(true); // readable titles, the ID separately
+    expect(before.actions.items[0].text).toBe("Elektro · Riem · +1 Tag");
   });
 
   it("filters narrow every widget", () => {
-    const a = dashboardFromSeed(seed, now, { project: IDS.project });
-    expect(a.heatmap.rows.map((r) => r.code)).toEqual(["A"]);
-    expect(kpi(a, "missing")).toMatchObject({ value: 1, note: "A Estrich" });
+    const b = dashboardFromSeed(seed, now, { project: IDS.project });
+    expect(b.heatmap.rows.map((r) => r.code)).toEqual(["B"]);
     const elektro = dashboardFromSeed(seed, now, { trade: "Elektro" });
     expect(elektro.heatmap.trades).toEqual(["Elektro"]);
-    expect(elektro.trade_bars.bars.map((b) => b.trade)).toEqual(["Elektro"]);
+    expect(elektro.trade_bars.bars.map((x) => x.trade)).toEqual(["Elektro"]);
     const seven = dashboardFromSeed(seed, now, { days: 7 });
     expect(seven.completeness.days).toHaveLength(7);
     expect(seven.kpis[0].spark).toHaveLength(7);
   });
 
-  it("the call's Behinderungsanzeige: one more open case, A × Elektro turns red, the Estrich row shows it", () => {
-    const after = dashboardFromSeed({ ...seed, case: [...seed.case!, callCase] }, now);
-    expect(kpi(after, "open").value).toBe(kpi(v, "open").value + 1);
-    expect(cell(after, "A", "Elektro")).toMatchObject({ status: "red", hindrance: { reference: "KL-2026-0042" } });
-    const row = after.schedule.rows.find((r) => r.trade === "Estrich" && r.area === "2.OG")!;
-    expect(row.hindrances[0]).toMatchObject({ reference: "KL-2026-0042", start: "2026-11-20" });
-  });
-
   it("a draft of a running call does not count yet", () => {
     const draft = dashboardFromSeed({ ...seed, case: [...seed.case!, { ...callCase, status: "entwurf" }] }, now);
-    expect(kpi(draft, "open").value).toBe(kpi(v, "open").value);
-    expect(cell(draft, "A", "Elektro").status).toBe("amber");
+    expect(kpi(draft, "open").value).toBe(kpi(before, "open").value);
+    expect(cell(draft, "B", "Elektro").status).toBe("amber");
   });
 });

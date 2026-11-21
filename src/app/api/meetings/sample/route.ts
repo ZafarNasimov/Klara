@@ -17,7 +17,8 @@ export async function POST(req: Request) {
   await connection();
   return handle(async () => {
     const body = await readJson<{ project?: string; meeting_id?: string }>(req).catch(() => ({}) as { project?: string; meeting_id?: string });
-    const projectId = body.project ?? DEFAULT_PROJECT_ID;
+    // Started from a recording view: that meeting's site; else the given (or demo) site.
+    const projectId = body.meeting_id ? (await getMeeting(body.meeting_id)).project_id : (body.project ?? DEFAULT_PROJECT_ID);
     const now = await projectNow(projectId);
     const ctx = await getProjectContext(projectId);
     const participants = SAMPLE_PARTICIPANTS.map((p) => {
