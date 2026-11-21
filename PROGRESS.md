@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-21 (local session: photo button, M5, other reply types, M6 eval; merged `pitchflow` with the pitch deck) · branch `claude/project-thread-jrqak8`
+Last update: 2026-11-21 (local session: photo button, M5, other reply types, M6 eval; merged `pitchflow`; `main` brought up to date) · branch `main`
 
 ## Milestones (SPEC §11)
 
@@ -127,12 +127,19 @@ Instead of Postmark, Klara can use a normal mailbox: `src/lib/mail/mailbox.ts` s
 - Live site (2026-11-21): `SITE_PASSWORD`, `DEMO_CLIENT_MAILBOX` and `MAIL_FROM_NAME` are set on Vercel and deployed; the login works, pages without it redirect, the API answers 401. Demo data reset there (Bauherr contact = the client mailbox, no cases).
 - 2026-11-21: Gmail login works (the address had a typo in `.env.local`); `MAIL_USER` + `MAIL_PASSWORD` set on Vercel and deployed. Live site reports mail mode `smtp`; an inbox check from Vercel takes ~2 s and leaves non-Klara mail unread. Next: the real round trip (send → client replies → Klara analyses).
 
+## Branches
+
+- **`main` is the main branch** (decided by Zafar, 2026-11-21). On 2026-11-21 it was fast-forwarded to `0940df7`, which holds all work so far: M0–M6, the mailbox e-mail loop, the photo button and the merged pitch deck. No history was rewritten.
+- `claude/project-thread-jrqak8`: the build branch these sessions worked on; identical to `main` at `0940df7`.
+- `pitchflow`: the pitch deck branch; fully merged into `main`. Before continuing there, merge `main` into it first.
+- `claude/project-thread-n3tjiq`: stale; its only extra commit is a PROGRESS note of the first cloud voice test (9–11 s per turn), summarised under "Call latency work".
+
 ## Deployment (Vercel)
 
 - Live: **https://klara-liard.vercel.app** (also klara-zafars-projects-3fafacbe.vercel.app), project `klara` in team "Zafar's projects", functions in `fra1` (`vercel.json`, next to Supabase). Deployed 2026-11-21 with `vercel deploy --prod`; `.vercelignore` keeps `.env*` and local data out of the upload.
 - Env vars set on Vercel (production): DATA_BACKEND=supabase, the Supabase four + bucket, KLARA_ANTHROPIC_* (key, models, effort low), OPENAI_API_KEY, STT/TTS settings. Smoke test: pages, `/api/project` (supabase, live), `/api/voice`, `/vad/*` all 200.
-- The project got connected to the GitHub repo while linking: pushes create preview deployments (protected by Vercel login); production = `vercel deploy --prod` or the production branch.
-- **The app has no login.** Anyone with the URL can use it (Claude/OpenAI costs, and once Postmark is set up, e-mails). Before Postmark: add a password gate (ask Claude for a small Basic-Auth proxy with a `SITE_PASSWORD` env var that leaves `/api/email/inbound` open) or keep the URL private.
+- The project is connected to the GitHub repo: **every push to `main` deploys production automatically**; pushes to other branches create preview deployments (protected by Vercel login). `vercel deploy --prod` still works for a deploy from a local tree.
+- **Site password:** `SITE_PASSWORD` is set on Vercel; every page (including `/pitch`) and API route needs the login at `/login` (cookie for 30 days), except `/api/email/inbound` (token-protected).
 - Postmark with this deployment: set `POSTMARK_SERVER_TOKEN`, `POSTMARK_FROM`, `POSTMARK_REPLY_TO`, `POSTMARK_INBOUND_TOKEN`, `DEMO_CLIENT_MAILBOX` in Vercel (Settings → Environment Variables), redeploy, set the inbound webhook to `https://klara-liard.vercel.app/api/email/inbound?token=<POSTMARK_INBOUND_TOKEN>`, then "Demo zurücksetzen" on `/admin/demo` so the Bauherr contact gets the mailbox. Until Postmark approves the account, the client mailbox must be on the sender's domain.
 - Phone test (M3) can use the same URL (HTTPS, no tunnel needed).
 
