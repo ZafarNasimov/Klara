@@ -10,7 +10,8 @@ import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/admin", label: "Vorgänge", exact: true },
+  { href: "/admin", label: "Übersicht", exact: true },
+  { href: "/admin/vorgaenge", label: "Vorgänge" },
   { href: "/admin/meetings", label: "Besprechungen" },
   { href: "/admin/demo", label: "Demo" },
 ];

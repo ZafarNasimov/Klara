@@ -611,7 +611,7 @@ function Failure({ message, caseId }: { message: string; caseId: string | null }
             Zum Vorgang
           </Link>
         ) : null}
-        <Link href="/admin" className={buttonVariants({ variant: "ghost" })}>
+        <Link href="/admin/vorgaenge" className={buttonVariants({ variant: "ghost" })}>
           Zur Übersicht
         </Link>
       </div>

@@ -94,7 +94,8 @@ export type DashboardView = {
 /** Heatmap columns (in this order). */
 export const HEAT_TRADES = ["Elektro", "Sanitär", "Trockenbau", "Estrich", "Rohbau", "Fassade"];
 
-const OPEN_STATUSES = new Set<CaseStatus>(["entwurf", "unvollstaendig", "bereit"]);
+/** Open for the office: confirmed by the Polier, not yet validated or sent (drafts in a running call do not count yet). */
+const OPEN_STATUSES = new Set<CaseStatus>(["unvollstaendig", "bereit"]);
 const NOT_LETTERS = new Set(["bautagesbericht"]);
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -256,11 +257,11 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
   const closedDay = (c: Case): string | null => {
     const stamps = (versionsByCase.get(c.id) ?? []).flatMap((v) => [v.validated_at, v.sent_at]).filter((x): x is string => !!x);
     if (stamps.length) return dayOf(stamps.sort()[0]);
-    return OPEN_STATUSES.has(c.status) ? null : dayOf(c.updated_at);
+    return OPEN_STATUSES.has(c.status) || c.status === "entwurf" ? null : dayOf(c.updated_at);
   };
   const openOn = (d: string) =>
     cases.filter((c) => {
-      if (dayOf(c.created_at) > d) return false;
+      if (dayOf(c.created_at) > d || c.status === "entwurf") return false;
       const closed = closedDay(c);
       return d === today ? OPEN_STATUSES.has(c.status) : !closed || closed > d;
     }).length;
@@ -318,7 +319,7 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
       delta: openNow - openOn(weekAgo),
       delta_label: fmtDelta(openNow - openOn(weekAgo)),
       note: null,
-      basis: "Vorgänge im Status Entwurf, unvollständig oder bereit (noch nicht validiert oder versendet)",
+      basis: "Vom Polier bestätigte Vorgänge, unvollständig oder bereit (noch nicht validiert oder versendet)",
     },
     {
       key: "missing",
@@ -367,7 +368,7 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
   ];
 
   // ── Heatmap Baustelle × Gewerk ──────────────────────────────────────
-  const openHindrances = all.cases.filter((c) => c.doc_type === "behinderungsanzeige" && c.status !== "abgeschlossen" && projectIds.has(c.project_id));
+  const openHindrances = all.cases.filter((c) => c.doc_type === "behinderungsanzeige" && c.status !== "abgeschlossen" && c.status !== "entwurf" && projectIds.has(c.project_id));
   const heatTrades = filters.trade ? HEAT_TRADES.filter((t) => t === filters.trade) : HEAT_TRADES;
   const sites = all.projects
     .filter((p) => projectIds.has(p.id))
@@ -436,7 +437,7 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
   const site = siteId ? project(siteId) : undefined;
   const from = addCalendarDays(today, -days);
   const to = addCalendarDays(today, days);
-  const siteHind = all.cases.filter((c) => c.project_id === siteId && c.doc_type === "behinderungsanzeige" && c.status !== "abgeschlossen");
+  const siteHind = all.cases.filter((c) => c.project_id === siteId && c.doc_type === "behinderungsanzeige" && c.status !== "abgeschlossen" && c.status !== "entwurf");
   const schedRows: ScheduleRow[] = [...now$.f.values()]
     .filter((x) => x.item.project_id === siteId && x.item.end_date >= from && x.item.start_date <= to)
     .sort((a, b) => a.item.start_date.localeCompare(b.item.start_date) || a.trade.localeCompare(b.trade))
@@ -508,7 +509,7 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
 
   // ── Activity feed ─────────────────────────────────────────────────
   const caseById = new Map(all.cases.map((c) => [c.id, c]));
-  const feed: FeedItem[] = all.events
+  const items: FeedItem[] = all.events
     .filter((e) => {
       if (!projectIds.has(e.project_id) || dayOf(e.created_at) < period[0]) return false;
       const c = e.case_id ? caseById.get(e.case_id) : undefined;
@@ -521,7 +522,7 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
       return !!feedTitle(e);
     })
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .slice(0, 14)
+    .slice(0, 60)
     .map((e) => {
       const c = e.case_id ? caseById.get(e.case_id) : undefined;
       const meetingId = typeof e.payload.meeting_id === "string" ? e.payload.meeting_id : null;
@@ -535,6 +536,8 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
         code: siteCode(project(e.project_id)),
       };
     });
+
+  const feed = groupCheckins(items).slice(0, 12);
 
   return {
     now: now.toISOString(),
@@ -554,6 +557,25 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
     pipeline: { steps, title: pipeTitle },
     feed,
   };
+}
+
+/** Routine check-ins of the same half-day become one line ("4 Check-ins"). */
+function groupCheckins(items: FeedItem[]): FeedItem[] {
+  const out: FeedItem[] = [];
+  const half = (iso: string) => `${dayOf(iso)}|${Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Berlin", hour: "2-digit", hourCycle: "h23" }).format(new Date(iso))) < 12 ? "am" : "pm"}`;
+  for (const f of items) {
+    const prev = out.at(-1);
+    if (f.source === "checkin" && prev?.source === "checkin" && !prev.href && !f.href && half(prev.at) === half(f.at)) {
+      const n = Number(/^(\d+)/.exec(prev.title)?.[1] ?? 1) + 1;
+      const who = (x: FeedItem) => `${(x.detail ?? "").split(":")[0]} (${x.code})`;
+      prev.detail = n === 2 ? `${who(prev)}, ${who(f)}` : `${prev.detail}, ${who(f)}`;
+      prev.title = `${n} Check-ins`;
+      prev.code = prev.code === f.code ? prev.code : null;
+      continue;
+    }
+    out.push({ ...f });
+  }
+  return out;
 }
 
 const rank = (c: HeatCell) => (c.status === "red" ? 1000 : c.status === "amber" ? 100 : 0) + c.delay * 10 + (c.hindrance ? 5 : 0);
