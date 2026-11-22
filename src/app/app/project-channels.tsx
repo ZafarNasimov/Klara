@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ProjectSummary } from "@/app/api/projects/route";
 import { LANGUAGE_DE } from "@/lib/labels";
 import { useApi } from "@/lib/use-api";
+import { $t } from "@/lib/i18n";
 
 /** Sites → team channels (SPEC §8 /app). */
 export function ProjectChannels() {
@@ -33,10 +34,10 @@ export function ProjectChannels() {
             {p.address}
           </p>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {p.contract_type === "VOB_B" ? "VOB/B-Vertrag" : "BGB-Vertrag"} <span className="font-mono">{p.contract_no}</span>
+            {p.contract_type === "VOB_B" ? $t("VOB/B-Vertrag") : $t("BGB-Vertrag")} <span className="font-mono">{p.contract_no}</span>
           </p>
 
-          <h3 className="mt-4 mb-2 text-sm font-medium text-muted-foreground">Teamkanäle</h3>
+          <h3 className="mt-4 mb-2 text-sm font-medium text-muted-foreground">{$t("Teamkanäle")}</h3>
           <ul className="overflow-hidden rounded-xl border border-border">
             {p.teams.map((team) => (
               <li key={team.id} className="border-b border-border last:border-b-0">
@@ -51,12 +52,12 @@ export function ProjectChannels() {
                     <span className="block truncate text-[15px] font-medium text-foreground">{team.name}</span>
                     <span className="block truncate text-sm text-muted-foreground">
                       {team.lead_name
-                        ? `${team.lead_name}, ${team.lead_language ? (LANGUAGE_DE[team.lead_language] ?? team.lead_language) : "Sprache offen"}`
-                        : "Kein Polier zugeordnet"}
+                        ? `${team.lead_name}, ${team.lead_language ? (LANGUAGE_DE[team.lead_language] ?? team.lead_language) : $t("Sprache offen")}`
+                        : $t("Kein Polier zugeordnet")}
                     </span>
                   </span>
                   {team.open_cases > 0 ? (
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">{team.open_cases} offen</span>
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-foreground">{$t("{n} offen", { n: team.open_cases })}</span>
                   ) : null}
                   <ChevronRight className="size-5 shrink-0 text-muted-foreground" aria-hidden />
                 </Link>

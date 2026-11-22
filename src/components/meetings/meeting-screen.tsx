@@ -14,6 +14,7 @@ import { fmtClock, PROCESSING_STEP_DE, PROCESSING_STEPS, type MailDraft, type Me
 import { ApiError, postJson, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { MeetingDetail } from "./meeting-detail";
+import { $t, $tx } from "@/lib/i18n";
 
 export function MeetingScreen({ id }: { id: string }) {
   const [processing, setProcessing] = useState(false);
@@ -100,10 +101,10 @@ function Recorder({ m, onChanged }: { m: MeetingView; onChanged: () => void }) {
         const n = seq.current++;
         uploads.current = uploads.current.then(() =>
           fetch(`/api/meetings/${m.id}/audio?seq=${n}`, { method: "POST", headers: { "content-type": e.data.type || mime || "audio/webm" }, body: e.data }).then((res) => {
-            if (!res.ok) throw new Error("Upload fehlgeschlagen");
+            if (!res.ok) throw new Error($t("Upload fehlgeschlagen"));
           }),
         );
-        uploads.current.catch(() => setError("Ein Teil der Aufnahme konnte nicht hochgeladen werden. Bitte Verbindung prüfen."));
+        uploads.current.catch(() => setError($t("Ein Teil der Aufnahme konnte nicht hochgeladen werden. Bitte Verbindung prüfen.")));
       };
       r.start(CHUNK_MS);
       rec.current = r;
@@ -127,7 +128,7 @@ function Recorder({ m, onChanged }: { m: MeetingView; onChanged: () => void }) {
       };
       requestAnimationFrame(loop);
     } catch {
-      setError("Kein Zugriff auf das Mikrofon. Erlauben Sie das Mikrofon im Browser oder nutzen Sie „Audio hochladen“.");
+      setError($t("Kein Zugriff auf das Mikrofon. Erlauben Sie das Mikrofon im Browser oder nutzen Sie „Audio hochladen“."));
       setPhase("idle");
     }
   }, [m.id]);
@@ -180,7 +181,7 @@ function Recorder({ m, onChanged }: { m: MeetingView; onChanged: () => void }) {
       await postJson(`/api/meetings/${m.id}/end`, { duration_sec: elapsed });
       onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Die Aufnahme konnte nicht abgeschlossen werden.");
+      setError(e instanceof Error ? $tx(e.message) : $t("Die Aufnahme konnte nicht abgeschlossen werden."));
       setPhase("idle");
     }
   }
@@ -190,16 +191,16 @@ function Recorder({ m, onChanged }: { m: MeetingView; onChanged: () => void }) {
       <header>
         <p className="font-mono text-xs text-muted-foreground">{m.ref}</p>
         <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground">{m.title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{m.participants.map((p) => p.name).join(", ") || "Keine Teilnehmer angegeben"}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{m.participants.map((p) => p.name).join(", ") || $t("Keine Teilnehmer angegeben")}</p>
       </header>
 
-      <section aria-label="Aufnahme" className="flex flex-col items-center gap-5 rounded-xl border border-border bg-background px-6 py-10">
+      <section aria-label={$t("Aufnahme")} className="flex flex-col items-center gap-5 rounded-xl border border-border bg-background px-6 py-10">
         <p className="font-mono text-4xl tracking-tight text-foreground tabular-nums" aria-live="off">
           {fmtClock(elapsed)}
         </p>
         <LevelMeter level={phase === "recording" ? level : 0} />
         <p className="text-sm text-muted-foreground" role="status">
-          {phase === "recording" ? "Aufnahme läuft" : phase === "paused" ? "Pausiert" : phase === "ending" ? "Aufnahme wird abgeschlossen …" : "Bereit"}
+          {phase === "recording" ? $t("Aufnahme läuft") : phase === "paused" ? $t("Pausiert") : phase === "ending" ? $t("Aufnahme wird abgeschlossen …") : $t("Bereit")}
         </p>
         <div className="flex flex-wrap justify-center gap-2">
           {phase === "idle" ? (
@@ -210,7 +211,7 @@ function Recorder({ m, onChanged }: { m: MeetingView; onChanged: () => void }) {
             <>
               <Button size="lg" variant="outline" onClick={togglePause} disabled={phase === "ending"}>
                 {phase === "paused" ? <Play aria-hidden /> : <Pause aria-hidden />}
-                {phase === "paused" ? "Fortsetzen" : "Pause"}
+                {phase === "paused" ? $t("Fortsetzen") : $t("Pause")}
               </Button>
               <Button size="lg" onClick={end} disabled={phase === "ending"}>
                 {phase === "ending" ? <Loader2 className="animate-spin" aria-hidden /> : <Square aria-hidden />}
@@ -255,13 +256,13 @@ function Fallbacks({ m, onChanged, onBeforeUse, recording = false }: { m: Meetin
     setBusy("upload");
     setError(null);
     try {
-      if (f.size > 4_000_000) throw new Error("Die Datei ist zu groß (max. 4 MB). Bitte eine kürzere oder komprimierte Aufnahme wählen.");
+      if (f.size > 4_000_000) throw new Error($t("Die Datei ist zu groß (max. 4 MB). Bitte eine kürzere oder komprimierte Aufnahme wählen."));
       const res = await fetch(`/api/meetings/${m.id}/audio?seq=0`, { method: "POST", headers: { "content-type": f.type || "audio/webm" }, body: f });
-      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Upload fehlgeschlagen");
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? $t("Upload fehlgeschlagen"));
       await postJson(`/api/meetings/${m.id}/end`, {});
       onChanged();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload fehlgeschlagen");
+      setError(e instanceof Error ? $tx(e.message) : $t("Upload fehlgeschlagen"));
       setBusy(null);
     }
   }
@@ -274,17 +275,17 @@ function Fallbacks({ m, onChanged, onBeforeUse, recording = false }: { m: Meetin
       await postJson(`/api/meetings/sample`, { meeting_id: m.id });
       onChanged();
     } catch (e) {
-      setError(e instanceof ApiError || e instanceof Error ? e.message : "Fehlgeschlagen");
+      setError(e instanceof ApiError || e instanceof Error ? $tx(e.message) : $t("Fehlgeschlagen"));
       setBusy(null);
     }
   }
 
   return (
-    <section aria-label="Ohne Mikrofon" className="rounded-xl border border-border bg-background px-5 py-4">
-      <h2 className="text-sm font-semibold text-foreground">Ohne Mikrofon</h2>
+    <section aria-label={$t("Ohne Mikrofon")} className="rounded-xl border border-border bg-background px-5 py-4">
+      <h2 className="text-sm font-semibold text-foreground">{$t("Ohne Mikrofon")}</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Eine vorhandene Aufnahme auswerten, oder die Beispielaufnahme (MT-2026-0007) durch die echte Auswertung schicken.
-        {recording ? " Die laufende Aufnahme wird dabei verworfen." : ""}
+        {$t("Eine vorhandene Aufnahme auswerten, oder die Beispielaufnahme (MT-2026-0007) durch die echte Auswertung schicken.")}
+        {recording ? $t(" Die laufende Aufnahme wird dabei verworfen.") : ""}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <input ref={file} type="file" accept="audio/*" className="hidden" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
@@ -309,10 +310,10 @@ function Fallbacks({ m, onChanged, onBeforeUse, recording = false }: { m: Meetin
 function Processing({ m }: { m: MeetingView }) {
   const current = PROCESSING_STEPS.find((s) => !m.steps[s]);
   return (
-    <section aria-label="Auswertung" className="rounded-xl border border-border bg-background px-6 py-6">
+    <section aria-label={$t("Auswertung")} className="rounded-xl border border-border bg-background px-6 py-6">
       <p className="font-mono text-xs text-muted-foreground">{m.ref}</p>
       <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground">{m.title}</h1>
-      <p className="mt-1 text-sm text-muted-foreground">Klara wertet die Besprechung aus.</p>
+      <p className="mt-1 text-sm text-muted-foreground">{$t("Klara wertet die Besprechung aus.")}</p>
       <ol className="mt-5 space-y-3" aria-live="polite">
         {PROCESSING_STEPS.map((s) => {
           const done = m.steps[s];
@@ -344,7 +345,7 @@ function Failed({ m, onChanged }: { m: MeetingView; onChanged: () => void }) {
         <p className="font-mono text-xs text-muted-foreground">{m.ref}</p>
         <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-foreground">{m.title}</h1>
         <p className="mt-2 text-sm text-light-red-text">Auswertung fehlgeschlagen: {m.error ?? "unbekannter Fehler"}</p>
-        <p className="mt-1 text-sm text-muted-foreground">Die Aufnahme bleibt gespeichert. Es wurde nichts angelegt oder geändert.</p>
+        <p className="mt-1 text-sm text-muted-foreground">{$t("Die Aufnahme bleibt gespeichert. Es wurde nichts angelegt oder geändert.")}</p>
       </section>
       <Fallbacks m={m} onChanged={onChanged} />
     </div>
@@ -360,11 +361,11 @@ function ProtocolButton({ m, onChanged }: { m: MeetingView; onChanged: () => voi
     <>
       <div className="flex flex-col items-end gap-1">
         <Button variant={sent ? "outline" : "default"} onClick={() => setOpen(true)}>
-          <Mail aria-hidden /> {sent ? "Protokoll ansehen" : "Protokoll an Teilnehmer senden"}
+          <Mail aria-hidden /> {sent ? $t("Protokoll ansehen") : $t("Protokoll an Teilnehmer senden")}
         </Button>
         {sent && m.mail?.sent_at ? (
           <p className="text-xs text-muted-foreground">
-            {m.mail.simulated ? "Testversand" : "Versendet"} am {fmtDateTime(m.mail.sent_at)}
+            {$t(m.mail.simulated ? "Testversand am {at}" : "Versendet am {at}", { at: fmtDateTime(m.mail.sent_at) })}
           </p>
         ) : null}
       </div>
@@ -395,7 +396,7 @@ function ProtocolDialog({ m, onClose, onSent }: { m: MeetingView; onClose: () =>
       onSent();
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Versand fehlgeschlagen");
+      setError(e instanceof Error ? $tx(e.message) : $t("Versand fehlgeschlagen"));
       setBusy(false);
     }
   }
@@ -404,8 +405,8 @@ function ProtocolDialog({ m, onClose, onSent }: { m: MeetingView; onClose: () =>
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Protokoll an Teilnehmer</DialogTitle>
-          <DialogDescription>{sent ? "Bereits versendet." : "Entwurf. Es wird erst versendet, wenn Sie auf „Senden“ klicken."}</DialogDescription>
+          <DialogTitle>{$t("Protokoll an Teilnehmer")}</DialogTitle>
+          <DialogDescription>{sent ? $t("Bereits versendet.") : $t("Entwurf. Es wird erst versendet, wenn Sie auf „Senden“ klicken.")}</DialogDescription>
         </DialogHeader>
         {loadError ? (
           <p className="text-sm text-light-red-text">{loadError}</p>
@@ -415,14 +416,14 @@ function ProtocolDialog({ m, onClose, onSent }: { m: MeetingView; onClose: () =>
           <div className="space-y-3">
             <label className="block space-y-1">
               <span className="text-sm font-medium text-foreground">An</span>
-              <Input value={to ?? draft.to.join(", ")} onChange={(e) => setTo(e.target.value)} disabled={sent} placeholder="E-Mail-Adressen, durch Komma getrennt" />
+              <Input value={to ?? draft.to.join(", ")} onChange={(e) => setTo(e.target.value)} disabled={sent} placeholder={$t("E-Mail-Adressen, durch Komma getrennt")} />
             </label>
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-foreground">Betreff</span>
+              <span className="text-sm font-medium text-foreground">{$t("Betreff")}</span>
               <Input value={subject ?? draft.subject} onChange={(e) => setSubject(e.target.value)} disabled={sent} />
             </label>
             <label className="block space-y-1">
-              <span className="text-sm font-medium text-foreground">Text</span>
+              <span className="text-sm font-medium text-foreground">{$t("Text")}</span>
               <Textarea value={body ?? draft.body} onChange={(e) => setBody(e.target.value)} disabled={sent} rows={14} className="font-mono text-xs" />
             </label>
             {error ? (
@@ -434,7 +435,7 @@ function ProtocolDialog({ m, onClose, onSent }: { m: MeetingView; onClose: () =>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
-            {sent ? "Schließen" : "Abbrechen"}
+            {sent ? $t("Schließen") : $t("Abbrechen")}
           </Button>
           {!sent ? (
             <Button onClick={send} disabled={busy || !draft}>

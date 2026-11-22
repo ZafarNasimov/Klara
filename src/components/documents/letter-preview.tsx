@@ -5,6 +5,7 @@ import { Fragment } from "react";
 import type { DocBlock, DocBody } from "@/lib/documents/types";
 import { fmtDate } from "@/lib/labels";
 import { cn } from "@/lib/utils";
+import { $t } from "@/lib/i18n";
 
 const dateDe = (day: string) => fmtDate(/^\d{4}-\d{2}-\d{2}$/.test(day) ? `${day}T12:00:00Z` : day);
 
@@ -115,7 +116,7 @@ function Block({ b }: { b: DocBlock }) {
 /** Bautagesbericht: a form with a header grid instead of an address window. */
 function ReportPreview({ body, className }: { body: DocBody; className?: string }) {
   return (
-    <article
+    <article lang="de"
       aria-label={`${body.subject}, ${body.reference}`}
       className={cn(
         "mx-auto aspect-[210/297] w-full max-w-[720px] rounded-sm border border-border bg-white px-[11.9%] pt-[8.5%] pb-[9.5%] pr-[9.5%] text-[13px] leading-[1.45] text-zinc-900 shadow-[0_1px_2px_rgb(24_24_27/0.06),0_8px_24px_-8px_rgb(24_24_27/0.12)]",
@@ -158,7 +159,8 @@ export function LetterPreview({ body, className }: { body: DocBody; className?: 
   const a = body.addressee;
   return (
     <article
-      aria-label={`Schreiben ${body.reference}`}
+      lang="de"
+      aria-label={$t("Schreiben {ref}", { ref: body.reference })}
       className={cn(
         "mx-auto aspect-[210/297] w-full max-w-[720px] rounded-sm border border-border bg-white px-[11.9%] pt-[8.5%] pb-[9.5%] pr-[9.5%] text-[13px] leading-[1.45] text-zinc-900 shadow-[0_1px_2px_rgb(24_24_27/0.06),0_8px_24px_-8px_rgb(24_24_27/0.12)]",
         className,

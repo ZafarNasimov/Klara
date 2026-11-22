@@ -2,6 +2,7 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { ApiError, postJson } from "@/lib/use-api";
+import { $t, $tx } from "@/lib/i18n";
 
 export function LoginForm({ next }: { next: string }) {
   const [password, setPassword] = useState("");
@@ -18,7 +19,7 @@ export function LoginForm({ next }: { next: string }) {
       // A full load, so the new cookie applies to every request of the app.
       window.location.assign(r.next);
     } catch (err) {
-      setError(err instanceof ApiError && err.status < 500 ? err.message : "Anmelden hat nicht geklappt. Bitte erneut versuchen.");
+      setError(err instanceof ApiError && err.status < 500 ? $tx(err.message) : $t("Anmelden hat nicht geklappt. Bitte erneut versuchen."));
       setBusy(false);
     }
   };
@@ -26,7 +27,7 @@ export function LoginForm({ next }: { next: string }) {
   return (
     <form onSubmit={(e) => void submit(e)} className="mt-8 grid w-full gap-3 text-left">
       <label htmlFor="site-password" className="text-sm font-medium text-foreground">
-        Passwort
+        {$t("Passwort")}
       </label>
       <input
         id="site-password"
@@ -48,7 +49,7 @@ export function LoginForm({ next }: { next: string }) {
         </p>
       ) : null}
       <Button type="submit" className="mt-2 h-12 text-base" disabled={!password || busy}>
-        {busy ? "Wird angemeldet …" : "Anmelden"}
+        {busy ? $t("Wird angemeldet …") : $t("Anmelden")}
       </Button>
     </form>
   );

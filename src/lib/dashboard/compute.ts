@@ -78,6 +78,8 @@ export type FeedItem = { id: string; at: string; source: FeedSource; title: stri
 /** One card in "Handlungsbedarf": the most severe first. */
 export type ActionItem = {
   id: string;
+  /** The site it belongs to (linked hover with the map). */
+  project_id: string;
   kind: "hindrance" | "delay" | "report" | "no_data" | "letter";
   status: Exclude<CellStatus, "none">;
   severity: number;
@@ -88,8 +90,33 @@ export type ActionItem = {
   detail: string;
 };
 
-/** A site on the map: worst status, open cases, forecast delay days. */
-export type SiteSummary = { id: string; code: string; name: string; short: string; lat: number; lng: number; status: CellStatus; open: number; delay: number; selected: boolean };
+/** A site on the map and in its list: worst trade status (the heatmap's thresholds), open cases, forecast delay days, today. */
+export type SiteSummary = {
+  id: string;
+  code: string;
+  name: string;
+  short: string;
+  lat: number;
+  lng: number;
+  status: CellStatus;
+  /** Why, for the worst trade: "Im Plan", "≤ 2 Tage Verzug", "> 2 Tage Verzug", "Behinderung offen", "Keine Mengenmeldung". */
+  status_text: string;
+  /** An open Behinderungsanzeige on this site. */
+  hindrance: boolean;
+  /** "VOB/B" or "BGB". */
+  contract: string;
+  open: number;
+  delay: number;
+  /** Teams with work planned today (schedule). */
+  teams_today: number;
+  /** Of those, without a daily report yet. */
+  missing_today: number;
+  /** The latest event on this site, as in the activity feed. */
+  last_event: { at: string; text: string; ref: string | null } | null;
+  selected: boolean;
+  /** Matches the site/team/trade filter; otherwise drawn as a ghost. */
+  in_filter: boolean;
+};
 
 export type DashboardView = {
   now: string;
@@ -118,7 +145,17 @@ const NOT_LETTERS = new Set(["bautagesbericht"]);
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-const dayOf = (iso: string) => new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" }).format(new Date(iso));
+// One formatter, results cached: called thousands of times per dashboard.
+const dayFmt = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Berlin" });
+const dayMemo = new Map<string, string>();
+const dayOf = (iso: string) => {
+  let d = dayMemo.get(iso);
+  if (d === undefined) {
+    if (dayMemo.size > 50_000) dayMemo.clear();
+    dayMemo.set(iso, (d = dayFmt.format(new Date(iso))));
+  }
+  return d;
+};
 
 function makeCalendar(region: string) {
   const memo = new Map<string, boolean>();
@@ -617,25 +654,25 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
   const cellOf = (pid: string, trade: string) => rows.find((r) => r.project_id === pid)?.cells.find((c) => c.trade === trade);
   const actions: ActionItem[] = [];
   for (const h of activeNow) {
-    actions.push({ id: `h-${h.case_id}`, kind: "hindrance", status: "red", severity: 100, text: `${h.trade} · ${short(h.project_id)} · Behinderung offen`, href: `/admin/case/${h.case_id}`, detail: `Behinderung ${h.reference} seit ${fmtSince(h.start_at, today)}` });
+    actions.push({ id: `h-${h.case_id}`, project_id: h.project_id, kind: "hindrance", status: "red", severity: 100, text: `${h.trade} · ${short(h.project_id)} · Behinderung offen`, href: `/admin/case/${h.case_id}`, detail: `Behinderung ${h.reference} seit ${fmtSince(h.start_at, today)}` });
   }
   for (const r of rows) {
     for (const c of r.cells) {
       if (c.hindrance || c.status === "none" || c.status === "green") continue;
       if (c.delay > 0) {
-        actions.push({ id: `d-${r.project_id}-${c.trade}`, kind: "delay", status: c.status, severity: c.delay > 2 ? 90 : 70, text: `${c.trade} · ${short(r.project_id)} · +${c.delay} ${c.delay === 1 ? "Tag" : "Tage"}`, href: `/admin/vorgaenge?site=${r.project_id}&trade=${encodeURIComponent(c.trade)}`, detail: c.reason });
+        actions.push({ id: `d-${r.project_id}-${c.trade}`, project_id: r.project_id, kind: "delay", status: c.status, severity: c.delay > 2 ? 90 : 70, text: `${c.trade} · ${short(r.project_id)} · +${c.delay} ${c.delay === 1 ? "Tag" : "Tage"}`, href: `/admin/vorgaenge?site=${r.project_id}&trade=${encodeURIComponent(c.trade)}`, detail: c.reason });
       }
     }
   }
   for (const t of missingToday) {
     const trade = all.trades.find((x) => x.team_id === t.id && tradeIds.has(x.id))?.name ?? t.name.replace(/^Team\s+/, "");
-    actions.push({ id: `r-${t.id}`, kind: "report", status: "amber", severity: 60, text: `Bericht fehlt · ${trade} · ${short(t.project_id)}`, href: `/admin/vorgaenge?site=${t.project_id}`, detail: `${t.name}: heute geplante Arbeit, noch kein Tagesbericht` });
+    actions.push({ id: `r-${t.id}`, project_id: t.project_id, kind: "report", status: "amber", severity: 60, text: `Bericht fehlt · ${trade} · ${short(t.project_id)}`, href: `/admin/vorgaenge?site=${t.project_id}`, detail: `${t.name}: heute geplante Arbeit, noch kein Tagesbericht` });
   }
   for (const r of rows) {
     for (const c of r.cells) {
       if (c.status !== "amber" || c.delay > 0 || c.hindrance) continue;
       if (actions.some((a) => a.kind === "report" && a.text.includes(`· ${c.trade} · ${short(r.project_id)}`))) continue;
-      actions.push({ id: `n-${r.project_id}-${c.trade}`, kind: "no_data", status: "amber", severity: 55, text: `Keine Mengen · ${c.trade} · ${short(r.project_id)}`, href: `/admin/vorgaenge?site=${r.project_id}&trade=${encodeURIComponent(c.trade)}`, detail: c.reason });
+      actions.push({ id: `n-${r.project_id}-${c.trade}`, project_id: r.project_id, kind: "no_data", status: "amber", severity: 55, text: `Keine Mengen · ${c.trade} · ${short(r.project_id)}`, href: `/admin/vorgaenge?site=${r.project_id}&trade=${encodeURIComponent(c.trade)}`, detail: c.reason });
     }
   }
   for (const c of cases.filter((x) => OPEN_STATUSES.has(x.status)).sort((a, b) => b.created_at.localeCompare(a.created_at))) {
@@ -649,16 +686,37 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
     const doc = SHORT_DOC[c.doc_type] ?? docTitle(c.doc_type);
     const text = [doc, trade, short(c.project_id)].filter(Boolean).join(" · ");
     const todo = c.doc_type === "mehrkostenanzeige" ? "vor Ausführung senden" : c.status === "bereit" ? "prüfen und freigeben" : "ergänzen";
-    actions.push({ id: `l-${c.id}`, kind: "letter", status: "amber", severity: c.doc_type === "mehrkostenanzeige" ? 52 : 50, text, href: `/admin/case/${c.id}`, detail: `${c.reference}: ${todo}` });
+    actions.push({ id: `l-${c.id}`, project_id: c.project_id, kind: "letter", status: "amber", severity: c.doc_type === "mehrkostenanzeige" ? 52 : 50, text, href: `/admin/case/${c.id}`, detail: `${c.reference}: ${todo}` });
   }
   actions.sort((a, b) => b.severity - a.severity || a.text.localeCompare(b.text));
   const ok = rows.flatMap((r) => r.cells.filter((c) => c.status === "green").map((c) => `${c.trade} · ${short(r.project_id)}`));
 
   // ── Map ─────────────────────────────────────────────────────────────
   const rankStatus = (st: CellStatus) => (st === "red" ? 3 : st === "amber" ? 2 : st === "green" ? 1 : 0);
+  // The latest event per site that the activity feed would show.
+  const nowIso = now.toISOString();
+  const lastEvent = new Map<string, AppEvent>();
+  for (const e of all.events) {
+    const prev = lastEvent.get(e.project_id);
+    if (e.created_at > nowIso || (prev && prev.created_at >= e.created_at)) continue;
+    if (feedTitle(e, e.case_id ? caseById.get(e.case_id) : undefined, null)) lastEvent.set(e.project_id, e);
+  }
   const siteMap: SiteSummary[] = sites.map((p) => {
     const cells = rows.find((r) => r.project_id === p.id)?.cells ?? [];
     const status = cells.reduce<CellStatus>((w, c) => (rankStatus(c.status) > rankStatus(w) ? c.status : w), "none");
+    const worst = cells.filter((c) => c.status !== "none").sort((a, b) => rank(b) - rank(a))[0];
+    const statusText =
+      !worst || worst.status === "green"
+        ? "Im Plan"
+        : worst.hindrance
+          ? "Behinderung offen"
+          : worst.delay > 2
+            ? "> 2 Tage Verzug"
+            : worst.delay > 0
+              ? "≤ 2 Tage Verzug"
+              : "Keine Mengenmeldung";
+    const ev = lastEvent.get(p.id);
+    const evCase = ev?.case_id ? caseById.get(ev.case_id) : undefined;
     return {
       id: p.id,
       code: siteCode(p),
@@ -667,9 +725,18 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
       lat: p.lat,
       lng: p.lng,
       status: status === "none" ? "green" : status,
+      status_text: statusText,
+      hindrance: activeNow.some((h) => h.project_id === p.id),
+      contract: p.contract_type === "VOB_B" ? "VOB/B" : "BGB",
       open: cases.filter((c) => c.project_id === p.id && OPEN_STATUSES.has(c.status)).length,
       delay: [...now$.cells.entries()].filter(([k]) => k.startsWith(`${p.id}|`)).reduce((n, [, d]) => n + d, 0),
+      teams_today: teams.filter((t) => t.project_id === p.id && activeOn(t, today)).length,
+      missing_today: missingToday.filter((t) => t.project_id === p.id).length,
+      last_event: ev
+        ? { at: ev.created_at, text: feedTitle(ev, evCase, evCase?.team_id ? teamName(evCase.team_id) : null)!, ref: evCase?.reference ?? (typeof ev.payload.reference === "string" ? ev.payload.reference : null) }
+        : null,
       selected: !!filters.project && p.id === filters.project,
+      in_filter: !filters.trade || trades.some((t) => t.project_id === p.id),
     };
   });
   void cellOf;
@@ -695,7 +762,7 @@ export function computeDashboard(all: DashboardData, now: Date, filters: Dashboa
     // The map always shows every site; with a site (or team) filter, the others come from the unfiltered view.
     site_map:
       filters.project || filters.team
-        ? computeDashboard(all, now, { ...filters, project: null, team: null }, region, defaultSite).site_map.map((x) => ({ ...x, selected: projectIds.has(x.id) }))
+        ? computeDashboard(all, now, { ...filters, project: null, team: null }, region, defaultSite).site_map.map((x) => ({ ...x, selected: projectIds.has(x.id), in_filter: x.in_filter && projectIds.has(x.id) }))
         : siteMap,
   };
 }

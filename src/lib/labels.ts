@@ -1,7 +1,13 @@
 // German UI labels and formatters (client-safe).
 import type { CaseStatus, Contact, ReplyKind, Sphere } from "@/lib/types";
+import { $t } from "./i18n";
+/** A label map whose values come out in the UI language (German on the server). */
+export function localized<T extends Record<string, string>>(map: T): T {
+  return new Proxy(map, { get: (o, k) => (typeof k === "string" && k in o ? $t(o[k as keyof T]) : Reflect.get(o, k)) });
+}
 
-export const CASE_STATUS_DE: Record<CaseStatus, string> = {
+
+export const CASE_STATUS_DE: Record<CaseStatus, string> = localized({
   entwurf: "Entwurf",
   unvollstaendig: "Unvollständig",
   bereit: "Bereit",
@@ -9,44 +15,44 @@ export const CASE_STATUS_DE: Record<CaseStatus, string> = {
   versendet: "Versendet",
   beantwortet: "Beantwortet",
   abgeschlossen: "Abgeschlossen",
-};
+});
 
-export const SPHERE_DE: Record<Sphere, string> = {
+export const SPHERE_DE: Record<Sphere, string> = localized({
   client: "Auftraggeber",
   own_sub: "eigener Nachunternehmer",
   own_team: "eigene Kolonne",
   weather: "Witterung",
   unclear: "unklar",
-};
+});
 
 /** What a client's reply means (SPEC §6.4). */
-export const REPLY_KIND_DE: Record<ReplyKind, string> = {
+export const REPLY_KIND_DE: Record<ReplyKind, string> = localized({
   acceptance: "Zustimmung",
   rejection: "Zurückweisung",
   request_info: "Rückfrage",
   counter_instruction: "Gegenanweisung",
   change_request: "Änderungswunsch",
   other: "Sonstiges",
-};
+});
 
 /** A contact's role, e.g. "Dr. Petra Lang (Bauherr)". */
-export const ROLE_DE: Record<Contact["role"], string> = {
+export const ROLE_DE: Record<Contact["role"], string> = localized({
   bauherr: "Bauherr",
   architekt: "Architekt",
   nu: "Nachunternehmer",
   intern: "intern",
-};
+});
 
 /** "Antwort des Bauherrn": the sender's role in the genitive. */
-export const ROLE_GENITIVE_DE: Record<Contact["role"], string> = {
+export const ROLE_GENITIVE_DE: Record<Contact["role"], string> = localized({
   bauherr: "des Bauherrn",
   architekt: "des Architekten",
   nu: "des Nachunternehmers",
   intern: "intern",
-};
+});
 
 /** Timeline wording for event kinds. Kinds without a label stay out of the timeline. */
-export const EVENT_DE: Record<string, string> = {
+export const EVENT_DE: Record<string, string> = localized({
   meeting_processed: "Besprechung ausgewertet",
   meeting_case_created: "Aus Besprechung angelegt",
   meeting_case_updated: "Durch Besprechung aktualisiert",
@@ -72,7 +78,7 @@ export const EVENT_DE: Record<string, string> = {
   call_ended: "Gespräch beendet",
   photo_added: "Foto hinzugefügt",
   unsupported_event: "Meldung ohne Vorlage",
-};
+});
 
 const TZ = "Europe/Berlin";
 
@@ -103,7 +109,7 @@ export const fmtShort = (v: string | Date) => shortFmt.format(asDate(v));
 export const fmtNumber = (n: number, digits = 0) =>
   new Intl.NumberFormat("de-DE", { maximumFractionDigits: digits, minimumFractionDigits: 0 }).format(n);
 
-export const LANGUAGE_DE: Record<string, string> = {
+export const LANGUAGE_DE: Record<string, string> = localized({
   de: "Deutsch",
   en: "Englisch",
   ru: "Russisch",
@@ -111,7 +117,7 @@ export const LANGUAGE_DE: Record<string, string> = {
   tr: "Türkisch",
   ro: "Rumänisch",
   uk: "Ukrainisch",
-};
+});
 
 const isoDayFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
 /** Berlin calendar day (YYYY-MM-DD), client-safe (no holiday data). */

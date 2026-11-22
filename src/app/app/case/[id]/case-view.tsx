@@ -22,6 +22,7 @@ import { useRole } from "@/lib/role";
 import type { CaseDetail, CaseStatus, CaseView } from "@/lib/types";
 import { ApiError, postJson, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
+import { $t, $tx } from "@/lib/i18n";
 
 const SENT = new Set<CaseStatus>(["versendet", "beantwortet", "abgeschlossen"]);
 
@@ -35,13 +36,13 @@ export function MobileCaseView({ id }: { id: string }) {
   if (!data) {
     return (
       <>
-        <MobileHeader title="Vorgang" backHref="/app" />
+        <MobileHeader title={$t("Vorgang")} backHref="/app" />
         {error ? (
           <main className="flex flex-1 flex-col items-center px-6 py-12 text-center">
-            <p className="text-base font-medium text-foreground">Der Vorgang konnte nicht geladen werden.</p>
+            <p className="text-base font-medium text-foreground">{$t("Der Vorgang konnte nicht geladen werden.")}</p>
             <p className="mt-1 text-sm text-muted-foreground">{error}</p>
             <button type="button" onClick={reload} className={cn(BTN_OUTLINE, "mt-4")}>
-              Erneut laden
+              {$t("Erneut laden")}
             </button>
           </main>
         ) : (
@@ -69,7 +70,7 @@ export function MobileCaseView({ id }: { id: string }) {
       await postJson(`/api/cases/${c.id}/correct`, { user_id: user.userId });
       router.push(channel);
     } catch (e) {
-      setActionError(e instanceof ApiError && e.status < 500 ? e.message : "Klara ist gerade nicht erreichbar. Bitte gleich noch einmal versuchen.");
+      setActionError(e instanceof ApiError && e.status < 500 ? $tx(e.message) : $t("Klara ist gerade nicht erreichbar. Bitte gleich noch einmal versuchen."));
       setBusy(false);
     }
   };
@@ -82,23 +83,23 @@ export function MobileCaseView({ id }: { id: string }) {
     </Link>
   );
   const primary = sent ? null : c.status === "entwurf" ? (
-    toChat("Im Chat bestätigen")
+    toChat($t("Im Chat bestätigen"))
   ) : returned ? (
-    toChat("Im Chat ergänzen")
+    toChat($t("Im Chat ergänzen"))
   ) : correcting ? (
-    toChat("Korrektur im Chat fortsetzen")
+    toChat($t("Korrektur im Chat fortsetzen"))
   ) : (
     <button type="button" onClick={correct} disabled={busy} aria-describedby={c.status === "validiert" ? "correct-note" : undefined} className={BTN_PRIMARY}>
       <Mic aria-hidden />
-      {busy ? "Klara öffnet den Chat …" : "Per Sprache korrigieren"}
+      {busy ? $t("Klara öffnet den Chat …") : $t("Per Sprache korrigieren")}
     </button>
   );
   const note = sent
-    ? "Bereits an den Auftraggeber versendet. Änderungen gehen nur noch über die Bauleitung."
+    ? $t("Bereits an den Auftraggeber versendet. Änderungen gehen nur noch über die Bauleitung.")
     : !latest
-      ? "Das Schreiben entsteht, sobald Sie die Meldung im Chat bestätigen."
+      ? $t("Das Schreiben entsteht, sobald Sie die Meldung im Chat bestätigen.")
       : c.status === "validiert" && !returned && !correcting
-        ? "Eine Korrektur hebt die Freigabe der Bauleitung auf. Sie prüft danach die neue Version."
+        ? $t("Eine Korrektur hebt die Freigabe der Bauleitung auf. Sie prüft danach die neue Version.")
         : null;
 
   return (
@@ -107,21 +108,21 @@ export function MobileCaseView({ id }: { id: string }) {
         title={docTitle(c.doc_type)}
         subtitle={<span className="font-mono">{c.reference}</span>}
         backHref={channel}
-        backLabel={c.team_name ? `Zurück zu ${c.team_name}` : "Zurück"}
+        backLabel={c.team_name ? $t("Zurück zu {team}", { team: c.team_name }) : $t("Zurück")}
       />
 
       <main className="flex-1 px-4 pt-5 pb-8">
-        <section aria-label="Stand">
+        <section aria-label={$t("Stand")}>
           <p className="text-[17px] leading-snug font-medium text-pretty text-foreground">{nextStepDe(c)}</p>
           {question ? (
             <div className="mt-3 rounded-lg border border-border bg-surface px-3 py-2.5">
-              <p className="text-xs text-muted-foreground">Frage der Bauleitung</p>
+              <p className="text-xs text-muted-foreground">{$t("Frage der Bauleitung")}</p>
               <p className="mt-0.5 text-[15px] leading-snug text-foreground">{question}</p>
             </div>
           ) : null}
           <p className="mt-2 text-sm text-muted-foreground">
-            {[c.team_name, c.author_name ? `gemeldet von ${c.author_name}` : null].filter(Boolean).join(", ")}
-            {c.team_name || c.author_name ? " am " : "Gemeldet am "}
+            {[c.team_name, c.author_name ? $t("gemeldet von {name}", { name: c.author_name }) : null].filter(Boolean).join(", ")}
+            {c.team_name || c.author_name ? " am " : $t("Gemeldet am ")}
             <span className="font-mono">{fmtDateTime(c.created_at)}</span> Uhr
           </p>
           {c.deadline ? <DeadlineBadge d={c.deadline} className="mt-3" /> : null}
@@ -129,25 +130,26 @@ export function MobileCaseView({ id }: { id: string }) {
 
         <section aria-labelledby="letter-h" className="mt-7">
           <h2 id="letter-h" className="text-[15px] font-semibold text-foreground">
-            {c.doc_type === "bautagesbericht" ? "Bericht" : "Schreiben"}
+            {c.doc_type === "bautagesbericht" ? $t("Bericht") : $t("Schreiben")}
           </h2>
           {latest && pdfHref ? (
             <>
               <LetterThumb body={latest.body as DocBody} href={pdfHref} className="mt-2 h-[236px]" />
               <p className="mt-2 text-sm text-muted-foreground">
-                Version <span className="font-mono">{latest.version}</span> vom <span className="font-mono">{fmtDateTime(latest.created_at)}</span> Uhr
-                {latest.validated_at && (c.status === "validiert" || sent) ? ", von der Bauleitung freigegeben" : null}
+                {$t("Version")} <span className="font-mono">{latest.version}</span> {$t("vom")} <span className="font-mono">{fmtDateTime(latest.created_at)}</span>
+                {$t(" Uhr")}
+                {latest.validated_at && (c.status === "validiert" || sent) ? $t(", von der Bauleitung freigegeben") : null}
               </p>
             </>
           ) : (
-            <p className="mt-1 text-sm text-muted-foreground">Noch kein Schreiben. Es entsteht, sobald Sie die Meldung im Chat bestätigen.</p>
+            <p className="mt-1 text-sm text-muted-foreground">{$t("Noch kein Schreiben. Es entsteht, sobald Sie die Meldung im Chat bestätigen.")}</p>
           )}
         </section>
 
         {c.checks.length ? (
           <section aria-labelledby="checks-h" className="mt-7">
             <h2 id="checks-h" className="text-[15px] font-semibold text-foreground">
-              Prüfungen durch Klara
+              {$t("Prüfungen durch Klara")}
             </h2>
             <CheckList checks={c.checks} className="mt-1" />
           </section>
@@ -161,12 +163,12 @@ export function MobileCaseView({ id }: { id: string }) {
           {pdfHref ? (
             <a href={pdfHref} target="_blank" rel="noreferrer" className={primary ? BTN_OUTLINE : BTN_PRIMARY}>
               <FileText aria-hidden />
-              PDF öffnen
+              {$t("PDF öffnen")}
             </a>
           ) : (
             <button type="button" disabled className={BTN_OUTLINE}>
               <FileText aria-hidden />
-              PDF öffnen
+              {$t("PDF öffnen")}
             </button>
           )}
           {primary}
@@ -195,7 +197,7 @@ function Facts({ c }: { c: CaseView }) {
   return (
     <section aria-labelledby="facts-h" className="mt-7">
       <h2 id="facts-h" className="text-[15px] font-semibold text-foreground">
-        Ihre Angaben
+        {$t("Ihre Angaben")}
       </h2>
       <dl className="mt-1 divide-y divide-border">
         {shown.map((f) => {
@@ -204,14 +206,14 @@ function Facts({ c }: { c: CaseView }) {
           return (
             <div key={f.key} className="py-2.5">
               <dt className="text-sm text-muted-foreground">
-                {f.label_de}
-                {inferred.includes(f.key) ? <span> (aus dem Bauzeitenplan)</span> : null}
+                {$t(f.label_de)}
+                {inferred.includes(f.key) ? <span> {$t("(aus dem Bauzeitenplan)")}</span> : null}
               </dt>
               <dd className={cn("mt-0.5 text-[15px] leading-snug text-foreground", mono && !missing && "font-mono")}>
                 {missing ? (
                   <span className="inline-flex items-center gap-2 text-light-yellow-text">
                     <LightDot light="yellow" />
-                    fehlt
+                    {$t("fehlt")}
                   </span>
                 ) : (
                   formatFact(f.type, c.facts[f.key])

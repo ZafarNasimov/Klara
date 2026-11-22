@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { RoleSwitcher } from "@/components/klara/role-switcher";
+import { $t } from "@/lib/i18n";
 
 /** Mobile top bar: 56px, back target 48px, role switcher on the right. */
 export function MobileHeader({
@@ -24,7 +25,7 @@ export function MobileHeader({
       {backHref ? (
         <Link
           href={backHref}
-          aria-label={backLabel}
+          aria-label={$t(backLabel)}
           className="flex size-12 shrink-0 items-center justify-center rounded-lg text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ChevronLeft className="size-6" aria-hidden />

@@ -4,12 +4,15 @@
 import { createContext, useCallback, useContext, useMemo, useSyncExternalStore, type ReactNode } from "react";
 import { IDS } from "@/lib/ids";
 
-export type UiRole = "polier" | "bauleiter" | "buero";
+export type UiRole = "polier" | "bauleiter";
 
-export const ROLES: { id: UiRole; label: string; home: string; userId: string; userName: string }[] = [
-  { id: "polier", label: "Polier", home: "/app", userId: IDS.userPolierEstrich, userName: "Sergej Iwanow" },
-  { id: "bauleiter", label: "Bauleiter", home: "/admin", userId: IDS.userBauleiter, userName: "Markus Hofmann" },
-  { id: "buero", label: "Büro", home: "/admin", userId: IDS.userBuero, userName: "Julia Brenner" },
+/**
+ * Two views: the phone screens of every team on site, and the office (the site
+ * manager). Labels are German keys for $t(); `hint` is the second line in the menu.
+ */
+export const ROLES: { id: UiRole; label: string; hint: string; home: string; userId: string; userName: string }[] = [
+  { id: "polier", label: "Baustelle", hint: "Teamkanäle und Anrufe der Poliere", home: "/app", userId: IDS.userPolierEstrich, userName: "Sergej Iwanow" },
+  { id: "bauleiter", label: "Bauleitung", hint: "Markus Hofmann prüft und versendet", home: "/admin", userId: IDS.userBauleiter, userName: "Markus Hofmann" },
 ];
 
 const KEY = "klara_role";
@@ -18,7 +21,8 @@ const listeners = new Set<() => void>();
 function read(): UiRole | null {
   try {
     const v = localStorage.getItem(KEY);
-    return v === "polier" || v === "bauleiter" || v === "buero" ? v : null;
+    // "buero" was a third view with the same screens as the site manager's.
+    return v === "polier" ? "polier" : v === "bauleiter" || v === "buero" ? "bauleiter" : null;
   } catch {
     return null;
   }

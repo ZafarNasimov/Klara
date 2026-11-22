@@ -35,7 +35,7 @@ export function LetterThumb({
     return () => ro.disconnect();
   }, []);
   return (
-    <a
+    <a lang="de"
       href={href}
       target="_blank"
       rel="noreferrer"

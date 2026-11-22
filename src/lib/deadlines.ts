@@ -48,8 +48,9 @@ export function addCalendarDays(day: string, n: number): string {
 }
 
 /** Offset of Berlin wall-clock time against UTC in minutes at an instant. */
+let offsetFmt: Intl.DateTimeFormat | null = null;
 function berlinOffsetMinutes(at: Date): number {
-  const parts = new Intl.DateTimeFormat("en-US", {
+  offsetFmt ??= new Intl.DateTimeFormat("en-US", {
     timeZone: TZ,
     hourCycle: "h23",
     year: "numeric",
@@ -58,7 +59,8 @@ function berlinOffsetMinutes(at: Date): number {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
-  }).formatToParts(at);
+  });
+  const parts = offsetFmt.formatToParts(at);
   const get = (t: string) => Number(parts.find((p) => p.type === t)!.value);
   const asUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
   return Math.round((asUtc - at.getTime()) / 60000);
@@ -94,9 +96,18 @@ function calendar(region: string): Holidays {
   return h;
 }
 
+const publicHolidayMemo = new Map<string, boolean>();
+/** Cached per day and region: date-holidays is slow, and the dashboard asks about the same days thousands of times. */
 export function isPublicHoliday(day: string, region = DEFAULT_HOLIDAY_REGION): boolean {
-  const res = calendar(region).isHoliday(berlinTime(day, 12));
-  return Array.isArray(res) && res.some((h) => h.type === "public");
+  const key = `${region}|${day}`;
+  let v = publicHolidayMemo.get(key);
+  if (v === undefined) {
+    const res = calendar(region).isHoliday(berlinTime(day, 12));
+    v = Array.isArray(res) && res.some((h) => h.type === "public");
+    if (publicHolidayMemo.size > 20_000) publicHolidayMemo.clear();
+    publicHolidayMemo.set(key, v);
+  }
+  return v;
 }
 
 /** Werktag: Monday–Saturday and not a Bavarian public holiday. */

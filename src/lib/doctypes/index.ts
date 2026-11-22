@@ -5,6 +5,7 @@ import { behinderungsanzeige } from "./behinderungsanzeige";
 import { mehrkostenanzeige } from "./mehrkostenanzeige";
 import { bedenken, maengelanzeige } from "./meeting-letters";
 import { bautagesbericht, ergaenzung, infoFolgegewerk, meldung, stellungnahmeZurueckweisung, verzugNu } from "./others";
+import { $t } from "@/lib/i18n";
 import type { DocTypeDef, DocTypeId, FieldDef } from "./types";
 
 export * from "./types";
@@ -57,8 +58,9 @@ export const NOT_BUILT_DE: Record<string, string> = {
   maengelanzeige_nu: "Mängelanzeige an Nachunternehmer (§ 4 Abs. 7 VOB/B)",
 };
 
+/** Title in the UI language (German on the server, where letters and subjects are built). */
 export function docTitle(id: string): string {
-  return getDocType(id)?.title_de ?? NOT_BUILT_DE[id] ?? id;
+  return $t(getDocType(id)?.title_de ?? NOT_BUILT_DE[id] ?? id);
 }
 
 /** Fields Klara may ask the user about. */
@@ -67,7 +69,7 @@ export function userFields(def: DocTypeDef): FieldDef[] {
 }
 
 export function fieldLabel(docType: string, key: string): string {
-  return getDocType(docType)?.fields.find((f) => f.key === key)?.label_de ?? key;
+  return $t(getDocType(docType)?.fields.find((f) => f.key === key)?.label_de ?? key);
 }
 
 export function hasValue(v: unknown): boolean {
