@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Suspense } from "react";
-import { FinishDemo } from "@/components/demo/finish-demo";
 import { KlaraAvatar } from "@/components/klara/klara-avatar";
 import { RoleSwitcher } from "@/components/klara/role-switcher";
 import type { ProjectContext } from "@/lib/db/repo";
@@ -36,15 +35,9 @@ export function AdminTopbar() {
       <Suspense fallback={<Nav path={null} />}>
         <ActiveNav />
       </Suspense>
-      {/* "Finish demo": centred in the header on wide screens; on narrower ones centred in the free space, so it never covers the date. */}
-      <div className="flex min-w-0 flex-1 justify-center min-[1760px]:pointer-events-none min-[1760px]:absolute min-[1760px]:inset-x-0">
-        <div className="min-[1760px]:pointer-events-auto">
-          <FinishDemo />
-        </div>
-      </div>
       <div className="ml-auto flex items-center gap-4">
         {data ? (
-          <p className="hidden text-sm whitespace-nowrap text-muted-foreground min-[1200px]:block" title={$t("Uhrzeit der Demo-Uhr")}>
+          <p className="hidden text-sm whitespace-nowrap text-muted-foreground lg:block" title={$t("Uhrzeit der Demo-Uhr")}>
             {/* The chosen site only where the page is about it (not on the dashboards, which name their own). */}
             <Suspense fallback={null}>
               <SiteName name={data.project.name} />
@@ -62,14 +55,13 @@ export function AdminTopbar() {
 function SiteName({ name }: { name: string }) {
   const path = usePathname();
   if (path === "/admin" || path.startsWith("/admin/project/")) return null;
-  // Only where there is room next to the centred "Finish demo".
   return (
-    <span className="hidden min-[1480px]:inline">
+    <>
       {name}
       <span className="mx-2 text-border" aria-hidden>
         |
       </span>
-    </span>
+    </>
   );
 }
 
