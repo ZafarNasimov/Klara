@@ -92,7 +92,7 @@ Full-screen pitch deck for the 3-minute presentation. Code in `src/components/pi
 - **Scenes** (`src/components/pitch/pitch-scenes.ts`, content spec of 2026-11-21, one story in `pitch-story.ts`: Baustelle B Wohnanlage Riem, team Estrich, client's electricians, 07:00, crew of 4, missing = duration + photo):
   | Key | Scene | Clicks inside |
   |---|---|---|
-  | 1 | Title (dark): Ask Klara, 3 stat rows (7% · § 6 · 80%) + sources line | 3 |
+  | 1 | Title (dark): Ask Klara, 3 stat rows (7% · § 6 · 80%) + sources line; one press brings the rows 0.9 s apart | 1 |
   | 2 | The call (REPLAY), real dialogue timing (`call-timing.ts`): foreman message → 1.5 s → document fields + Klara typing dots → 1.5 s → her full reply; 1 s after the last reply the document moves left, then 5 capabilities. A press during a turn queues the next message (never skips the latency) | 4 (one per foreman message) |
   | 3 | The office (app mock; cursor visible; only the ringed `data-next` control or the next key advances): open Estrich, transcript, close, Clarify, Site manager, Send (3.2 waiting, amber), reply (3.3, next key or `S`, all green at once), Validate (3.4). `R` resets the scene | 8 |
   | 4 | More sources: meeting summary, email parsing, daily plan | 3 |

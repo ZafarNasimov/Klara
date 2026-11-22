@@ -7,7 +7,7 @@ import { StaticSpotlight } from "../StaticSpotlight";
 import { DARK_BG, EASE_OUT, u } from "../stage";
 import { ExitBlur, FadeUp, RevealWords, scheduleGlances, SILVER_TEXT, Stage, type SceneProps } from "./scene-parts";
 
-/** Pain points as stat rows (spec update 2026-11-22), revealed one per click. */
+/** Pain points as stat rows (spec update 2026-11-22), revealed together by one click. */
 export const TITLE_STATS = [
   { big: "€143k", line: "of revenue to earn back one lost €10,000 claim — at a 7 % average margin." },
   { big: "0 days", line: "of extra time, as a rule, without a written Behinderungsanzeige (§ 6 Abs. 1 VOB/B)." },
@@ -23,12 +23,17 @@ const SOURCES =
  * The PNG fallback is captured at exactly this size.
  */
 export const ROBOT_BOX = { left: 948, top: 30, width: 1080, height: 1020 } as const;
+/** One press: the rows land this far apart (s), as the lines of scene 6b do. */
+const ROW_GAP = 0.9;
+/** Auto mode: they follow the subline 1.2 s apart. */
+const AUTO_GAP = 1.2;
+
 /** Light centre in % of the stage: just behind the robot's head and shoulders. */
 const SPOT = { x: 77, y: 30 };
 
 /**
  * Scene 1 – title. Dark, text left (~55%), Klara right (~45%).
- * Click mode: the three stat rows appear one per click (steps 1–3).
+ * Click mode: one press (step 1) brings the three stat rows, 0.9 s apart.
  * Auto mode: they follow the subline 1.2 s apart.
  */
 export function TitleScene({ phase, step, revealMode, headRef, robotPaused }: SceneProps) {
@@ -42,7 +47,9 @@ export function TitleScene({ phase, step, revealMode, headRef, robotPaused }: Sc
     if (phase !== "enter") return;
     const cues: [string, number][] = auto
       ? [["headline", 400], ["point-2", 1400], ["audience", 3200]]
-      : [[step === 0 ? "headline" : `point-${step - 1}`, step === 0 ? 400 : 150]];
+      : step === 0
+        ? [["headline", 400]]
+        : TITLE_STATS.map((_, i): [string, number] => [`point-${i}`, 150 + i * ROW_GAP * 1000]);
     return scheduleGlances(rootRef.current, robotRef.current, cues);
   }, [phase, step, auto]);
 
@@ -102,9 +109,9 @@ export function TitleScene({ phase, step, revealMode, headRef, robotPaused }: Sc
                 key={stat.big}
                 as="li"
                 gaze={`point-${i}`}
-                show={show && (auto || step > i)}
-                delay={auto ? 0.6 + i * 1.2 : 0}
-                duration={0.5}
+                show={show && (auto || step >= 1)}
+                delay={auto ? 0.6 + i * AUTO_GAP : i * ROW_GAP}
+                duration={0.6}
                 className="grid items-center border-t border-neutral-800"
                 style={{ gridTemplateColumns: `${u(236)} 1fr`, columnGap: u(24), paddingBlock: u(18) }}
               >
