@@ -13,16 +13,17 @@ export const CALL_TIMING = {
   queueGapMs: 400,
   /** After Klara's last reply, before the document moves left. */
   afterLastReplyMs: 1000,
-  /** AUTO pacing: reading time for Klara's reply before the next foreman line. */
-  readingMinMs: 1500,
+  /** AUTO pacing: reading time for Klara's reply before the next foreman line (40 ms per character, less 1 s). */
+  readingMinMs: 500,
   readingPerCharMs: 40,
+  readingLeadMs: 1000,
   /** AUTO pacing: first foreman line after the scene enters. */
   autoStartMs: 1000,
 } as const;
 
 /** AUTO pacing: how long the jury gets to read Klara's reply. */
 export function readingTimeMs(text: string): number {
-  return Math.max(CALL_TIMING.readingMinMs, CALL_TIMING.readingPerCharMs * text.length);
+  return Math.max(CALL_TIMING.readingMinMs, CALL_TIMING.readingPerCharMs * text.length - CALL_TIMING.readingLeadMs);
 }
 
 export type TurnSchedule = {

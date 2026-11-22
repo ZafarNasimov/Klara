@@ -22,7 +22,7 @@ describe("call timing (pitch Scene 2)", () => {
   });
 
   it("AUTO pacing reads max(1500 ms, 40 ms per character)", () => {
-    expect(readingTimeMs("Who hired the electricians — the client or us?")).toBe(1840);
-    expect(readingTimeMs("Ok.")).toBe(1500);
+    expect(readingTimeMs("Who hired the electricians — the client or us?")).toBe(840);
+    expect(readingTimeMs("Ok.")).toBe(500);
   });
 });
