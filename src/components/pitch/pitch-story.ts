@@ -5,7 +5,8 @@
 // are fictional.
 
 export type Speaker = "foreman" | "klara";
-export type CallLine = { who: Speaker; text: string };
+/** `lang`: ISO code of the spoken language (foreman lines; default "en"). */
+export type CallLine = { who: Speaker; text: string; lang?: string };
 
 /** Scene 2 replay script (exact). One click plays one exchange (two lines). */
 export const CALL_SCRIPT: CallLine[] = [

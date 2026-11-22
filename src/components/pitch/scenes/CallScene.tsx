@@ -3,7 +3,6 @@
 import { Check, Phone } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { KlaraAvatar } from "@/components/klara/klara-avatar";
 import { cn } from "@/lib/utils";
 import { CALL_TIMING, readingTimeMs, turnSchedule } from "../call-timing";
@@ -147,9 +146,10 @@ export function CallScene({ phase, autoPace = false, debug = false, arrivedBack 
   return (
     <LightScene label="Scene 2 – the call" phase={phase}>
       <div className="absolute flex items-center gap-4" style={{ left: u(160), top: u(72) }}>
-        <Badge variant="outline" className="h-auto border-zinc-300 bg-white px-3 py-1 font-mono text-sm text-zinc-900">
-          EN → DE
-        </Badge>
+        <LanguageBadge
+          waiting={phase === "enter" && turn === 0}
+          detected={turn === 0 ? null : (CALL_SCRIPT[foremanLine]?.lang ?? "en").toUpperCase()}
+        />
         <span className="flex items-center gap-2 text-sm text-zinc-600">
           <Phone className="size-4 text-primary" aria-hidden />
           Call · Foreman, Team Estrich · Wohnanlage Riem
@@ -325,6 +325,66 @@ function TimingOverlay({ log }: { log: TurnLog[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** Source languages shown in the badge (the call works in more). */
+const SOURCE_LANGS = ["EN", "PL", "RO", "TR", "HR", "RU"] as const;
+/** The one-pass scan while the call waits: PL → RO → TR → HR → RU → EN, 600 ms each. */
+const SCAN = ["PL", "RO", "TR", "HR", "RU", "EN"] as const;
+const SOURCES_TIP = "English · Polski · Română · Türkçe · Hrvatski/Bosanski/Srpski · Русский — und weitere Sprachen";
+
+/**
+ * "EN · PL · RO · TR · HR · RU → DE". While the call waits, the source chips
+ * light up one by one (one pass); with the first foreman message the
+ * highlight locks on the detected language and "Sprache erkannt: EN" shows.
+ * A later message in another language moves the highlight there.
+ */
+function LanguageBadge({ waiting, detected }: { waiting: boolean; detected: string | null }) {
+  const [scan, setScan] = useState<number>(-1);
+  useEffect(() => {
+    if (!waiting) return;
+    const timers = SCAN.map((_, i) => window.setTimeout(() => setScan(i), 300 + i * 600));
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [waiting]);
+  const lit = detected ?? (waiting && scan >= 0 ? SCAN[scan] : null);
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-2">
+        <span className="flex items-center gap-1" title={SOURCES_TIP} aria-label={`Quellsprachen: ${SOURCES_TIP}`}>
+          {SOURCE_LANGS.map((l) => (
+            <span
+              key={l}
+              className={cn(
+                "rounded-md border px-1.5 py-0.5 font-mono text-xs transition-colors duration-200",
+                l === lit ? "border-primary bg-primary text-white" : detected ? "border-zinc-200 bg-white text-zinc-400" : "border-zinc-300 bg-white text-zinc-700",
+              )}
+            >
+              {l}
+            </span>
+          ))}
+        </span>
+        <span aria-hidden className="text-zinc-500">
+          →
+        </span>
+        <span className="rounded-md bg-zinc-900 px-1.5 py-0.5 font-mono text-xs text-white">DE</span>
+      </div>
+      <AnimatePresence>
+        {detected ? (
+          <motion.span
+            key="detected"
+            role="status"
+            className="absolute top-full left-0 mt-1.5 whitespace-nowrap font-mono text-xs text-zinc-500"
+            initial={{ opacity: 0, y: -2 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: EASE_OUT }}
+          >
+            Sprache erkannt: {detected}
+          </motion.span>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
