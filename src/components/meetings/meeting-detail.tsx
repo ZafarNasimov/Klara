@@ -365,16 +365,16 @@ function DetectedRow({ item, link, onJump, dense }: { item: MeetingItem; link: R
     item.case_action === "uncertain"
       ? $t("nicht erstellt: Beleg unsicher erkannt oder übersetzt, bitte prüfen")
       : item.case_action === "existing"
-      ? "bereits vorhanden"
+      ? $t("bereits vorhanden")
       : item.case_action === "noop"
         ? $t("festgehalten, kein Eintrag im Terminplan geändert")
         : item.updated_case_id
-          ? "aktualisiert"
+          ? $t("aktualisiert")
           : item.created_case_id
             ? $t("Entwurf")
             : item.kind === "termin"
               ? $t("Terminplan angepasst")
-              : "festgehalten";
+              : $t("festgehalten");
   return (
     <li className="rounded-lg border border-border px-3.5 py-2.5">
       <p className="flex flex-wrap items-baseline gap-x-2 text-sm">

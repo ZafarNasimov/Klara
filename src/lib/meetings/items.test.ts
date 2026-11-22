@@ -93,7 +93,7 @@ describe("seed meetings", async () => {
   const now = new Date("2026-11-20T08:00:00Z");
 
   it("MT-2026-0006 and MT-2026-0007 keep every stored item (all quotes verbatim)", () => {
-    const [kw46, kw47] = buildSeedMeetings(now);
+    const [kw46, kw47] = buildSeedMeetings(now).slice(-2);
     const p46 = kw46.protocol as { ref: string; items: unknown[] };
     const p47 = kw47.protocol as { ref: string; items: { kind: string }[]; changes: { text_de: string }[] };
     expect([p46.ref, p47.ref]).toEqual(["MT-2026-0006", "MT-2026-0007"]);
@@ -105,7 +105,7 @@ describe("seed meetings", async () => {
 
   it("buildSeed carries the meetings; the demo site starts without cases (the call is KL-…-0042)", async () => {
     const seed = buildSeed(now);
-    expect(seed.meeting).toHaveLength(2);
+    expect(seed.meeting).toHaveLength(7);
     const { IDS } = await import("@/lib/ids");
     expect((seed.case ?? []).filter((c) => c.project_id === IDS.project)).toHaveLength(0);
     expect((seed.case ?? []).every((c) => /^KL-\d{4}-00(2\d|3\d|4[01])$/.test(c.reference))).toBe(true); // the call gets KL-…-0042
@@ -153,5 +153,35 @@ describe("translation step (checks on the model's output)", () => {
     expect(ru.language).toBe("ru");
     expect(ru.confidence).toBeLessThan(0.6);
     expect(ru.notes).toContain("Nicht übersetzt");
+  });
+});
+
+describe("history meetings (demo data on all three sites)", async () => {
+  const { buildSeedMeetings } = await import("./sample");
+  const { buildHistoryMeetings } = await import("./history");
+  const { IDS } = await import("@/lib/ids");
+  const now = new Date("2026-11-20T08:00:00Z");
+  type P = { ref: string; started_at: string; items: { kind: string; case_ref: string | null; case_action?: string; status: string; quote_language: string }[]; languages: string[] };
+  const all = buildSeedMeetings(now).map((m) => ({ ...m, p: m.protocol as P }));
+
+  it("MT-2026-0001 … 0007 in date order; every site has meetings", () => {
+    expect(all.map((m) => m.p.ref)).toEqual(["MT-2026-0001", "MT-2026-0002", "MT-2026-0003", "MT-2026-0004", "MT-2026-0005", "MT-2026-0006", "MT-2026-0007"]);
+    const starts = all.map((m) => m.p.started_at);
+    expect([...starts].sort()).toEqual(starts);
+    for (const site of [IDS.project, IDS.projectRiem, IDS.projectSchwabing]) expect(all.filter((m) => m.project_id === site).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("every stored item survives the quote check; links point at the history letters", () => {
+    const hist = buildHistoryMeetings(now).map((m) => m.protocol as P);
+    expect(hist.map((p) => p.items.length)).toEqual([6, 5, 5, 4, 4]);
+    expect(hist.flatMap((p) => p.items.filter((i) => i.case_ref).map((i) => `${i.case_ref}:${i.case_action ?? "-"}`))).toEqual([
+      "KL-2026-0032:existing",
+      "KL-2026-0031:existing",
+      "KL-2026-0034:-",
+      "KL-2026-0038:-",
+      "KL-2026-0036:existing",
+    ]);
+    expect(hist.flatMap((p) => p.languages)).toEqual(expect.arrayContaining(["ru", "tr", "en", "ro"]));
+    expect(hist.flatMap((p) => p.items).some((i) => i.status === "erledigt")).toBe(true);
   });
 });

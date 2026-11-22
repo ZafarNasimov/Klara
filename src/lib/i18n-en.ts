@@ -733,6 +733,10 @@ const SCREENS: Record<string, string> = {
   "Bedenken: nichts erkannt": "Concerns: nothing recognised",
   "Termine: nichts erkannt": "Dates: nothing recognised",
   "Voraussetzung für:": "Prerequisite for:",
+  "bereits vorhanden": "already exists",
+  "Demo beenden": "End demo",
+  aktualisiert: "updated",
+  festgehalten: "recorded",
   " Uhr": "",
   // Trades (data names, shown in English in EN mode)
   Elektro: "Electrical",

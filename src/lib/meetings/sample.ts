@@ -6,6 +6,7 @@
 import { berlinTime, subWerktage, DEFAULT_HOLIDAY_REGION, demoDay } from "@/lib/deadlines";
 import { IDS } from "@/lib/ids";
 import type { Meeting } from "@/lib/types";
+import { buildHistoryMeetings } from "./history";
 import { verifyItems } from "./items";
 import { finalizeSegment } from "./language";
 import { defaultTitle, emptySteps, isoWeek, sortLanguages, type ItemKind, type MeetingChange, type MeetingProtocol, type Participant, type Segment } from "./model";
@@ -235,6 +236,8 @@ export function buildSeedMeetings(now: Date): Meeting[] {
   };
 
   return [
+    // MT-2026-0001 … 0005 on all three sites (history.ts), then these two.
+    ...buildHistoryMeetings(now),
     { id: IDS.meetingKw46, project_id: IDS.project, type: "nu_koordination", audio_url: null, transcript: { segments: PREVIOUS_SEGMENTS }, protocol: kw46, created_at: kw46Start.toISOString() },
     { id: IDS.meetingKw47, project_id: IDS.project, type: "bauherr", audio_url: null, transcript: { segments: SAMPLE_SEGMENTS }, protocol: kw47, created_at: kw47Start.toISOString() },
   ];

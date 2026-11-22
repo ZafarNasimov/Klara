@@ -78,4 +78,10 @@ export const IDS = {
   schedSchwFassade: id(526),
   meetingKw46: id(701),
   meetingKw47: id(702),
+  // History meetings MT-2026-0001 … 0005 (meetings/history.ts)
+  meetingHist1: id(703),
+  meetingHist2: id(704),
+  meetingHist3: id(705),
+  meetingHist4: id(706),
+  meetingHist5: id(707),
 } as const;
