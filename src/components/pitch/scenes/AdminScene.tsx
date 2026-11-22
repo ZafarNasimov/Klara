@@ -296,7 +296,7 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
                   </motion.div>
                   <div className="min-w-0 text-sm leading-snug">
                     <p className="font-medium text-zinc-900">
-                      Gesendet an {CASE.client} · <span className="font-mono">08:02</span>
+                      Sent to {CASE.client} · <span className="font-mono">08:02</span>
                     </p>
                     <p className="truncate font-mono text-xs text-zinc-500">Behinderungsanzeige_{CASE.reference}.pdf</p>
                   </div>
@@ -411,7 +411,7 @@ export function AdminScene({ phase, step, revealMode }: SceneProps) {
         {/* Toasts, bottom right, 2.5 s each */}
         <div className="pointer-events-none absolute right-5 bottom-5 flex flex-col items-end gap-2">
           {beat === B.sent && <TimedToast key="sent">Sent to site manager · <span className="font-mono">07:52</span></TimedToast>}
-          {beat === B.validated && <TimedToast key="validated">Validiert · ready to send to Wohnbau Riem GmbH</TimedToast>}
+          {beat === B.validated && <TimedToast key="validated">Validated · ready to send to Wohnbau Riem GmbH</TimedToast>}
           {beat === B.mailed && <TimedToast key="mailed">Gesendet · Zustellung protokolliert</TimedToast>}
         </div>
       </div>
@@ -520,7 +520,7 @@ function StatusLine({ beat }: { beat: number }) {
   const green = beat >= B.replied;
   const text =
     beat >= B.validated
-      ? <>Validiert by Office · <span className="font-mono">07:59</span></>
+      ? <>Validated by Office · <span className="font-mono">07:59</span></>
       : green
         ? "Complete · ready to validate"
         : beat === B.sent

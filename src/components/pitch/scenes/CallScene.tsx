@@ -338,7 +338,7 @@ const SOURCES_TIP = "English · Polski · Română · Türkçe · Hrvatski/Bosan
 /**
  * "EN · PL · RO · TR · HR → DE". While the call waits, the source chips
  * light up one by one (one pass); with the first foreman message the
- * highlight locks on the detected language and "Sprache erkannt: EN" shows.
+ * highlight locks on the detected language and "Language detected: EN" shows.
  * A later message in another language moves the highlight there.
  */
 function LanguageBadge({ waiting, detected }: { waiting: boolean; detected: string | null }) {
@@ -381,7 +381,7 @@ function LanguageBadge({ waiting, detected }: { waiting: boolean; detected: stri
             exit={{ opacity: 0 }}
             transition={{ duration: 0.25, ease: EASE_OUT }}
           >
-            Sprache erkannt: {detected}
+            Language detected: {detected}
           </motion.span>
         ) : null}
       </AnimatePresence>

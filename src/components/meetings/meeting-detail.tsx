@@ -307,10 +307,13 @@ function LangBadge({ code }: { code: string }) {
 function Section({ title, note, icon, children }: { title: string; note?: string; icon?: ReactNode; children: ReactNode }) {
   return (
     <section className="rounded-xl border border-border bg-background px-5 py-4">
-      <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-        {icon}
-        {title}
-        {note ? <span className="font-normal text-muted-foreground">· {note}</span> : null}
+      {/* The note flows after the title like text (a long one wraps under it, not beside it). */}
+      <h2 className="mb-3 text-sm font-semibold text-foreground">
+        <span className="inline-flex items-center gap-2 align-middle">
+          {icon}
+          {title}
+        </span>
+        {note ? <span className="font-normal text-muted-foreground"> · {note}</span> : null}
       </h2>
       {children}
     </section>
