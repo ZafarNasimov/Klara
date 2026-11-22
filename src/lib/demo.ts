@@ -4,8 +4,12 @@
 import { useSyncExternalStore } from "react";
 import { IDS } from "@/lib/ids";
 
-/** Where "Start live demo" lands: the Polier's call screen (Estrich, Riem). Change here only. */
-export const DEMO_LIVE_START = `/app/call/new?team=${IDS.teamEstrich}`;
+/**
+ * Where "Start live demo" lands: the Polier's call screen. Team Fassade on
+ * Baustelle A Schwabing, Polier Liam O'Connor (English), so Klara greets and
+ * speaks English. Change here only.
+ */
+export const DEMO_LIVE_START = `/app/call/new?team=${IDS.teamFassade}`;
 
 /** The closing slide that "Finish demo" leads to. */
 export const DEMO_CLOSE = "/demo?scene=close";
