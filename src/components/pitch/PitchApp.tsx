@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { useSearchParams } from "next/navigation";
 import { DARK_BG } from "./stage";
 
 // The pitch is a client-only presentation: no server HTML to hydrate, so the
@@ -8,9 +9,17 @@ import { DARK_BG } from "./stage";
 // Scene 1, so there is no white flash before it mounts.
 const PitchFlow = dynamic(() => import("./PitchFlow").then((m) => m.PitchFlow), {
   ssr: false,
-  loading: () => <div className="fixed inset-0" style={{ background: DARK_BG }} />,
+  loading: () => <PitchPlaceholder />,
 });
 
+/** Dark like Scene 1 and the close, while the flow loads. */
+export function PitchPlaceholder() {
+  return <div className="fixed inset-0" style={{ background: DARK_BG }} />;
+}
+
 export function PitchApp() {
-  return <PitchFlow />;
+  // Links into the pitch ("Demo beenden" → ?scene=6b) are client-side navigations:
+  // read ?scene= from the router; the window URL may still be the previous page's.
+  const search = useSearchParams().toString();
+  return <PitchFlow initialSearch={search} />;
 }
