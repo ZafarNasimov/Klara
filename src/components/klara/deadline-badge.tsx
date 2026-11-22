@@ -4,6 +4,7 @@
 import { Clock } from "lucide-react";
 import type { DeadlineInfo } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { $t, $tx } from "@/lib/i18n";
 
 export function DeadlineBadge({ d, className }: { d: DeadlineInfo | null | undefined; className?: string }) {
   if (!d) return null;
@@ -18,8 +19,8 @@ export function DeadlineBadge({ d, className }: { d: DeadlineInfo | null | undef
     >
       <Clock className={cn("size-3.5 shrink-0", overdue ? "text-light-red-text" : "text-muted-foreground")} aria-hidden />
       <span className="truncate">
-        <span className="sr-only">{d.label_de.startsWith("versendet") ? "Frist eingehalten, " : "Frist: "}</span>
-        {d.label_de}
+        <span className="sr-only">{d.label_de.startsWith("versendet") || d.label_de.startsWith("geprüft") ? $t("Frist eingehalten, ") : $t("Frist: ")}</span>
+        {$tx(d.label_de)}
       </span>
     </span>
   );

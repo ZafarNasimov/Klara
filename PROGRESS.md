@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-22, 00:20 (Vasily's dashboard fit fix 46f2191 checked: typecheck, 189 tests; deploy of `main`) · branch `main`
+Last update: 2026-11-22 (EN/DE switch, views Baustelle/Bauleitung) · branch `claude/project-thread-jrqak8`, not yet on `main`
 
 ## Milestones (SPEC §11)
 
@@ -179,6 +179,15 @@ Instead of Postmark, Klara can use a normal mailbox: `src/lib/mail/mailbox.ts` s
 - Site password: `SITE_PASSWORD` → `src/proxy.ts` sends visitors without the cookie to `/login` (API: 401); `/api/email/inbound` stays open (own token).
 - Live site (2026-11-21): `SITE_PASSWORD`, `DEMO_CLIENT_MAILBOX` and `MAIL_FROM_NAME` are set on Vercel and deployed; the login works, pages without it redirect, the API answers 401. Demo data reset there (Bauherr contact = the client mailbox, no cases).
 - 2026-11-21: Gmail login works (the address had a typo in `.env.local`); `MAIL_USER` + `MAIL_PASSWORD` set on Vercel and deployed. Live site reports mail mode `smtp`; an inbox check from Vercel takes ~2 s and leaves non-Klara mail unread. Next: the real round trip (send → client replies → Klara analyses).
+
+## EN/DE switch and two views (2026-11-22)
+
+- **Switch:** "DE | EN" in the office top bar, on the start page and the login; on the phone inside the view menu (top right). Stored per browser (`klara_lang`), sets `<html lang>`, re-renders the screens in place (`LangProvider` in the root layout, `src/lib/i18n-provider.tsx`). German stays the default (CLAUDE.md).
+- **How it works:** `$t("German text", vars)` for fixed UI text; German is the key, English in `src/lib/i18n-en.ts` (≈ 620 entries). `$tx(text)` for German the server builds (check reasons, deadline labels, timeline lines, Klara's hints, dashboard headlines and action lines): exact entry, else a pattern (`EN_PATTERNS`), else each part of an "A · B · C" line. Label maps in `labels.ts` and `docTitle`/`fieldLabel` translate on read (`localized()`), the server always reads German. Server components use `<T>`. Trade names show in English (Elektro → Electrical …).
+- **Stays German on purpose:** letters and PDFs (`lang="de"` on the letter preview and thumbnail), what people said (transcripts, quotes, facts), meeting protocols, site names and addresses, browser tab titles.
+- **New UI text:** wrap it in `$t()` (or `$tx()` for server text) and add the English to `i18n-en.ts`; `src/lib/i18n.test.ts` covers the patterns. An EN sweep (open every screen in EN, list visible German outside `lang="de"`) found nothing left apart from the intended German content.
+- **Views:** the role switcher is now "Baustelle | Bauleitung" (EN "Site | Office"); "Büro" removed (same screens as the site manager; a stored "buero" opens "Bauleitung").
+- 193 tests (4 new).
 
 ## Demo data: three sites, six languages (2026-11-21)
 

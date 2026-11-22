@@ -2,6 +2,7 @@
 // korrigiert, red = blockiert. Never decorative, always with a German reason.
 import type { CheckResult, Light } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { $t, $tx } from "@/lib/i18n";
 
 export const LIGHT_DE: Record<Light, string> = { green: "Grün", yellow: "Gelb", red: "Rot" };
 /** State words for screen readers (DESIGN.md), never the colour name alone. */
@@ -49,10 +50,10 @@ export function LightSummary({ checks, className, compact = false }: { checks: C
   return (
     <p className={cn("flex min-w-0 items-center gap-2 text-sm", className)}>
       <LightDot light={light} />
-      <span className="sr-only">{LIGHT_STATE_DE[light]}:</span>
+      <span className="sr-only">{$t(LIGHT_STATE_DE[light])}:</span>
       <span className={cn("min-w-0", compact ? "truncate" : "", light === "green" ? "text-foreground" : TEXT[light])}>
-        {light === "green" ? "Alle Prüfungen bestanden" : lead.reason_de}
-        {light !== "green" && others > 0 ? <span className="text-muted-foreground"> (+{others} weitere)</span> : null}
+        {light === "green" ? $t("Alle Prüfungen bestanden") : $tx(lead.reason_de)}
+        {light !== "green" && others > 0 ? <span className="text-muted-foreground"> {$t("(+{n} weitere)", { n: others })}</span> : null}
       </span>
     </p>
   );
@@ -67,10 +68,10 @@ export function CheckList({ checks, className }: { checks: CheckResult[]; classN
           <LightDot light={c.light} className="mt-1.5" />
           <div className="min-w-0">
             <p className="text-sm font-medium text-foreground">
-              {c.label_de}
-              <span className="sr-only">: {LIGHT_STATE_DE[c.light]}</span>
+              {$t(c.label_de)}
+              <span className="sr-only">: {$t(LIGHT_STATE_DE[c.light])}</span>
             </p>
-            <p className={cn("text-sm", c.light === "green" ? "text-muted-foreground" : TEXT[c.light])}>{c.reason_de}</p>
+            <p className={cn("text-sm", c.light === "green" ? "text-muted-foreground" : TEXT[c.light])}>{$tx(c.reason_de)}</p>
           </div>
         </li>
       ))}

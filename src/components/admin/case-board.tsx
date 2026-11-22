@@ -17,6 +17,7 @@ import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { eventDetail, eventTitle } from "./event-text";
 import { formatFact } from "./format-fact";
+import { $t } from "@/lib/i18n";
 
 type ProjectResponse = ProjectContext & { now: string; projects: { id: string; name: string; contract_type: string; contract_no: string }[] };
 
@@ -70,7 +71,7 @@ export function CaseBoard({ site = null, trade = null }: { site?: string | null;
   return (
     <div className="grid min-h-0 flex-1 grid-cols-[232px_minmax(0,1fr)_380px]">
       {/* ── Project tree ─────────────────────────────────────────── */}
-      <aside aria-label="Projekte" className="min-h-0 overflow-y-auto border-r border-border bg-background px-3 py-4">
+      <aside aria-label={$t("Projekte")} className="min-h-0 overflow-y-auto border-r border-border bg-background px-3 py-4">
         {ctx ? (
           <>
             <p className="flex items-center gap-2 px-2 text-xs font-medium text-muted-foreground">
@@ -135,7 +136,7 @@ export function CaseBoard({ site = null, trade = null }: { site?: string | null;
                 );
               })}
             </ul>
-            <h2 className="mt-6 px-2 text-xs font-medium text-muted-foreground">Gewerke</h2>
+            <h2 className="mt-6 px-2 text-xs font-medium text-muted-foreground">{$t("Gewerke")}</h2>
             <ul className="mt-1 space-y-1 px-2">
               {ctx.trades.map((t) => {
                 const late = tradeDelays.get(t.name);
@@ -143,12 +144,15 @@ export function CaseBoard({ site = null, trade = null }: { site?: string | null;
                   <li key={t.id} className="text-sm">
                     <span className="text-foreground">{t.name}</span>
                     <span className="block text-xs text-muted-foreground">
-                      {t.contracted_by === "client" ? "vom Bauherrn beauftragt" : t.team_id ? "eigene Kolonne" : "eigener Nachunternehmer"}
+                      {t.contracted_by === "client" ? $t("vom Bauherrn beauftragt") : t.team_id ? $t("eigene Kolonne") : $t("eigener Nachunternehmer")}
                     </span>
                     {late ? (
                       <span className="mt-0.5 flex items-center gap-1.5 text-xs text-light-yellow-text">
                         <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-light-yellow" />
-                        Verzug +{late.days} {late.days === 1 ? "Arbeitstag" : "Arbeitstage"} · {late.area} (Besprechung)
+                        {$t(late.days === 1 ? "Verzug +{n} Arbeitstag · {area} (Besprechung)" : "Verzug +{n} Arbeitstage · {area} (Besprechung)", {
+                          n: late.days,
+                          area: late.area,
+                        })}
                       </span>
                     ) : null}
                   </li>
@@ -167,20 +171,20 @@ export function CaseBoard({ site = null, trade = null }: { site?: string | null;
 
       {/* ── Case table ───────────────────────────────────────────── */}
       <main className="min-h-0 overflow-y-auto px-6 py-5">
-        <section aria-label="Fristen und Hinweise" className="grid grid-cols-3 gap-3">
-          <Summary title="Fristen heute" count={dueToday.length} light={dueToday.length ? "yellow" : null} items={dueToday} onPick={setSelectedId} />
-          <Summary title="Fristen morgen" count={dueTomorrow.length} light={null} items={dueTomorrow} onPick={setSelectedId} />
-          <Summary title="Rote Hinweise" count={redFlags.length} light={redFlags.length ? "red" : null} items={redFlags} onPick={setSelectedId} />
+        <section aria-label={$t("Fristen und Hinweise")} className="grid grid-cols-3 gap-3">
+          <Summary title={$t("Fristen heute")} count={dueToday.length} light={dueToday.length ? "yellow" : null} items={dueToday} onPick={setSelectedId} />
+          <Summary title={$t("Fristen morgen")} count={dueTomorrow.length} light={null} items={dueTomorrow} onPick={setSelectedId} />
+          <Summary title={$t("Rote Hinweise")} count={redFlags.length} light={redFlags.length ? "red" : null} items={redFlags} onPick={setSelectedId} />
         </section>
 
         <div className="mt-6 flex items-end justify-between gap-4">
           <div>
-            <h1 className="text-lg font-semibold text-foreground">Vorgänge</h1>
+            <h1 className="text-lg font-semibold text-foreground">{$t("Vorgänge")}</h1>
             <p className="text-sm text-muted-foreground">
-              {teamFilter ? ctx?.teams.find((t) => t.id === teamFilter)?.name : "Alle Teams"}, {rows.length} {rows.length === 1 ? "Vorgang" : "Vorgänge"}
+              {teamFilter ? ctx?.teams.find((t) => t.id === teamFilter)?.name : $t("Alle Teams")}, {rows.length} {rows.length === 1 ? $t("Vorgang") : $t("Vorgänge")}
             </p>
           </div>
-          <div role="radiogroup" aria-label="Filter" className="inline-flex rounded-lg border border-border bg-background p-0.5">
+          <div role="radiogroup" aria-label={$t("Filter")} className="inline-flex rounded-lg border border-border bg-background p-0.5">
             {(["open", "all"] as const).map((s) => (
               <button
                 key={s}
@@ -193,7 +197,7 @@ export function CaseBoard({ site = null, trade = null }: { site?: string | null;
                   scope === s ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {s === "open" ? "Offen" : "Alle"}
+                {s === "open" ? $t("Offen") : $t("Alle")}
               </button>
             ))}
           </div>
@@ -210,11 +214,11 @@ export function CaseBoard({ site = null, trade = null }: { site?: string | null;
             </colgroup>
             <thead>
               <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th scope="col" className="px-4 py-2.5 font-medium">Dokument und Ampel</th>
-                <th scope="col" className="px-3 py-2.5 font-medium">Zeichen</th>
-                <th scope="col" className="px-3 py-2.5 font-medium">Verfasser</th>
-                <th scope="col" className="px-3 py-2.5 font-medium">Status</th>
-                <th scope="col" className="px-3 py-2.5 font-medium">Frist</th>
+                <th scope="col" className="px-4 py-2.5 font-medium">{$t("Dokument und Ampel")}</th>
+                <th scope="col" className="px-3 py-2.5 font-medium">{$t("Zeichen")}</th>
+                <th scope="col" className="px-3 py-2.5 font-medium">{$t("Verfasser")}</th>
+                <th scope="col" className="px-3 py-2.5 font-medium">{$t("Status")}</th>
+                <th scope="col" className="px-3 py-2.5 font-medium">{$t("Frist")}</th>
               </tr>
             </thead>
             <tbody>
@@ -231,7 +235,7 @@ export function CaseBoard({ site = null, trade = null }: { site?: string | null;
               ) : rows.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
-                    {scope === "open" ? "Keine offenen Vorgänge. Neue Meldungen von der Baustelle erscheinen hier sofort." : "Noch keine Vorgänge."}
+                    {scope === "open" ? $t("Keine offenen Vorgänge. Neue Meldungen von der Baustelle erscheinen hier sofort.") : $t("Noch keine Vorgänge.")}
                   </td>
                 </tr>
               ) : (
@@ -279,7 +283,7 @@ export function CaseBoard({ site = null, trade = null }: { site?: string | null;
       </main>
 
       {/* ── Detail panel ─────────────────────────────────────────── */}
-      <aside aria-label="Details" className="min-h-0 overflow-y-auto border-l border-border bg-background">
+      <aside aria-label={$t("Details")} className="min-h-0 overflow-y-auto border-l border-border bg-background">
         {selected ? <CaseDetailPanel c={selected} /> : <RecentEvents events={events} />}
       </aside>
     </div>
@@ -343,21 +347,21 @@ function CaseDetailPanel({ c }: { c: CaseView }) {
         href={`/admin/case/${c.id}`}
         className="mt-4 inline-flex h-10 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
-        Vorgang öffnen
+        {$t("Vorgang öffnen")}
         <ArrowUpRight className="size-4" aria-hidden />
       </Link>
 
-      <h3 className="mt-6 text-sm font-medium text-foreground">Prüfungen</h3>
+      <h3 className="mt-6 text-sm font-medium text-foreground">{$t("Prüfungen")}</h3>
       <CheckList checks={c.checks} className="mt-1" />
 
       {c.sphere ? (
         <>
-          <h3 className="mt-5 text-sm font-medium text-foreground">Sphäre</h3>
+          <h3 className="mt-5 text-sm font-medium text-foreground">{$t("Sphäre")}</h3>
           <p className="mt-1 text-sm text-muted-foreground">{SPHERE_DE[c.sphere]}</p>
         </>
       ) : null}
 
-      <h3 className="mt-5 text-sm font-medium text-foreground">Angaben</h3>
+      <h3 className="mt-5 text-sm font-medium text-foreground">{$t("Angaben")}</h3>
       <dl className="mt-1 divide-y divide-border">
         {facts.map((f) => (
           <div key={f.key} className="py-2">
@@ -370,7 +374,7 @@ function CaseDetailPanel({ c }: { c: CaseView }) {
             <LightDot light="yellow" className="mt-1.5" />
             <div>
               <dt className="text-xs text-muted-foreground">{fieldLabel(c.doc_type, k)}</dt>
-              <dd className="text-sm text-light-yellow-text">fehlt</dd>
+              <dd className="text-sm text-light-yellow-text">{$t("fehlt")}</dd>
             </div>
           </div>
         ))}
@@ -383,9 +387,9 @@ function RecentEvents({ events }: { events: AppEvent[] | undefined }) {
   const shown = (events ?? []).filter((e) => eventTitle(e));
   return (
     <div className="px-5 py-5">
-      <h2 className="text-sm font-medium text-foreground">Letzte Ereignisse</h2>
+      <h2 className="text-sm font-medium text-foreground">{$t("Letzte Ereignisse")}</h2>
       {shown.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">Noch nichts passiert. Wählen Sie einen Vorgang, um Details zu sehen.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{$t("Noch nichts passiert. Wählen Sie einen Vorgang, um Details zu sehen.")}</p>
       ) : (
         <ol className="mt-3 space-y-3">
           <AnimatePresence initial={false}>

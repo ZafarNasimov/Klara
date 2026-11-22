@@ -10,6 +10,7 @@ import { PERIODS, type DashboardFilters, type DashboardView, type Period } from 
 import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
 import { Actions, ActivityFeed, Card, CompletenessGrid, Heatmap, HeatLegend, InfoTip, KpiCard, MiniSchedule, Pipeline, SiteMap, TradeBullets } from "./widgets";
+import { $t, $tx } from "@/lib/i18n";
 
 // At ≥ 760 px viewport height the Überblick fills the screen exactly; below, the page scrolls.
 // (Class names are written out in full: Tailwind only generates what it finds literally in the source.)
@@ -53,7 +54,7 @@ export function Dashboard({ initial, fixedProject = null }: { initial: Dashboard
           <FilterBar v={data} filters={filters} fixedProject={fixedProject} onChange={update} tab={tab} onTab={setTab} />
           {error && !data ? (
             <p role="alert" className="mt-6 rounded-lg border border-border bg-background px-4 py-3 text-sm text-foreground">
-              Das Dashboard konnte nicht geladen werden: {error}
+              {$t("Das Dashboard konnte nicht geladen werden: {error}", { error: $tx(error) })}
             </p>
           ) : data ? (
             <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="min-h-0 flex-1">
@@ -84,18 +85,18 @@ export function Overview({ v, linkable, onPick = null }: { v: DashboardView; lin
           ))}
       </div>
       <div className="grid min-h-0 grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
-        <Card title="Baustellen">
+        <Card title={$t("Baustellen")}>
           <SiteMap v={v} onPick={onPick} />
         </Card>
-        <Card title="Handlungsbedarf">
+        <Card title={$t("Handlungsbedarf")}>
           <Actions v={v} linkable={linkable} />
         </Card>
       </div>
       <div className="grid min-h-0 grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-4">
-        <Card title="Gewerke" action={<HeatLegend />}>
+        <Card title={$t("Gewerke")} action={<HeatLegend />}>
           <Heatmap v={v} linkable={linkable} />
         </Card>
-        <Card title="Plan/Ist">
+        <Card title={$t("Plan/Ist")}>
           <TradeBullets v={v} />
         </Card>
       </div>
@@ -112,16 +113,16 @@ function Details({ v, linkable }: { v: DashboardView; linkable: boolean }) {
         <Card title={`Bauablauf ${v.site_map.find((s) => s.id === v.schedule.project_id)?.short ?? v.schedule.code}`}>
           <MiniSchedule v={v} linkable={linkable} />
         </Card>
-        <Card title="Tagesberichte">
+        <Card title={$t("Tagesberichte")}>
           <CompletenessGrid v={v} />
         </Card>
       </div>
       <div className="flex min-w-0 flex-col gap-3">
-        <Card title="Dokumente">
+        <Card title={$t("Dokumente")}>
           <Pipeline v={v} />
         </Card>
         {claims ? <KpiCard kpi={claims} index={0} /> : null}
-        <Card title="Aktivitäten">
+        <Card title={$t("Aktivitäten")}>
           <ActivityFeed v={v} linkable={linkable} />
         </Card>
       </div>
@@ -149,14 +150,14 @@ function FilterBar({
     <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold tracking-tight whitespace-nowrap text-foreground">{site ? `Baustelle ${site.code} · ${site.name}` : "Alle Baustellen"}</h1>
-          {v ? <span className="font-mono text-xs whitespace-nowrap text-muted-foreground">Stand {stand(v.now)}</span> : null}
-          <InfoTip label="Woher die Zahlen kommen" text="Aus Bauzeitenplan, Mengen, Tagesberichten und Vorgängen berechnet; aktualisiert sich bei jeder neuen Meldung." />
+          <h1 className="text-xl font-semibold tracking-tight whitespace-nowrap text-foreground">{site ? $t("Baustelle {code} · {name}", { code: site.code, name: site.name }) : $t("Alle Baustellen")}</h1>
+          {v ? <span className="font-mono text-xs whitespace-nowrap text-muted-foreground">{$t("Stand {at}", { at: stand(v.now) })}</span> : null}
+          <InfoTip label={$t("Woher die Zahlen kommen")} text={$t("Aus Bauzeitenplan, Mengen, Tagesberichten und Vorgängen berechnet; aktualisiert sich bei jeder neuen Meldung.")} />
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {fixedProject ? null : (
-            <Select label="Baustelle" value={filters.project ?? ""} onChange={(x) => onChange({ project: x || null })}>
-              <option value="">Baustellen</option>
+            <Select label={$t("Baustelle")} value={filters.project ?? ""} onChange={(x) => onChange({ project: x || null })}>
+              <option value="">{$t("Baustellen")}</option>
               {v?.sites.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.code} · {s.name}
@@ -164,8 +165,8 @@ function FilterBar({
               ))}
             </Select>
           )}
-          <Select label="Team" value={filters.team ?? ""} onChange={(x) => onChange({ team: x || null })}>
-            <option value="">Teams</option>
+          <Select label={$t("Team")} value={filters.team ?? ""} onChange={(x) => onChange({ team: x || null })}>
+            <option value="">{$t("Teams")}</option>
             {v?.teams
               .filter((t) => !filters.project || t.project_id === filters.project)
               .map((t) => (
@@ -174,21 +175,21 @@ function FilterBar({
                 </option>
               ))}
           </Select>
-          <Select label="Gewerk" value={filters.trade ?? ""} onChange={(x) => onChange({ trade: x || null })}>
-            <option value="">Gewerke</option>
+          <Select label={$t("Gewerk")} value={filters.trade ?? ""} onChange={(x) => onChange({ trade: x || null })}>
+            <option value="">{$t("Gewerke")}</option>
             {v?.trade_names.map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>
             ))}
           </Select>
-          <div role="group" aria-label="Zeitraum in Tagen" className="inline-flex h-9 items-center rounded-lg border border-border bg-background p-0.5">
+          <div role="group" aria-label={$t("Zeitraum in Tagen")} className="inline-flex h-9 items-center rounded-lg border border-border bg-background p-0.5">
             {PERIODS.map((p) => (
               <button
                 key={p}
                 type="button"
                 aria-pressed={filters.days === p}
-                aria-label={`${p} Tage`}
+                aria-label={$t("{n} Tage", { n: p })}
                 onClick={() => onChange({ days: p as Period })}
                 className={cn(
                   "rounded-md px-3 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -198,11 +199,11 @@ function FilterBar({
                 {p}
               </button>
             ))}
-            <span className="px-2 text-sm text-muted-foreground">Tage</span>
+            <span className="px-2 text-sm text-muted-foreground">{$t("Tage")}</span>
           </div>
         </div>
       </div>
-      <div role="tablist" aria-label="Ansicht" className="flex gap-1 border-b border-border">
+      <div role="tablist" aria-label={$t("Ansicht")} className="flex gap-1 border-b border-border">
         {(
           [
             ["overview", "Überblick"],
@@ -222,7 +223,7 @@ function FilterBar({
               tab === id ? "border-foreground font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
-            {label}
+            {$t(label)}
           </button>
         ))}
       </div>

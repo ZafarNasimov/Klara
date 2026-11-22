@@ -7,6 +7,7 @@ import type { ProjectContext } from "@/lib/db/repo";
 import { fmtDateTime } from "@/lib/labels";
 import { postJson, useApi } from "@/lib/use-api";
 import type { VadSettings } from "@/lib/voice/types";
+import { $t, $tx } from "@/lib/i18n";
 
 type ProjectResponse = ProjectContext & { now: string; llm_mode: "live" | "mock"; backend: "memory" | "supabase"; mail: "smtp" | "postmark" | "simulated" };
 
@@ -21,7 +22,7 @@ export function DemoControls() {
       toast.success(done);
       reload();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Fehlgeschlagen");
+      toast.error(e instanceof Error ? $tx(e.message) : $t("Fehlgeschlagen"));
     } finally {
       setBusy(null);
     }
@@ -30,40 +31,40 @@ export function DemoControls() {
   return (
     <div className="mt-6 space-y-4">
       <section className="rounded-xl border border-border bg-background p-5">
-        <h2 className="text-sm font-medium text-foreground">Demo zurücksetzen</h2>
+        <h2 className="text-sm font-medium text-foreground">{$t("Demo zurücksetzen")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Löscht alle Vorgänge, Gespräche und E-Mails und lädt die Ausgangsdaten (Muster Bau GmbH, Baustellen A Schwabing, B Riem und C Pasing).
+          {$t("Löscht alle Vorgänge, Gespräche und E-Mails und lädt die Ausgangsdaten (Muster Bau GmbH, Baustellen A Schwabing, B Riem und C Pasing).")}
         </p>
-        <Button className="mt-3 h-10 px-4" disabled={busy !== null} onClick={() => run("reset", "/api/demo/reset", {}, "Demo zurückgesetzt")}>
-          {busy === "reset" ? "Wird zurückgesetzt…" : "Demo zurücksetzen"}
+        <Button className="mt-3 h-10 px-4" disabled={busy !== null} onClick={() => run("reset", "/api/demo/reset", {}, $t("Demo zurückgesetzt"))}>
+          {busy === "reset" ? $t("Wird zurückgesetzt…") : $t("Demo zurücksetzen")}
         </Button>
       </section>
 
       <section className="rounded-xl border border-border bg-background p-5">
-        <h2 className="text-sm font-medium text-foreground">Demo-Uhr</h2>
+        <h2 className="text-sm font-medium text-foreground">{$t("Demo-Uhr")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Aktuell: <span className="font-mono text-foreground">{data ? fmtDateTime(data.now) : "–"}</span>. Fristen und Zeitstempel richten sich nach dieser Uhr.
+          {$t("Aktuell:")} <span className="font-mono text-foreground">{data ? fmtDateTime(data.now) : "–"}</span>. {$t("Fristen und Zeitstempel richten sich nach dieser Uhr.")}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Button variant="outline" className="h-10 px-4" disabled={busy !== null} onClick={() => run("07", "/api/demo/clock", { set: "07:00" }, "Uhr auf 07:00 gestellt")}>
-            Heute 07:00
+          <Button variant="outline" className="h-10 px-4" disabled={busy !== null} onClick={() => run("07", "/api/demo/clock", { set: "07:00" }, $t("Uhr auf 07:00 gestellt"))}>
+            {$t("Heute 07:00")}
           </Button>
-          <Button variant="outline" className="h-10 px-4" disabled={busy !== null} onClick={() => run("16", "/api/demo/clock", { set: "16:00" }, "Uhr auf 16:00 gestellt")}>
-            Heute 16:00
+          <Button variant="outline" className="h-10 px-4" disabled={busy !== null} onClick={() => run("16", "/api/demo/clock", { set: "16:00" }, $t("Uhr auf 16:00 gestellt"))}>
+            {$t("Heute 16:00")}
           </Button>
           <Button variant="outline" className="h-10 px-4" disabled={busy !== null} onClick={() => run("day", "/api/demo/clock", { add_minutes: 24 * 60 }, "Einen Tag weiter")}>
-            Einen Tag weiter
+            {$t("Einen Tag weiter")}
           </Button>
           <Button variant="ghost" className="h-10 px-4" disabled={busy !== null} onClick={() => run("real", "/api/demo/clock", { set: "real" }, "Echte Uhrzeit")}>
-            Echte Uhrzeit
+            {$t("Echte Uhrzeit")}
           </Button>
         </div>
       </section>
 
       <section className="rounded-xl border border-border bg-background p-5">
-        <h2 className="text-sm font-medium text-foreground">Antwort des Auftraggebers</h2>
+        <h2 className="text-sm font-medium text-foreground">{$t("Antwort des Auftraggebers")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Spielt eine Antwort auf die zuletzt versendete Behinderungsanzeige ein, als käme sie per E-Mail. Für den Fall, dass die echte Antwort nicht ankommt. Klara bereitet je nach Antwort die passenden Schreiben vor.
+          {$t("Spielt eine Antwort auf die zuletzt versendete Behinderungsanzeige ein, als käme sie per E-Mail. Für den Fall, dass die echte Antwort nicht ankommt. Klara bereitet je nach Antwort die passenden Schreiben vor.")}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {(
@@ -78,10 +79,10 @@ export function DemoControls() {
               variant="outline"
               className="h-10 px-4"
               disabled={busy !== null}
-              title={`Klara bereitet vor: ${result}`}
-              onClick={() => run(`reply-${kind}`, "/api/demo/reply", { kind }, `Antwort eingespielt: ${label}`)}
+              title={$t("Klara bereitet vor: {result}", { result: $t(result) })}
+              onClick={() => run(`reply-${kind}`, "/api/demo/reply", { kind }, $t("Antwort eingespielt: {label}", { label: $t(label) }))}
             >
-              {busy === `reply-${kind}` ? "Wird eingespielt…" : label}
+              {busy === `reply-${kind}` ? $t("Wird eingespielt…") : $t(label)}
             </Button>
           ))}
         </div>
@@ -91,13 +92,13 @@ export function DemoControls() {
 
       {data ? (
         <section className="rounded-xl border border-border bg-background p-5">
-          <h2 className="text-sm font-medium text-foreground">Betriebsart</h2>
+          <h2 className="text-sm font-medium text-foreground">{$t("Betriebsart")}</h2>
           <dl className="mt-2 grid grid-cols-[160px_1fr] gap-y-1 text-sm">
-            <dt className="text-muted-foreground">Datenhaltung</dt>
-            <dd className="text-foreground">{data.backend === "supabase" ? "Supabase" : "Lokal (ohne Supabase)"}</dd>
-            <dt className="text-muted-foreground">Sprachmodell</dt>
+            <dt className="text-muted-foreground">{$t("Datenhaltung")}</dt>
+            <dd className="text-foreground">{data.backend === "supabase" ? $t("Supabase") : $t("Lokal (ohne Supabase)")}</dd>
+            <dt className="text-muted-foreground">{$t("Sprachmodell")}</dt>
             <dd className="text-foreground">{data.llm_mode === "live" ? "Claude (live)" : "Testmodus ohne KI-Modell"}</dd>
-            <dt className="text-muted-foreground">E-Mail-Versand</dt>
+            <dt className="text-muted-foreground">{$t("E-Mail-Versand")}</dt>
             <dd className="text-foreground">
               {data.mail === "smtp" ? "E-Mail-Postfach (echte E-Mails, Antworten per IMAP)" : data.mail === "postmark" ? "Postmark (echte E-Mails)" : "Testversand ohne E-Mail-Server"}
             </dd>
@@ -120,10 +121,10 @@ function VadSettingsForm({ initial, onSaved }: { initial: VadSettings; onSaved: 
     setSaving(true);
     try {
       await postJson("/api/demo/vad", { silence_ms: num(v.silence_ms), min_speech_ms: num(v.min_speech_ms), positive_threshold: num(v.positive_threshold) });
-      toast.success("Freihändig-Einstellungen gespeichert");
+      toast.success($t("Freihändig-Einstellungen gespeichert"));
       onSaved();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
+      toast.error(err instanceof Error ? $tx(err.message) : $t("Speichern fehlgeschlagen"));
     } finally {
       setSaving(false);
     }
@@ -135,13 +136,13 @@ function VadSettingsForm({ initial, onSaved }: { initial: VadSettings; onSaved: 
   ] as const;
   return (
     <section className="rounded-xl border border-border bg-background p-5">
-      <h2 className="text-sm font-medium text-foreground">Freihändig sprechen</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Wann Klara erkennt, dass der Polier fertig gesprochen hat. Gilt ab dem nächsten Anruf.</p>
+      <h2 className="text-sm font-medium text-foreground">{$t("Freihändig sprechen")}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{$t("Wann Klara erkennt, dass der Polier fertig gesprochen hat. Gilt ab dem nächsten Anruf.")}</p>
       <form onSubmit={save} className="mt-3 grid gap-3 sm:grid-cols-3">
         {fields.map((f) => (
           <div key={f.key}>
             <label htmlFor={`vad-${f.key}`} className="text-sm font-medium text-foreground">
-              {f.label} <span className="font-normal text-muted-foreground">({f.unit})</span>
+              {$t(f.label)} <span className="font-normal text-muted-foreground">({f.unit})</span>
             </label>
             <Input
               id={`vad-${f.key}`}
@@ -152,13 +153,13 @@ function VadSettingsForm({ initial, onSaved }: { initial: VadSettings; onSaved: 
               className="mt-1 h-10 font-mono"
             />
             <p id={`vad-${f.key}-hint`} className="mt-1 text-xs text-muted-foreground">
-              {f.hint}
+              {$t(f.hint)}
             </p>
           </div>
         ))}
         <div className="sm:col-span-3">
           <Button type="submit" variant="outline" className="h-10 px-4" disabled={saving}>
-            {saving ? "Wird gespeichert…" : "Speichern"}
+            {saving ? $t("Wird gespeichert…") : $t("Speichern")}
           </Button>
         </div>
       </form>

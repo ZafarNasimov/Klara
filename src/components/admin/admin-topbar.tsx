@@ -9,6 +9,8 @@ import { fmtDateTime } from "@/lib/labels";
 import { useProjectId } from "@/lib/project-choice";
 import { useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
+import { $t } from "@/lib/i18n";
+import { LangSwitch } from "@/lib/i18n-provider";
 
 const NAV = [
   { href: "/admin", label: "Übersicht", exact: true },
@@ -34,7 +36,7 @@ export function AdminTopbar() {
       </Suspense>
       <div className="ml-auto flex items-center gap-4">
         {data ? (
-          <p className="hidden text-sm text-muted-foreground lg:block" title="Uhrzeit der Demo-Uhr">
+          <p className="hidden text-sm text-muted-foreground lg:block" title={$t("Uhrzeit der Demo-Uhr")}>
             {/* The chosen site only where the page is about it (not on the dashboards, which name their own). */}
             <Suspense fallback={null}>
               <SiteName name={data.project.name} />
@@ -42,6 +44,7 @@ export function AdminTopbar() {
             <span className="font-mono text-foreground">{fmtDateTime(data.now)}</span>
           </p>
         ) : null}
+        <LangSwitch />
         <RoleSwitcher />
       </div>
     </header>
@@ -82,7 +85,7 @@ function Nav({ path }: { path: string | null }) {
               active ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
             )}
           >
-            {n.label}
+            {$t(n.label)}
           </Link>
         );
       })}

@@ -11,6 +11,8 @@ import type { CellStatus, DashboardView, FeedSource, Kpi } from "@/lib/dashboard
 import { fmtDayDe } from "@/lib/deadlines";
 import { cn } from "@/lib/utils";
 import { DISTRICTS, ISAR, MAP_H, MAP_W, OUTLINE, project } from "./munich-map";
+import { $t, $tx } from "@/lib/i18n";
+import { localized } from "@/lib/labels";
 
 const EASE = [0.23, 1, 0.32, 1] as const;
 
@@ -39,7 +41,7 @@ export function Card({ title, children, className, action }: { title: string; ch
   return (
     <section className={cn("flex min-h-0 min-w-0 flex-col rounded-xl border border-border bg-background px-4 pt-2 pb-4", className)} aria-label={title}>
       <header className="flex h-8 shrink-0 items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold whitespace-nowrap text-foreground">{title}</h2>
+        <h2 className="text-sm font-semibold whitespace-nowrap text-foreground">{typeof title === "string" ? $tx(title) : title}</h2>
         {action}
       </header>
       <div className="mt-2 min-h-0 flex-1">{children}</div>
@@ -62,13 +64,13 @@ const Shape = ({ status, className }: { status: Exclude<CellStatus, "none">; cla
 // ── KPI ─────────────────────────────────────────────────────────────────
 
 /** Labels of at most two words. */
-const KPI_LABEL: Record<Kpi["key"], string> = {
+const KPI_LABEL: Record<Kpi["key"], string> = localized({
   open: "Offene Vorgänge",
   missing: "Fehlende Berichte",
   sent: "Anzeigen",
   delay: "Verzugstage",
   claims: "Anspruchsgrundlage",
-};
+});
 
 const fmtValue = (v: number, format: Kpi["format"]) => (format === "eur" ? `${Math.round(v).toLocaleString("de-DE")} €` : Math.round(v).toLocaleString("de-DE"));
 
@@ -100,8 +102,8 @@ export function KpiCard({ kpi, index }: { kpi: Kpi; index: number }) {
     <Tip
       content={
         <span className="flex flex-col gap-1">
-          <span>{kpi.basis}</span>
-          <span className="opacity-80">{kpi.delta_label}</span>
+          <span>{$tx(kpi.basis)}</span>
+          <span className="opacity-80">{$tx(kpi.delta_label)}</span>
           {kpi.note && kpi.key === "missing" ? <span className="opacity-80">{kpi.note}</span> : null}
         </span>
       }
@@ -126,7 +128,7 @@ export function KpiCard({ kpi, index }: { kpi: Kpi; index: number }) {
         ) : null}
         <p className="relative flex items-center gap-1.5 text-[13px] leading-4 whitespace-nowrap text-muted-foreground">
           {KPI_LABEL[kpi.key]}
-          {kpi.note && kpi.key === "claims" ? <span className="rounded border border-border px-1 text-[10px]">{kpi.note}</span> : null}
+          {kpi.note && kpi.key === "claims" ? <span className="rounded border border-border px-1 text-[10px]">{$tx(kpi.note)}</span> : null}
         </p>
         <div className="relative flex items-end justify-between gap-3">
           <p className="font-mono text-[32px] leading-8 font-medium tracking-tight whitespace-nowrap text-foreground tabular-nums">
@@ -136,11 +138,11 @@ export function KpiCard({ kpi, index }: { kpi: Kpi; index: number }) {
         </div>
         <p className="relative flex h-4 items-center gap-1 font-mono text-[13px] text-muted-foreground tabular-nums">
           {kpi.delta === 0 ? (
-            <span aria-label="unverändert gegenüber der Vorwoche">±0</span>
+            <span aria-label={$t("unverändert gegenüber der Vorwoche")}>±0</span>
           ) : (
             <>
               <Arrow className="size-3 text-blue-600" aria-hidden />
-              <span aria-label={kpi.delta_label}>{fmtValue(Math.abs(kpi.delta), kpi.format)}</span>
+              <span aria-label={$tx(kpi.delta_label)}>{fmtValue(Math.abs(kpi.delta), kpi.format)}</span>
             </>
           )}
         </p>
@@ -191,7 +193,12 @@ export function SiteMap({ v, onPick }: { v: DashboardView; onPick: ((id: string)
           const [x, y] = project(s.lat, s.lng);
           const status = s.status === "none" ? "green" : s.status;
           const dim = anySelected && !s.selected;
-          const label = `Baustelle ${s.code} · ${s.name}: ${s.open} ${s.open === 1 ? "offener Vorgang" : "offene Vorgänge"}, ${s.delay} Verzugstage`;
+          const label = $t(s.open === 1 ? "Baustelle {code} · {name}: {n} offener Vorgang, {d} Verzugstage" : "Baustelle {code} · {name}: {n} offene Vorgänge, {d} Verzugstage", {
+            code: s.code,
+            name: s.name,
+            n: s.open,
+            d: s.delay,
+          });
           const pin = (
             <span className={cn("relative flex items-center gap-1.5 transition-opacity duration-300", dim && "opacity-40")} data-pin={s.code} data-status={status} data-selected={s.selected || undefined}>
               <Pulse status={status} />
@@ -211,7 +218,7 @@ export function SiteMap({ v, onPick }: { v: DashboardView; onPick: ((id: string)
             <div key={s.id} className="absolute -translate-y-1/2" style={{ left: `${(x / MAP_W) * 100}%`, top: `${(y / MAP_H) * 100}%`, marginLeft: -14 }}>
               <Tip content={<span>{label}</span>}>
                 {onPick ? (
-                  <button type="button" onClick={() => onPick(s.id)} aria-pressed={s.selected} aria-label={`${label}. Filter setzen`} className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <button type="button" onClick={() => onPick(s.id)} aria-pressed={s.selected} aria-label={$t("{what}. Filter setzen", { what: label })}  className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     {pin}
                   </button>
                 ) : (
@@ -257,14 +264,14 @@ export function Actions({ v, linkable }: { v: DashboardView; linkable: boolean }
   const top = v.actions.items.slice(0, 3);
   return (
     <div className="flex h-full flex-col justify-start gap-1.5">
-      {top.length ? null : <Empty>Nichts zu tun.</Empty>}
+      {top.length ? null : <Empty>{$t("Nichts zu tun.")}</Empty>}
       <ul className="flex flex-col gap-1.5">
         <AnimatePresence initial={false} mode="popLayout">
           {top.map((a) => {
             const body = (
               <span className="flex h-11 items-center gap-3 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted">
                 <Shape status={a.status} />
-                <span className="min-w-0 flex-1 whitespace-nowrap">{a.text}</span>
+                <span className="min-w-0 flex-1 whitespace-nowrap">{$tx(a.text)}</span>
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
               </span>
             );
@@ -278,7 +285,7 @@ export function Actions({ v, linkable }: { v: DashboardView; linkable: boolean }
                 transition={{ duration: 0.35, ease: EASE }}
                 data-action={a.kind}
               >
-                <Tip content={<span>{a.detail}</span>}>
+                <Tip content={<span>{$tx(a.detail)}</span>}>
                   {linkable ? (
                     <Link href={a.href} className="block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring">
                       {body}
@@ -296,7 +303,7 @@ export function Actions({ v, linkable }: { v: DashboardView; linkable: boolean }
         <details className="group text-sm">
           <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md px-1 py-1 text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring">
             <Shape status="green" />
-            Alles im Plan ({v.actions.ok.length})
+            {$t("Alles im Plan ({n})", { n: v.actions.ok.length })}
             <ChevronRight className="ml-auto size-4 transition-transform group-open:rotate-90" aria-hidden />
           </summary>
           <p className="mt-1 px-1 text-xs leading-relaxed text-muted-foreground">{v.actions.ok.join(", ")}</p>
@@ -322,33 +329,39 @@ const since = (iso: string, today: string) => (dayKey.format(new Date(iso)) === 
 export function Heatmap({ v, linkable }: { v: DashboardView; linkable: boolean }) {
   const reduce = useReducedMotion();
   const { trades, rows } = v.heatmap;
-  if (!rows.length || !trades.length) return <Empty>Keine laufenden Arbeiten im Filter.</Empty>;
+  if (!rows.length || !trades.length) return <Empty>{$t("Keine laufenden Arbeiten im Filter.")}</Empty>;
   const short = (pid: string) => v.site_map.find((s) => s.id === pid)?.short ?? "";
   return (
     <div className="h-full">
       <div
         role="table"
-        aria-label="Gewerke je Baustelle"
+        aria-label={$t("Gewerke je Baustelle")}
         className="grid h-full content-start justify-start gap-1"
         style={{ gridTemplateColumns: `6rem repeat(${trades.length}, minmax(3.25rem, 220px))`, gridTemplateRows: `24px repeat(${rows.length}, minmax(28px, 40px))` }}
       >
         <span role="columnheader" />
         {trades.map((t) => (
           <span key={t} role="columnheader" className="self-center text-center text-xs whitespace-nowrap text-muted-foreground">
-            {t}
+            {$t(t)}
           </span>
         ))}
         {rows.map((r, ri) => {
           const fade = { initial: reduce ? false : { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.35, delay: 0.1 + ri * 0.03 } } as const;
           return (
             <div key={r.project_id} role="row" className="contents">
-              <motion.span role="rowheader" aria-label={`Baustelle ${r.code} · ${r.name}`} className="flex items-center text-sm whitespace-nowrap text-foreground" {...fade}>
+              <motion.span role="rowheader" aria-label={$t("Baustelle {code} · {name}", { code: r.code, name: r.name })} className="flex items-center text-sm whitespace-nowrap text-foreground" {...fade}>
                 {short(r.project_id)}
               </motion.span>
               {r.cells.map((c) => {
-                if (c.status === "none") return <span key={c.trade} role="cell" aria-label={`${r.code} ${c.trade}: keine laufenden Arbeiten`} />;
+                if (c.status === "none") return <span key={c.trade} role="cell" aria-label={$t("{code} {trade}: keine laufenden Arbeiten", { code: r.code, trade: $t(c.trade) })} />;
                 const text = c.delay > 0 ? `+${c.delay}` : c.status === "red" ? "!" : "0";
-                const tip = c.hindrance ? `Behinderung ${c.hindrance.reference} · seit ${since(c.hindrance.since, v.today)}${c.delay ? ` · Prognose +${c.delay} Tage` : ""}` : `${r.code} ${c.trade}: ${c.reason}`;
+                const tip = c.hindrance
+                  ? $t(c.delay ? "Behinderung {ref} · seit {since} · Prognose +{d} Tage" : "Behinderung {ref} · seit {since}", {
+                      ref: c.hindrance.reference,
+                      since: since(c.hindrance.since, v.today),
+                      d: c.delay,
+                    })
+                  : `${r.code} ${$t(c.trade)}: ${$tx(c.reason)}`;
                 const body = (
                   <span className={cn("flex h-full items-center justify-center gap-1.5 rounded-md font-mono text-sm tabular-nums transition-colors duration-300", CELL[c.status])}>
                     <Shape status={c.status} className={c.status === "red" ? "bg-white" : undefined} />
@@ -361,7 +374,7 @@ export function Heatmap({ v, linkable }: { v: DashboardView; linkable: boolean }
                       {linkable ? (
                         <Link
                           href={c.hindrance ? `/admin/case/${c.hindrance.id}` : `/admin/vorgaenge?site=${r.project_id}&trade=${encodeURIComponent(c.trade)}`}
-                          aria-label={`${tip}. Öffnen`}
+                          aria-label={$t("{what}. Öffnen", { what: tip })}
                           data-cell={`${r.code}-${c.trade}`}
                           data-status={c.status}
                           className="block h-full rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -390,15 +403,15 @@ export function HeatLegend() {
   return (
     <p className="flex items-center gap-3 text-xs whitespace-nowrap text-muted-foreground">
       <span className="flex items-center gap-1.5">
-        <Shape status="green" /> im Plan
+        <Shape status="green" /> {$t("im Plan")}
       </span>
       <span className="flex items-center gap-1.5">
-        <Shape status="amber" /> ≤ 2 Tage
+        <Shape status="amber" /> {$t("≤ 2 Tage")}
       </span>
       <span className="flex items-center gap-1.5">
-        <Shape status="red" /> &gt; 2 Tage / Behinderung
+        <Shape status="red" /> {$t("> 2 Tage / Behinderung")}
       </span>
-      <InfoTip label="Was die Zahl bedeutet" text="Zahl = prognostizierte Verzugstage. Ohne Mengenmeldung seit zwei Arbeitstagen: ◆." />
+      <InfoTip label={$t("Was die Zahl bedeutet")} text={$t("Zahl = prognostizierte Verzugstage. Ohne Mengenmeldung seit zwei Arbeitstagen: ◆.")} />
     </p>
   );
 }
@@ -409,16 +422,16 @@ export function TradeBullets({ v }: { v: DashboardView }) {
   const reduce = useReducedMotion();
   // The trades the site reports quantities for, worst first in the list order; at most four on the Überblick.
   const bars = v.trade_bars.bars.slice(0, 4);
-  if (!bars.length) return <Empty>Für diesen Filter sind keine Mengen geplant.</Empty>;
+  if (!bars.length) return <Empty>{$t("Für diesen Filter sind keine Mengen geplant.")}</Empty>;
   return (
     <ul className="grid h-full content-start" style={{ gridTemplateRows: `repeat(${bars.length}, minmax(24px, 32px))` }}>
       {bars.map((b, i) => {
         const d = b.actual - b.plan;
         return (
           <li key={b.trade} className="grid grid-cols-[5.75rem_minmax(0,1fr)_2.25rem] items-center gap-3">
-            <span className={cn("text-sm whitespace-nowrap", b.worst ? "font-medium text-foreground" : "text-foreground")}>{b.trade}</span>
-            <Tip content={<span>{`${b.trade}: Ist ${b.actual} % fertig, Soll bis gestern ${b.plan} %`}</span>}>
-              <span className="relative block h-6" role="img" aria-label={`${b.trade}: Ist ${b.actual} Prozent, Soll ${b.plan} Prozent`}>
+            <span className={cn("text-sm whitespace-nowrap", b.worst ? "font-medium text-foreground" : "text-foreground")}>{$t(b.trade)}</span>
+            <Tip content={<span>{$t("{trade}: Ist {actual} % fertig, Soll bis gestern {plan} %", { trade: $t(b.trade), actual: b.actual, plan: b.plan })}</span>}>
+              <span className="relative block h-6" role="img" aria-label={$t("{trade}: Ist {actual} Prozent, Soll {plan} Prozent", { trade: $t(b.trade), actual: b.actual, plan: b.plan })}>
                 <span className="absolute inset-y-1.5 left-0 w-full rounded-sm bg-zinc-100" />
                 <motion.span
                   className={cn("absolute inset-y-1.5 left-0 origin-left rounded-sm", b.worst ? "bg-blue-600" : "bg-zinc-400")}
@@ -445,7 +458,7 @@ const dayIndex = (d: string) => Math.round(Date.parse(`${d}T12:00:00Z`) / 86_400
 export function MiniSchedule({ v, linkable }: { v: DashboardView; linkable: boolean }) {
   const reduce = useReducedMotion();
   const s = v.schedule;
-  if (!s.rows.length) return <Empty>Im Zeitraum sind auf dieser Baustelle keine Vorgänge geplant.</Empty>;
+  if (!s.rows.length) return <Empty>{$t("Im Zeitraum sind auf dieser Baustelle keine Vorgänge geplant.")}</Empty>;
   const a = dayIndex(s.from);
   const span = dayIndex(s.to) - a + 1;
   const x = (d: string) => `${(Math.max(0, Math.min(span, dayIndex(d) - a)) / span) * 100}%`;
@@ -485,7 +498,19 @@ export function MiniSchedule({ v, linkable }: { v: DashboardView; linkable: bool
                 transition={{ duration: 0.6, ease: EASE, delay: 0.1 + i * 0.04 }}
               />
             </Tip>
-            <Tip content={<span>{`Prognose bis ${fmtDayDe(r.forecast_end)}${r.delay ? ` (+${r.delay} Arbeitstage${r.waits_for ? `, wartet auf ${r.waits_for}` : ""})` : ""}`}</span>}>
+            <Tip
+              content={
+                <span>
+                  {r.delay
+                    ? $t(r.waits_for ? "Prognose bis {day} (+{d} Arbeitstage, wartet auf {what})" : "Prognose bis {day} (+{d} Arbeitstage)", {
+                        day: fmtDayDe(r.forecast_end),
+                        d: r.delay,
+                        what: r.waits_for ?? "",
+                      })
+                    : $t("Prognose bis {day}", { day: fmtDayDe(r.forecast_end) })}
+                </span>
+              }
+            >
               <motion.span
                 className="absolute top-5 h-2 origin-left rounded-sm bg-zinc-500"
                 style={{ left: x(r.start), width: w(r.start, r.forecast_end) }}
@@ -506,9 +531,9 @@ export function MiniSchedule({ v, linkable }: { v: DashboardView; linkable: bool
                 </span>
               );
               return (
-                <Tip key={h.case_id} content={<span>{`Behinderung ${h.reference} seit ${fmtDayDe(h.start)}`}</span>}>
+                <Tip key={h.case_id} content={<span>{$t("Behinderung {ref} seit {day}", { ref: h.reference, day: fmtDayDe(h.start) })}</span>}>
                   {linkable ? (
-                    <Link href={`/admin/case/${h.case_id}`} aria-label={`Behinderung ${h.reference} öffnen`}>
+                    <Link href={`/admin/case/${h.case_id}`} aria-label={$t("Behinderung {ref} öffnen", { ref: h.reference })}>
                       {seg}
                     </Link>
                   ) : (
@@ -523,10 +548,10 @@ export function MiniSchedule({ v, linkable }: { v: DashboardView; linkable: bool
       ))}
       <span />
       <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <Key className="h-2.5 w-4 rounded-sm bg-zinc-200" text="Soll" />
-        <Key className="h-2 w-4 rounded-sm bg-zinc-500" text="Prognose" />
-        <Key className="h-2.5 w-4 rounded-sm bg-light-red" text="Behinderung" />
-        <Key className="h-3 w-0.5 bg-blue-600" text="heute" />
+        <Key className="h-2.5 w-4 rounded-sm bg-zinc-200" text={$t("Soll")} />
+        <Key className="h-2 w-4 rounded-sm bg-zinc-500" text={$t("Prognose")} />
+        <Key className="h-2.5 w-4 rounded-sm bg-light-red" text={$t("Behinderung")} />
+        <Key className="h-3 w-0.5 bg-blue-600" text={$t("heute")} />
       </p>
     </div>
   );
@@ -543,7 +568,7 @@ const Key = ({ className, text }: { className: string; text: string }) => (
 
 export function CompletenessGrid({ v }: { v: DashboardView }) {
   const { rows, days } = v.completeness;
-  if (!rows.length) return <Empty>Keine Teams mit geplanter Arbeit im Zeitraum.</Empty>;
+  if (!rows.length) return <Empty>{$t("Keine Teams mit geplanter Arbeit im Zeitraum.")}</Empty>;
   const small = days.length > 14;
   return (
     <div className="overflow-x-auto">
@@ -555,10 +580,10 @@ export function CompletenessGrid({ v }: { v: DashboardView }) {
             </span>
             <span className="flex gap-1">
               {r.cells.map((c) => (
-                <Tip key={c.day} content={<span>{`${r.code} ${r.team}, ${fmtDayDe(c.day)}: ${c.state === "report" ? "Bericht eingegangen" : c.state === "missing" ? "Bericht fehlt" : "keine Arbeit geplant"}`}</span>}>
+                <Tip key={c.day} content={<span>{`${r.code} ${r.team}, ${fmtDayDe(c.day)}: ${c.state === "report" ? $t("Bericht eingegangen") : c.state === "missing" ? $t("Bericht fehlt") : $t("keine Arbeit geplant")}`}</span>}>
                   <span
                     role="img"
-                    aria-label={`${fmtDayDe(c.day)}: ${c.state === "report" ? "Bericht" : c.state === "missing" ? "fehlt" : "frei"}`}
+                    aria-label={`${fmtDayDe(c.day)}: ${c.state === "report" ? $t("Bericht") : c.state === "missing" ? $t("fehlt") : $t("frei")}`}
                     className={cn(
                       "shrink-0 rounded-[3px]",
                       small ? "size-3" : "size-4",
@@ -573,9 +598,9 @@ export function CompletenessGrid({ v }: { v: DashboardView }) {
         ))}
       </div>
       <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <Key className="size-3 rounded-[3px] bg-zinc-700" text="Bericht" />
-        <Key className="size-3 rounded-[3px] border-2 border-light-red" text="fehlt" />
-        <Key className="size-3 rounded-[3px] bg-zinc-100" text="keine Arbeit" />
+        <Key className="size-3 rounded-[3px] bg-zinc-700" text={$t("Bericht")} />
+        <Key className="size-3 rounded-[3px] border-2 border-light-red" text={$t("fehlt")} />
+        <Key className="size-3 rounded-[3px] bg-zinc-100" text={$t("keine Arbeit")} />
       </p>
     </div>
   );
@@ -584,13 +609,13 @@ export function CompletenessGrid({ v }: { v: DashboardView }) {
 // ── Details: Dokumente ──────────────────────────────────────────────────
 
 const PIPE_TONE = ["bg-zinc-200", "bg-zinc-300", "bg-zinc-400", "bg-zinc-600", "bg-zinc-800"];
-const PIPE_LABEL: Record<string, string> = { entwurf: "Entwurf", unvollstaendig: "Unvollst.", bereit: "Bereit", validiert: "Validiert", versendet: "Versendet" };
+const PIPE_LABEL: Record<string, string> = localized({ entwurf: "Entwurf", unvollstaendig: "Unvollst.", bereit: "Bereit", validiert: "Validiert", versendet: "Versendet" });
 
 export function Pipeline({ v }: { v: DashboardView }) {
   const reduce = useReducedMotion();
   const steps = v.pipeline.steps;
   const total = steps.reduce((s, x) => s + x.count, 0);
-  if (!total) return <Empty>Noch keine Schreiben in diesem Filter.</Empty>;
+  if (!total) return <Empty>{$t("Noch keine Schreiben in diesem Filter.")}</Empty>;
   return (
     <div>
       <div className="flex h-3 w-full overflow-hidden rounded-sm bg-zinc-100" role="img" aria-label={steps.map((s) => `${PIPE_LABEL[s.status]} ${s.count}`).join(", ")}>
@@ -640,7 +665,7 @@ const SOURCE: Record<FeedSource, { icon: typeof Phone; label: string }> = {
 const dateFmt = new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit" });
 
 export function ActivityFeed({ v, linkable }: { v: DashboardView; linkable: boolean }) {
-  if (!v.feed.length) return <Empty>Im Zeitraum ist nichts passiert.</Empty>;
+  if (!v.feed.length) return <Empty>{$t("Im Zeitraum ist nichts passiert.")}</Empty>;
   return (
     <ol className="-mx-2 flex flex-col">
       {v.feed.map((f) => {
@@ -649,15 +674,15 @@ export function ActivityFeed({ v, linkable }: { v: DashboardView; linkable: bool
         const when = dayKey.format(at) === v.today ? timeFmt.format(at) : dateFmt.format(at);
         const body = (
           <span className="flex gap-3 rounded-lg px-2 py-2">
-            <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground" title={S.label}>
-              <S.icon className="size-3.5" aria-label={S.label} />
+            <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground" title={$t(S.label)}>
+              <S.icon className="size-3.5" aria-label={$t(S.label)} />
             </span>
             <span className="min-w-0 flex-1">
               <span className="flex items-baseline justify-between gap-2">
-                <span className="text-sm font-medium text-foreground">{f.title}</span>
+                <span className="text-sm font-medium text-foreground">{$tx(f.title)}</span>
                 <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{when}</span>
               </span>
-              <span className="mt-0.5 block font-mono text-[11px] text-muted-foreground">{[f.ref, f.code ? `Baustelle ${f.code}` : null].filter(Boolean).join(" · ")}</span>
+              <span className="mt-0.5 block font-mono text-[11px] text-muted-foreground">{[f.ref, f.code ? $t("Baustelle {code}", { code: f.code }) : null].filter(Boolean).join(" · ")}</span>
             </span>
           </span>
         );

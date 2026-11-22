@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { createAudioContext, createLevelMeter, createSpeaker, MIC_CONSTRAINTS, startRecording, type Speaker } from "@/lib/voice/client";
 import { DEFAULT_VAD, type VoiceConfig, type VoiceResult } from "@/lib/voice/types";
 import { loadHandsFree, type HandsFree } from "@/lib/voice/vad";
+import { $t, $tx } from "@/lib/i18n";
 
 type Phase = "ready" | "ringing" | "connecting" | "listening" | "recording" | "processing" | "speaking" | "ended";
 type Mode = "handsfree" | "ptt";
@@ -89,7 +90,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
       if (klara) setTurns((prev) => [...prev, klara]);
       setNotice(null);
     } catch (e) {
-      setNotice(e instanceof ApiError && e.status < 500 ? e.message : "Das Foto wurde nicht gesendet. Bitte erneut versuchen.");
+      setNotice(e instanceof ApiError && e.status < 500 ? $tx(e.message) : $t("Das Foto wurde nicht gesendet. Bitte erneut versuchen."));
     } finally {
       setPhotoBusy(false);
     }
@@ -121,7 +122,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
           setLang(d.conversation.language ?? "de");
           if (d.conversation.status === "closed") setPhase("ended");
         })
-        .catch((e: unknown) => !off && setLoadError(e instanceof Error ? e.message : "Laden fehlgeschlagen"));
+        .catch((e: unknown) => !off && setLoadError(e instanceof Error ? $tx(e.message) : $t("Laden fehlgeschlagen")));
     }
     return () => {
       off = true;
@@ -207,10 +208,10 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
   const failed = useCallback((e: unknown) => {
     setNotice(
       e instanceof ApiError && e.status === 503
-        ? `${e.message} Schreiben Sie Ihre Antwort.`
+        ? $t("{msg} Schreiben Sie Ihre Antwort.", { msg: $tx(e.message) })
         : e instanceof ApiError && e.status < 500
-          ? e.message
-          : "Klara ist gerade nicht erreichbar. Bitte noch einmal versuchen.",
+          ? $tx(e.message)
+          : $t("Klara ist gerade nicht erreichbar. Bitte noch einmal versuchen."),
     );
     if (e instanceof ApiError && e.status === 503) setTyping(true);
     setPhase("listening");
@@ -236,7 +237,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
         if (streamRef.current !== stream) return;
         setVadState("failed");
         setMode("ptt");
-        setNotice("Freihändig startet auf diesem Gerät nicht. Halten Sie die Taste, solange Sie sprechen.");
+        setNotice($t("Freihändig startet auf diesem Gerät nicht. Halten Sie die Taste, solange Sie sprechen."));
       });
   };
 
@@ -259,7 +260,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
         if (ctx) prepareHandsFree(stream, ctx);
         else setMode("ptt");
       } catch {
-        setNotice("Das Mikrofon ist nicht freigegeben. Sie können Ihre Antwort schreiben.");
+        setNotice($t("Das Mikrofon ist nicht freigegeben. Sie können Ihre Antwort schreiben."));
         setTyping(true);
       }
     } else {
@@ -268,7 +269,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
     try {
       let d = detail;
       if (isNew) {
-        if (!teamId) throw new ApiError("Kein Team gewählt.", 400);
+        if (!teamId) throw new ApiError($t("Kein Team gewählt."), 400);
         const conv = await postJson<Conversation>("/api/conversations", { team_id: teamId, kind: "call" });
         window.history.replaceState(null, "", `/app/call/${conv.id}`);
         const r = await fetch(`/api/conversations/${conv.id}`, { cache: "no-store" });
@@ -276,7 +277,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
         setDetail(d);
         setTurns(d.turns);
       }
-      if (!d) throw new ApiError("Das Gespräch konnte nicht geladen werden.", 500);
+      if (!d) throw new ApiError($t("Das Gespräch konnte nicht geladen werden."), 500);
       convRef.current = d.conversation;
       setStartedAt(Date.now());
       const greeting = isNew ? [...d.turns].reverse().find((t) => t.role === "klara") : null;
@@ -307,7 +308,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
     stopMeter();
     const { blob, ext, ms } = await rec.stop();
     if (ms < MIN_SEGMENT_MS || blob.size < 1200) {
-      setNotice("Zu kurz. Halten Sie die Taste, solange Sie sprechen.");
+      setNotice($t("Zu kurz. Halten Sie die Taste, solange Sie sprechen."));
       setPhase("listening");
       return;
     }
@@ -329,7 +330,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
       const res = out as VoiceResult;
       if (res.ignored || !res.turn) {
         // Hands-free hears coughs and machines too: drop those without a word.
-        if (!quietOnNoise) setNotice("Das habe ich nicht verstanden. Bitte noch einmal sprechen.");
+        if (!quietOnNoise) setNotice($t("Das habe ich nicht verstanden. Bitte noch einmal sprechen."));
         setPhase("listening");
         return;
       }
@@ -454,12 +455,12 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
   if (loadError) {
     return (
       <>
-        <MobileHeader title="Gespräch mit Klara" backHref={channelHref} />
+        <MobileHeader title={$t("Gespräch mit Klara")} backHref={channelHref} />
         <main className="flex flex-1 flex-col items-center px-6 py-12 text-center">
-          <p className="text-base font-medium text-foreground">Das Gespräch konnte nicht geladen werden.</p>
+          <p className="text-base font-medium text-foreground">{$t("Das Gespräch konnte nicht geladen werden.")}</p>
           <p className="mt-1 text-sm text-muted-foreground">{loadError}</p>
           <Link href={channelHref} className={cn(BTN_OUTLINE, "mt-4")}>
-            Zum Teamkanal
+            {$t("Zum Teamkanal")}
           </Link>
         </main>
       </>
@@ -468,7 +469,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
   if (!cfg || (!isNew && !detail)) {
     return (
       <>
-        <MobileHeader title="Gespräch mit Klara" backHref={channelHref} />
+        <MobileHeader title={$t("Gespräch mit Klara")} backHref={channelHref} />
         <main className="flex flex-1 flex-col items-center gap-4 px-6 pt-16" aria-busy>
           <Skeleton className="size-28 rounded-full" />
           <Skeleton className="h-5 w-40" />
@@ -485,7 +486,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
     const ringing = phase === "ringing";
     return (
       <div className="flex h-dvh flex-col">
-        <MobileHeader title={ringing ? "Eingehender Anruf" : "Gespräch mit Klara"} backHref={channelHref} />
+        <MobileHeader title={ringing ? $t("Eingehender Anruf") : $t("Gespräch mit Klara")} backHref={channelHref} />
         <main className="flex flex-1 flex-col items-center justify-center px-6 text-center">
           <div className="relative flex size-40 items-center justify-center">
             {ringing ? (
@@ -496,13 +497,13 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
             ) : null}
             <KlaraAvatar size={112} mood="idle" />
           </div>
-          <h2 className="mt-6 text-2xl font-semibold tracking-tight text-foreground">{ringing ? "Klara ruft an" : "Klara anrufen"}</h2>
+          <h2 className="mt-6 text-2xl font-semibold tracking-tight text-foreground">{ringing ? $t("Klara ruft an") : $t("Klara anrufen")}</h2>
           {team?.name || teamName ? <p className="mt-1 text-base text-muted-foreground">{team?.name ?? teamName}</p> : null}
           <p className="mt-6 max-w-xs text-sm text-pretty text-muted-foreground">
-            Dieses Gespräch wird aufgezeichnet. Klara schreibt daraus die Meldung, die Bauleitung prüft sie.
+            {$t("Dieses Gespräch wird aufgezeichnet. Klara schreibt daraus die Meldung, die Bauleitung prüft sie.")}
           </p>
           {cfg.stt === "none" ? (
-            <p className="mt-3 max-w-xs text-sm text-pretty text-muted-foreground">Spracherkennung ist noch nicht eingerichtet: Sie schreiben, Klara antwortet mit Stimme.</p>
+            <p className="mt-3 max-w-xs text-sm text-pretty text-muted-foreground">{$t("Spracherkennung ist noch nicht eingerichtet: Sie schreiben, Klara antwortet mit Stimme.")}</p>
           ) : null}
           {notice ? (
             <p role="alert" className="mt-3 max-w-xs text-sm text-light-red-text">
@@ -514,17 +515,17 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
           {ringing ? (
             <div className="grid grid-cols-2 gap-3">
               <Link href={channelHref} className={BTN_OUTLINE}>
-                Ablehnen
+                {$t("Ablehnen")}
               </Link>
               <button type="button" onClick={start} className={BTN_PRIMARY}>
                 <Phone aria-hidden />
-                Annehmen
+                {$t("Annehmen")}
               </button>
             </div>
           ) : (
             <button type="button" onClick={start} className={cn(BTN_PRIMARY, "min-h-14 text-base")}>
               <Phone aria-hidden />
-              {isNew ? "Anrufen" : "Gespräch fortsetzen"}
+              {isNew ? $t("Anrufen") : $t("Gespräch fortsetzen")}
             </button>
           )}
         </div>
@@ -539,41 +540,41 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
     phase === "connecting"
       ? "Verbinde …"
       : phase === "recording"
-        ? "Klara hört zu"
+        ? $t("Klara hört zu")
         : phase === "processing"
-          ? "Klara denkt nach"
+          ? $t("Klara denkt nach")
           : phase === "speaking"
-            ? "Klara spricht"
+            ? $t("Klara spricht")
             : !voice
-              ? "Schreiben Sie Ihre Antwort."
+              ? $t("Schreiben Sie Ihre Antwort.")
               : !handsFree
-                ? "Halten Sie die Taste und sprechen Sie."
+                ? $t("Halten Sie die Taste und sprechen Sie.")
                 : muted
-                  ? "Stummgeschaltet. Klara hört nicht zu."
+                  ? $t("Stummgeschaltet. Klara hört nicht zu.")
                   : vadState === "ready"
-                    ? "Sprechen Sie einfach, Klara hört zu."
-                    : "Freihändig startet …";
+                    ? $t("Sprechen Sie einfach, Klara hört zu.")
+                    : $t("Freihändig startet …");
   /** The second line: how to talk in the current mode. */
   const hint =
     !voice || phase === "processing" || phase === "speaking" || phase === "connecting"
       ? null
       : handsFree
         ? muted
-          ? "Tippen Sie auf das Mikrofon, um weiterzusprechen."
-          : "Klara antwortet, wenn Sie eine Pause machen."
+          ? $t("Tippen Sie auf das Mikrofon, um weiterzusprechen.")
+          : $t("Klara antwortet, wenn Sie eine Pause machen.")
         : phase === "recording"
           ? toggleRec
-            ? "Tippen Sie zum Senden."
-            : "Loslassen zum Senden."
+            ? $t("Tippen Sie zum Senden.")
+            : $t("Loslassen zum Senden.")
           : "Kurz tippen startet, erneut tippen sendet.";
 
   return (
     <div className="flex h-dvh flex-col">
       <MobileHeader
-        title="Gespräch mit Klara"
+        title={$t("Gespräch mit Klara")}
         subtitle={team?.name}
         backHref={channelHref}
-        backLabel="Zum Teamkanal (das Gespräch bleibt offen)"
+        backLabel={$t("Zum Teamkanal (das Gespräch bleibt offen)")}
         trailing={startedAt ? <Timer since={startedAt} /> : null}
       />
 
@@ -605,12 +606,12 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
         </div>
         {/* Fixed height, so the transcript does not jump each time the user starts speaking. */}
         <p className="min-h-5 text-center text-sm text-pretty text-muted-foreground">{hint}</p>
-        <p className="mt-1 text-xs text-muted-foreground">Dieses Gespräch wird aufgezeichnet.</p>
+        <p className="mt-1 text-xs text-muted-foreground">{$t("Dieses Gespräch wird aufgezeichnet.")}</p>
       </section>
 
       {/* Transcript */}
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
-        <ol aria-label="Gesprächsverlauf" className="flex flex-col gap-3">
+        <ol aria-label={$t("Gesprächsverlauf")} className="flex flex-col gap-3">
           <AnimatePresence initial={false}>
             {turns.map((t) => (
               <motion.li
@@ -661,21 +662,21 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
         {typing || !voice ? (
           <form onSubmit={onSubmit} className="mb-3 flex items-center gap-2">
             <label htmlFor="call-input" className="sr-only">
-              Antwort an Klara
+              {$t("Antwort an Klara")}
             </label>
             <input
               id="call-input"
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Antwort an Klara"
+              placeholder={$t("Antwort an Klara")}
               autoComplete="off"
               enterKeyHint="send"
               className="h-12 min-w-0 flex-1 rounded-full border border-border bg-surface px-4 text-base text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
             />
             <button
               type="submit"
-              aria-label="Senden"
+              aria-label={$t("Senden")}
               disabled={!draft.trim() || phase === "processing"}
               className="flex size-12 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-40"
             >
@@ -686,7 +687,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
         {voice ? (
           <>
             {vadState !== "failed" ? (
-              <div role="group" aria-label="Sprechmodus" className="mb-3 grid grid-cols-2 rounded-full border border-border bg-muted p-0.5">
+              <div role="group" aria-label={$t("Sprechmodus")} className="mb-3 grid grid-cols-2 rounded-full border border-border bg-muted p-0.5">
                 {(
                   [
                     ["handsfree", "Freihändig"],
@@ -704,7 +705,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
                       mode === m ? "bg-background text-foreground shadow-sm ring-1 ring-border" : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    {label}
+                    {$t(label)}
                   </button>
                 ))}
               </div>
@@ -718,7 +719,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
                     if (!typing) requestAnimationFrame(() => inputRef.current?.focus());
                   }}
                   aria-pressed={typing}
-                  aria-label="Tippen statt sprechen"
+                  aria-label={$t("Tippen statt sprechen")}
                   className={cn(
                     "flex size-14 items-center justify-center rounded-full border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                     typing ? "bg-muted text-foreground" : "bg-background text-foreground hover:bg-muted",
@@ -735,7 +736,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
                     dropSegment();
                     setMuted((m) => !m);
                   }}
-                  aria-label="Stummschalten"
+                  aria-label={$t("Stummschalten")}
                   aria-pressed={muted}
                   className={cn(
                     "flex size-20 items-center justify-center rounded-full outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
@@ -758,7 +759,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
                   onPointerCancel={onPointerUp}
                   onKeyDown={onKeyDown}
                   onContextMenu={(e) => e.preventDefault()}
-                  aria-label={phase === "recording" ? "Senden" : "Halten und sprechen"}
+                  aria-label={phase === "recording" ? $t("Senden") : $t("Halten und sprechen")}
                   aria-pressed={phase === "recording"}
                   className={cn(
                     "flex size-20 touch-none items-center justify-center rounded-full outline-none select-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-40 [-webkit-touch-callout:none]",
@@ -772,7 +773,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
               <button
                 type="button"
                 onClick={hangUp}
-                aria-label="Auflegen"
+                aria-label={$t("Auflegen")}
                 className="flex size-14 items-center justify-center justify-self-end rounded-full bg-zinc-900 text-white outline-none hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <PhoneOff className="size-6" aria-hidden />
@@ -785,7 +786,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
             <button
               type="button"
               onClick={hangUp}
-              aria-label="Auflegen"
+              aria-label={$t("Auflegen")}
               className="flex size-14 items-center justify-center rounded-full bg-zinc-900 text-white outline-none hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <PhoneOff className="size-6" aria-hidden />
@@ -819,7 +820,7 @@ function TranscriptLine({ t }: { t: Turn }) {
       <KlaraAvatar size={24} className="mt-0.5" />
       <div className="min-w-0 max-w-[85%]">
         <p lang={t.language ?? undefined} className="text-[15px] leading-snug text-foreground">
-          <span className="sr-only">Klara: </span>
+          <span className="sr-only">{$t("Klara:")} </span>
           {t.text_original}
         </p>
         {subtitle ? (
@@ -850,7 +851,7 @@ function Timer({ since }: { since: number }) {
   }, []);
   const s = Math.max(0, Math.floor((now - since) / 1000));
   return (
-    <span className="mr-1 font-mono text-sm text-muted-foreground tabular-nums" aria-label={`Gesprächsdauer ${Math.floor(s / 60)} Minuten ${s % 60} Sekunden`}>
+    <span className="mr-1 font-mono text-sm text-muted-foreground tabular-nums" aria-label={$t("Gesprächsdauer {m} Minuten {s} Sekunden", { m: Math.floor(s / 60), s: s % 60 })}>
       {String(Math.floor(s / 60)).padStart(2, "0")}:{String(s % 60).padStart(2, "0")}
     </span>
   );
@@ -871,12 +872,16 @@ function Ended({
 }) {
   return (
     <div className="flex min-h-dvh flex-col">
-      <MobileHeader title="Gespräch beendet" subtitle={teamName} backHref={channelHref} backLabel="Zum Teamkanal" />
+      <MobileHeader title={$t("Gespräch beendet")} subtitle={teamName} backHref={channelHref} backLabel="Zum Teamkanal" />
       <main className="flex-1 px-4 pt-5 pb-8">
         <div className="flex items-center gap-3">
           <KlaraAvatar size={44} />
           <p className="text-[17px] leading-snug font-medium text-foreground">
-            {cases.length === 1 ? "Klara hat eine Meldung angelegt." : cases.length ? `Klara hat ${cases.length} Meldungen angelegt.` : "Aus diesem Gespräch ist keine Meldung entstanden."}
+            {cases.length === 1
+              ? $t("Klara hat eine Meldung angelegt.")
+              : cases.length
+                ? $t("Klara hat {n} Meldungen angelegt.", { n: cases.length })
+                : $t("Aus diesem Gespräch ist keine Meldung entstanden.")}
           </p>
         </div>
         {cases.length ? (
@@ -889,7 +894,7 @@ function Ended({
         {turns.length ? (
           <section aria-labelledby="transcript-h" className="mt-8">
             <h2 id="transcript-h" className="text-[15px] font-semibold text-foreground">
-              Gesprächsprotokoll
+              {$t("Gesprächsprotokoll")}
             </h2>
             <ol className="mt-3 flex flex-col gap-3">
               {turns.map((t) => (
@@ -903,7 +908,7 @@ function Ended({
       </main>
       <div className="sticky bottom-0 border-t border-border bg-background px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <Link href={channelHref} className={cn(BTN_PRIMARY, "w-full")}>
-          Zum Teamkanal
+          {$t("Zum Teamkanal")}
         </Link>
       </div>
     </div>
@@ -933,7 +938,7 @@ function CameraButton({ busy, onPhoto }: { busy: boolean; onPhoto: (file: File) 
         type="button"
         onClick={() => ref.current?.click()}
         disabled={busy}
-        aria-label={busy ? "Foto wird gesendet" : "Foto aufnehmen"}
+        aria-label={busy ? $t("Foto wird gesendet") : $t("Foto aufnehmen")}
         aria-busy={busy}
         className="flex size-14 items-center justify-center rounded-full border border-border bg-background text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
       >

@@ -19,6 +19,7 @@ import {
   type TemplateKind,
 } from "@/lib/meetings/model";
 import { cn } from "@/lib/utils";
+import { $t } from "@/lib/i18n";
 
 export type DetailSection = "header" | "summary" | "decisions" | "tasks" | "detected" | "nothing" | "changes" | "transcript";
 const ALL: DetailSection[] = ["header", "summary", "decisions", "tasks", "detected", "nothing", "changes", "transcript"];
@@ -60,7 +61,7 @@ export function MeetingDetail({
         {ref}
       </Link>
     ) : (
-      <span className="font-mono text-xs text-muted-foreground" title="Vorgang in dieser Demo nicht vorhanden">
+      <span className="font-mono text-xs text-muted-foreground" title={$t("Vorgang in dieser Demo nicht vorhanden")}>
         {ref}
       </span>
     );
@@ -104,7 +105,7 @@ export function MeetingDetail({
       ) : null}
 
       {show("summary") ? (
-        <Section title="Zusammenfassung">
+        <Section title={$t("Zusammenfassung")}>
           {m.summary.length ? (
             <ul className="list-disc space-y-1 pl-5 text-sm text-foreground marker:text-muted-foreground">
               {m.summary.slice(0, 5).map((s) => (
@@ -112,13 +113,13 @@ export function MeetingDetail({
               ))}
             </ul>
           ) : (
-            <Empty>Keine Zusammenfassung.</Empty>
+            <Empty>{$t("Keine Zusammenfassung.")}</Empty>
           )}
         </Section>
       ) : null}
 
       {show("decisions") ? (
-        <Section title="Entscheidungen">
+        <Section title={$t("Entscheidungen")}>
           {decisions.length ? (
             <ul className="space-y-2">
               {decisions.map((d) => (
@@ -128,13 +129,13 @@ export function MeetingDetail({
               ))}
             </ul>
           ) : (
-            <Empty>Keine Entscheidungen festgehalten.</Empty>
+            <Empty>{$t("Keine Entscheidungen festgehalten.")}</Empty>
           )}
         </Section>
       ) : null}
 
       {show("tasks") ? (
-        <Section title="Aufgaben" icon={<ListChecks className="size-4" aria-hidden />}>
+        <Section title={$t("Aufgaben")} icon={<ListChecks className="size-4" aria-hidden />}>
           {tasks.length ? (
             <table className="w-full text-sm">
               <thead>
@@ -142,7 +143,7 @@ export function MeetingDetail({
                   <th className="pb-2 font-normal">Was</th>
                   <th className="pb-2 font-normal">Wer</th>
                   <th className="pb-2 font-normal">Bis</th>
-                  <th className="pb-2 font-normal">Gewerk</th>
+                  <th className="pb-2 font-normal">{$t("Gewerk")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -162,13 +163,13 @@ export function MeetingDetail({
               </tbody>
             </table>
           ) : (
-            <Empty>Keine Aufgaben.</Empty>
+            <Empty>{$t("Keine Aufgaben.")}</Empty>
           )}
         </Section>
       ) : null}
 
       {show("detected") ? (
-        <Section title="Erkannt & erstellt" note="Nur Vorlagen mit Beleg im Gespräch">
+        <Section title={$t("Erkannt & erstellt")} note={$t("Nur Vorlagen mit Beleg im Gespräch")}>
           {detected.length ? (
             <ul className="space-y-2.5">
               {detected.map((i) => (
@@ -176,18 +177,18 @@ export function MeetingDetail({
               ))}
             </ul>
           ) : (
-            <Empty>Keine Vorlage betroffen.</Empty>
+            <Empty>{$t("Keine Vorlage betroffen.")}</Empty>
           )}
         </Section>
       ) : null}
 
       {show("nothing") && nothing.length ? (
-        <Section title="Nichts erkannt">
+        <Section title={$t("Nichts erkannt")}>
           <ul className="flex flex-wrap gap-1.5">
             {nothing.map((k) => (
               <li key={k} className="flex items-center gap-1.5 rounded-md border border-border px-2 py-0.5 text-xs text-muted-foreground">
                 <CircleDashed className="size-3" aria-hidden />
-                {TEMPLATE_DE[k].nothing}
+                {$t(TEMPLATE_DE[k].nothing)}
               </li>
             ))}
           </ul>
@@ -195,7 +196,7 @@ export function MeetingDetail({
       ) : null}
 
       {show("changes") ? (
-        <Section title="Änderungen durch dieses Meeting">
+        <Section title={$t("Änderungen durch dieses Meeting")}>
           {m.changes.length ? (
             <ul className="space-y-1.5">
               {m.changes.map((c, idx) => (
@@ -203,7 +204,7 @@ export function MeetingDetail({
               ))}
             </ul>
           ) : (
-            <Empty>Keine Änderungen.</Empty>
+            <Empty>{$t("Keine Änderungen.")}</Empty>
           )}
         </Section>
       ) : null}
@@ -222,8 +223,8 @@ export function MeetingDetail({
           {openTranscript ? (
             <div className="border-t border-border">
               <div className="flex items-center justify-between gap-3 px-5 pt-3">
-                <p className="text-xs text-muted-foreground">Jeder Abschnitt in der gesprochenen Sprache und auf Deutsch.</p>
-                <div role="group" aria-label="Transkript anzeigen" className="inline-flex rounded-lg border border-border p-0.5">
+                <p className="text-xs text-muted-foreground">{$t("Jeder Abschnitt in der gesprochenen Sprache und auf Deutsch.")}</p>
+                <div role="group" aria-label={$t("Transkript anzeigen")} className="inline-flex rounded-lg border border-border p-0.5">
                   {TRANSCRIPT_VIEWS.map(([v, label]) => (
                     <button
                       key={v}
@@ -235,7 +236,7 @@ export function MeetingDetail({
                         view === v ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
                       )}
                     >
-                      {label}
+                      {$t(label)}
                     </button>
                   ))}
                 </div>
@@ -263,7 +264,7 @@ export function MeetingDetail({
                           </p>
                         ) : null}
                         {unsure ? (
-                          <p className="mt-1 text-xs font-medium text-light-yellow-text">Unsicher erkannt oder übersetzt: nicht allein als Beleg für eine Vorlage verwendet</p>
+                          <p className="mt-1 text-xs font-medium text-light-yellow-text">{$t("Unsicher erkannt oder übersetzt: nicht allein als Beleg für eine Vorlage verwendet")}</p>
                         ) : null}
                         {s.notes.map((n) => (
                           <p key={n} className="mt-1 flex items-start gap-1.5 text-xs text-muted-foreground">
@@ -335,7 +336,7 @@ function Evidence({ item, onJump }: { item: MeetingItem; onJump: (ts: number) =>
           type="button"
           onClick={() => onJump(item.ts_sec)}
           className="rounded font-mono text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={`Im Transkript bei ${fmtClock(item.ts_sec)} zeigen`}
+          aria-label={$t("Im Transkript bei {at} zeigen", { at: fmtClock(item.ts_sec) })}
         >
           {fmtClock(item.ts_sec)}
         </button>
@@ -350,7 +351,7 @@ function Evidence({ item, onJump }: { item: MeetingItem; onJump: (ts: number) =>
         <>
           <Link2 className="size-3 translate-y-0.5" aria-hidden />
           <span>
-            Voraussetzung für: „{item.depends.text_de.replace(/[.]$/, "")}“ – {item.depends.speaker}, <span className="font-mono">{fmtClock(item.depends.ts_sec)}</span>
+            {$t("Voraussetzung für:")} „{item.depends.text_de.replace(/[.]$/, "")}“ – {item.depends.speaker}, <span className="font-mono">{fmtClock(item.depends.ts_sec)}</span>
           </span>
         </>
       ) : null}
@@ -362,22 +363,22 @@ function DetectedRow({ item, link, onJump, dense }: { item: MeetingItem; link: R
   const t = TEMPLATE_DE[item.kind as TemplateKind];
   const action =
     item.case_action === "uncertain"
-      ? "nicht erstellt: Beleg unsicher erkannt oder übersetzt, bitte prüfen"
+      ? $t("nicht erstellt: Beleg unsicher erkannt oder übersetzt, bitte prüfen")
       : item.case_action === "existing"
       ? "bereits vorhanden"
       : item.case_action === "noop"
-        ? "festgehalten, kein Eintrag im Terminplan geändert"
+        ? $t("festgehalten, kein Eintrag im Terminplan geändert")
         : item.updated_case_id
           ? "aktualisiert"
           : item.created_case_id
-            ? "Entwurf"
+            ? $t("Entwurf")
             : item.kind === "termin"
-              ? "Terminplan angepasst"
+              ? $t("Terminplan angepasst")
               : "festgehalten";
   return (
     <li className="rounded-lg border border-border px-3.5 py-2.5">
       <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
-        <span className="font-medium text-foreground">{t.title}</span>
+        <span className="font-medium text-foreground">{$t(t.title)}</span>
         <span className={cn("text-xs", item.case_action === "uncertain" ? "font-medium text-light-yellow-text" : "text-muted-foreground")}>{action}</span>
         <span className="ml-auto">{link}</span>
       </p>

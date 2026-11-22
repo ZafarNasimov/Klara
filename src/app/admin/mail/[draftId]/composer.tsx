@@ -22,12 +22,13 @@ import { useRole } from "@/lib/role";
 import type { MailDraftView } from "@/lib/types";
 import { ApiError, postJson, sendJson, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
+import { $t, $tx } from "@/lib/i18n";
 
 type Contact = MailDraftView["contacts"][number];
 
 export function MailComposer({ draftId, caseId }: { draftId: string; caseId: string | null }) {
   if (draftId !== "new") return <Composer id={draftId} />;
-  if (!caseId) return <Failure message="Zu welchem Vorgang? Bitte die E-Mail aus dem Vorgang heraus vorbereiten." caseId={null} />;
+  if (!caseId) return <Failure message={$t("Zu welchem Vorgang? Bitte die E-Mail aus dem Vorgang heraus vorbereiten.")} caseId={null} />;
   return <NewDraft caseId={caseId} />;
 }
 
@@ -42,14 +43,14 @@ function NewDraft({ caseId }: { caseId: string }) {
         if (live) router.replace(`/admin/mail/${v.draft.id}`);
       })
       .catch((e: unknown) => {
-        if (live) setError(e instanceof ApiError && e.status < 500 ? e.message : "Die E-Mail konnte nicht vorbereitet werden. Bitte erneut versuchen.");
+        if (live) setError(e instanceof ApiError && e.status < 500 ? $tx(e.message) : $t("Die E-Mail konnte nicht vorbereitet werden. Bitte erneut versuchen."));
       });
     return () => {
       live = false;
     };
   }, [caseId, router]);
   if (error) return <Failure message={error} caseId={caseId} />;
-  return <ComposerSkeleton note="Klara bereitet die E-Mail vor …" />;
+  return <ComposerSkeleton note={$t("Klara bereitet die E-Mail vor …")} />;
 }
 
 function Composer({ id }: { id: string }) {
@@ -125,14 +126,14 @@ function DraftForm({ view, onStale }: { view: MailDraftView; onStale: () => void
   const validateAndSend = view.needs_validation && isBauleiter && !view.validation_blocker;
   const stateBlocker = view.needs_validation
     ? !isBauleiter
-      ? "Das Schreiben ist noch nicht validiert. Validieren kann nur die Bauleitung (Rolle oben rechts wechseln)."
+      ? $t("Das Schreiben ist noch nicht validiert. Validieren kann nur die Bauleitung (Rolle oben rechts wechseln).")
       : view.validation_blocker
     : view.state_blocker;
-  const roleBlocker = user.role === "polier" ? "Senden kann nur das Büro oder die Bauleitung (Rolle oben rechts wechseln)." : null;
+  const roleBlocker = user.role === "polier" ? $t("Senden kann nur die Bauleitung (oben rechts „Bauleitung“ wählen).") : null;
   const pendingBlocker = toPending.bad
-    ? `An: „${toPending.bad}“ ist keine gültige E-Mail-Adresse.`
+    ? $t("An: „{bad}“ ist keine gültige E-Mail-Adresse.", { bad: toPending.bad })
     : ccPending.bad
-      ? `CC: „${ccPending.bad}“ ist keine gültige E-Mail-Adresse.`
+      ? $t("CC: „{bad}“ ist keine gültige E-Mail-Adresse.", { bad: ccPending.bad })
       : null;
   const blocker = stateBlocker ?? roleBlocker ?? pendingBlocker ?? fieldBlocker(outgoing, view.addressee);
   const wrongAddressee = addresseeProblem(outgoing.to, view.addressee);
@@ -144,11 +145,11 @@ function DraftForm({ view, onStale }: { view: MailDraftView; onStale: () => void
     try {
       await sendJson("PATCH", url, outgoing);
       await postJson(`${url}/send`, { user_id: user.userId, attach_docx: docx, validate: validateAndSend });
-      if (view.delivery !== "simulated") toast.success(`${docTitle(c.doc_type)} an ${outgoing.to.join(", ")} versendet`);
-      else toast("Testversand im Verlauf festgehalten, nicht zugestellt");
+      if (view.delivery !== "simulated") toast.success($t("{doc} an {to} versendet", { doc: docTitle(c.doc_type), to: outgoing.to.join(", ") }));
+      else toast($t("Testversand im Verlauf festgehalten, nicht zugestellt"));
       router.push(`/admin/case/${c.id}`);
     } catch (e) {
-      toast.error(e instanceof ApiError && e.status < 500 ? e.message : "Senden hat nicht geklappt. Bitte erneut versuchen.");
+      toast.error(e instanceof ApiError && e.status < 500 ? $tx(e.message) : $t("Senden hat nicht geklappt. Bitte erneut versuchen."));
       setSending(false);
       // A new letter version or a changed status: show the current state.
       if (e instanceof ApiError && e.status < 500) onStale();
@@ -157,7 +158,7 @@ function DraftForm({ view, onStale }: { view: MailDraftView; onStale: () => void
 
   // Names stay on one line ("Dr. Petra Lang" must not break after "Dr.").
   const recipients = outgoing.to.map((a) => (contactOf(a, view.contacts)?.name ?? a).replace(/ /g, "\u00a0")).join(", ");
-  const verb = validateAndSend ? "Validieren und senden" : "Senden";
+  const verb = validateAndSend ? $t("Validieren und senden") : $t("Senden");
   const status = blocker ? (
     <>
       {blocker}
@@ -165,15 +166,15 @@ function DraftForm({ view, onStale }: { view: MailDraftView; onStale: () => void
         <>
           {" "}
           <Link href={`/admin/case/${c.id}`} className="text-primary underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
-            Zum Vorgang
+            {$t("Zum Vorgang")}
           </Link>
         </>
       ) : null}
     </>
   ) : validateAndSend ? (
-    `Validiert Version ${view.version?.version ?? 1} als ${user.userName} und sendet an ${recipients}.`
+    $t("Validiert Version {n} als {name} und sendet an {to}.", { n: view.version?.version ?? 1, name: user.userName, to: recipients })
   ) : (
-    `Geht an ${recipients}.`
+    $t("Geht an {to}.", { to: recipients })
   );
 
   return (
@@ -193,18 +194,18 @@ function DraftForm({ view, onStale }: { view: MailDraftView; onStale: () => void
               disabled={!!blocker || sending}
               aria-describedby="send-status"
               aria-keyshortcuts="Control+Enter"
-              title="Strg+Enter"
+              title={$t("Strg+Enter")}
               onClick={() => void send()}
             >
               <Send aria-hidden />
-              {sending ? (validateAndSend ? "Wird validiert und gesendet …" : "Wird gesendet …") : verb}
+              {sending ? (validateAndSend ? $t("Wird validiert und gesendet …") : $t("Wird gesendet …")) : verb}
             </Button>
             <p id="send-status" className="max-w-[400px] text-right text-sm text-muted-foreground" aria-live="polite">
               {status}
             </p>
             <p className="text-right text-xs text-muted-foreground">
-              {saveFailed ? "Entwurf nicht gespeichert; die Änderungen gehen beim Senden mit." : pending ? "Wird gespeichert …" : "Entwurf gespeichert."}
-              {view.delivery === "simulated" ? " Testmodus: wird nicht zugestellt." : null}
+              {saveFailed ? $t("Entwurf nicht gespeichert; die Änderungen gehen beim Senden mit.") : pending ? $t("Wird gespeichert …") : $t("Entwurf gespeichert.")}
+              {view.delivery === "simulated" ? $t(" Testmodus: wird nicht zugestellt.") : null}
             </p>
           </div>
         </div>
@@ -212,7 +213,7 @@ function DraftForm({ view, onStale }: { view: MailDraftView; onStale: () => void
 
       <form
         className="px-8 py-6"
-        aria-label="E-Mail"
+        aria-label={$t("E-Mail")}
         onSubmit={(e) => e.preventDefault()}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -230,7 +231,7 @@ function DraftForm({ view, onStale }: { view: MailDraftView; onStale: () => void
             {wrongAddressee ? (
               <FieldNote light="red">{wrongAddressee}</FieldNote>
             ) : (
-              <FieldNote light={view.recipient_check.light}>{view.recipient_check.reason_de}</FieldNote>
+              <FieldNote light={view.recipient_check.light}>{$tx(view.recipient_check.reason_de)}</FieldNote>
             )}
             {unauthorized.map((k) => (
               <FieldNote key={k.email} light="yellow">
@@ -241,7 +242,7 @@ function DraftForm({ view, onStale }: { view: MailDraftView; onStale: () => void
           <Row label="CC" htmlFor="mail-cc">
             <AddressField id="mail-cc" label="CC" values={cc} onChange={setCc} text={ccText} onText={setCcText} contacts={view.contacts} />
           </Row>
-          <Row label="Betreff" htmlFor="mail-subject">
+          <Row label={$t("Betreff")} htmlFor="mail-subject">
             <textarea
               id="mail-subject"
               value={subject}
@@ -250,10 +251,10 @@ function DraftForm({ view, onStale }: { view: MailDraftView; onStale: () => void
               aria-invalid={!subject.trim()}
               className="-mx-1 block w-full resize-none rounded-md bg-transparent px-1 py-1.5 text-sm leading-5 text-foreground outline-none [field-sizing:content] focus-visible:ring-2 focus-visible:ring-ring"
             />
-            {!subject.trim() ? <FieldNote light="red">Bitte einen Betreff angeben.</FieldNote> : null}
+            {!subject.trim() ? <FieldNote light="red">{$t("Bitte einen Betreff angeben.")}</FieldNote> : null}
           </Row>
           <label htmlFor="mail-body" className="sr-only">
-            Nachricht
+            {$t("Nachricht")}
           </label>
           <textarea
             id="mail-body"
@@ -269,7 +270,7 @@ function DraftForm({ view, onStale }: { view: MailDraftView; onStale: () => void
         <p className="mt-2 flex max-w-[760px] items-center gap-1.5 text-xs text-muted-foreground">
           <Info className="size-3.5 shrink-0" aria-hidden />
           {!body.trim() ? "Bitte einen Text angeben. " : null}
-          Text von Klara vorgeschlagen. Vor dem Senden lesen; Rechtliches steht nur im Schreiben selbst.
+          {$t("Text von Klara vorgeschlagen. Vor dem Senden lesen; Rechtliches steht nur im Schreiben selbst.")}
         </p>
       </form>
     </Frame>
@@ -312,11 +313,11 @@ function SentMail({ view }: { view: MailDraftView }) {
             </p>
           </div>
           <Link href={`/admin/case/${c.id}`} className={buttonVariants({ size: "lg", className: "px-4" })}>
-            Zum Vorgang
+            {$t("Zum Vorgang")}
           </Link>
         </div>
       </header>
-      <section className="px-8 py-6" aria-label="Versendete E-Mail">
+      <section className="px-8 py-6" aria-label={$t("Versendete E-Mail")}>
         <div className="max-w-[760px] rounded-xl border border-border bg-background">
           <Row label="Von">
             <FromLine view={view} />
@@ -329,7 +330,7 @@ function SentMail({ view }: { view: MailDraftView }) {
               <ReadAddresses values={d.cc} contacts={view.contacts} />
             </Row>
           ) : null}
-          <Row label="Betreff">
+          <Row label={$t("Betreff")}>
             <p className="py-1.5 text-sm text-foreground">{d.subject}</p>
           </Row>
           <p className="whitespace-pre-wrap px-5 py-4 text-sm leading-6 text-foreground">{d.body}</p>
@@ -356,35 +357,35 @@ function Frame({ view, docx, onDocx, children }: { view: MailDraftView; docx?: b
       <main className="min-h-0 overflow-y-auto">{children}</main>
       <aside aria-labelledby="attachment-h" className="min-h-0 overflow-y-auto border-l border-border bg-background px-5 py-5">
         <h2 id="attachment-h" className="text-sm font-medium text-foreground">
-          Anhang
+          {$t("Anhang")}
         </h2>
         {view.version && pdf ? (
           <>
-            <LetterThumb whole body={view.version.body as DocBody} href={pdf.url} label={`${pdf.name} öffnen`} className="mt-2 pb-5" />
+            <LetterThumb whole body={view.version.body as DocBody} href={pdf.url} label={$t("{name} öffnen", { name: pdf.name })} className="mt-2 pb-5" />
             <ul className="mt-3 divide-y divide-border text-sm">
               <li className="flex min-h-10 items-center gap-2">
                 <Paperclip className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                 <span className="min-w-0 truncate font-mono text-foreground">{pdf.name}</span>
                 <a href={pdf.url} target="_blank" rel="noreferrer" className={buttonVariants({ variant: "ghost", size: "sm", className: "ml-auto" })}>
-                  Öffnen
+                  {$t("Öffnen")}
                 </a>
               </li>
               {word && !sent && onDocx ? (
                 <li>
                   <label className="flex min-h-10 cursor-pointer items-center gap-2">
                     <input type="checkbox" checked={!!docx} onChange={(e) => onDocx(e.target.checked)} className="size-4 accent-primary" />
-                    <span className="text-foreground">Word-Datei mitsenden</span>
+                    <span className="text-foreground">{$t("Word-Datei mitsenden")}</span>
                     <span className="ml-auto truncate font-mono text-xs text-muted-foreground">{word.name}</span>
                   </label>
                 </li>
               ) : null}
             </ul>
             <p className="mt-3 text-xs leading-5 text-muted-foreground">
-              Die interne Prüfseite mit Gesprächsprotokoll und Prüfergebnissen wird nicht mitgesendet.
+              {$t("Die interne Prüfseite mit Gesprächsprotokoll und Prüfergebnissen wird nicht mitgesendet.")}
             </p>
           </>
         ) : (
-          <p className="mt-2 text-sm text-muted-foreground">Kein Schreiben angehängt.</p>
+          <p className="mt-2 text-sm text-muted-foreground">{$t("Kein Schreiben angehängt.")}</p>
         )}
       </aside>
     </div>
@@ -408,16 +409,16 @@ function VersionLine({ view }: { view: MailDraftView }) {
   if (!v) return null;
   return (
     <p className="mt-0.5 text-sm text-muted-foreground">
-      Schreiben Version <span className="font-mono">{v.version}</span>
+      {$t("Schreiben Version")} <span className="font-mono">{v.version}</span>
       {v.validated_at ? (
         <>
-          , validiert von {view.validated_by_name ?? "der Bauleitung"} am{" "}
+          {$t(", validiert von {name} am", { name: view.validated_by_name ?? $t("der Bauleitung") })}{" "}
           <time dateTime={v.validated_at} className="font-mono">
             {fmtDateTime(v.validated_at)}
           </time>
         </>
       ) : (
-        ", noch nicht validiert"
+        $t(", noch nicht validiert")
       )}
     </p>
   );
@@ -432,7 +433,7 @@ function FromLine({ view }: { view: MailDraftView }) {
     <p className="py-1.5 text-sm text-foreground">
       {s.name}, {s.role}, {s.company}
       {!simulated && view.from ? <span className="text-muted-foreground"> &lt;{view.from.replace(/^.*<|>.*$/g, "")}&gt;</span> : null}
-      {simulated && sent ? <span className="text-muted-foreground"> (Testversand, nicht zugestellt)</span> : null}
+      {simulated && sent ? <span className="text-muted-foreground"> {$t("(Testversand, nicht zugestellt)")}</span> : null}
     </p>
   );
 }
@@ -502,7 +503,7 @@ function AddressField({
   const add = (raw: string) => {
     const { ok, bad } = parsePending(raw);
     if (bad) {
-      setError(`„${bad}“ ist keine gültige E-Mail-Adresse.`);
+      setError($t("„{bad}“ ist keine gültige E-Mail-Adresse.", { bad }));
       return;
     }
     if (!ok.length) return;
@@ -523,7 +524,7 @@ function AddressField({
     <div>
       <div className="-mx-1 flex min-h-8 flex-wrap items-center gap-1.5 rounded-md px-1 py-0.5 focus-within:ring-2 focus-within:ring-ring">
         {values.length ? (
-          <ul aria-label={`Empfänger ${label}`} className="contents">
+          <ul aria-label={$t("Empfänger {field}", { field: label })} className="contents">
             {values.map((a) => {
               const k = contactOf(a, contacts);
               const noAuthority = !!k && !k.has_authority;
@@ -532,7 +533,7 @@ function AddressField({
                   {noAuthority ? <LightDot light="yellow" /> : null}
                   {k ? <span className="truncate text-foreground">{k.name}</span> : null}
                   <span className={cn("truncate", k ? "text-muted-foreground" : "text-foreground")}>{a}</span>
-                  {noAuthority ? <span className="sr-only">, ohne Vollmacht</span> : null}
+                  {noAuthority ? <span className="sr-only">{$t(", ohne Vollmacht")}</span> : null}
                   <button
                     type="button"
                     onClick={() => onChange(values.filter((x) => x !== a))}
@@ -558,7 +559,7 @@ function AddressField({
           }}
           onKeyDown={onKey}
           onBlur={() => add(text)}
-          placeholder={values.length ? "" : "Adresse eingeben"}
+          placeholder={values.length ? "" : $t("Adresse eingeben")}
           autoComplete="off"
           aria-invalid={invalid || !!error}
           aria-describedby={error ? `${id}-error` : undefined}
@@ -603,16 +604,16 @@ function ComposerSkeleton({ note }: { note?: string }) {
 function Failure({ message, caseId }: { message: string; caseId: string | null }) {
   return (
     <main className="mx-auto max-w-lg px-6 py-16 text-center">
-      <p className="text-base font-medium text-foreground">Die E-Mail ist nicht verfügbar.</p>
+      <p className="text-base font-medium text-foreground">{$t("Die E-Mail ist nicht verfügbar.")}</p>
       <p className="mt-1 text-sm text-muted-foreground">{message}</p>
       <div className="mt-4 flex justify-center gap-2">
         {caseId ? (
           <Link href={`/admin/case/${caseId}`} className={buttonVariants({ variant: "outline" })}>
-            Zum Vorgang
+            {$t("Zum Vorgang")}
           </Link>
         ) : null}
         <Link href="/admin/vorgaenge" className={buttonVariants({ variant: "ghost" })}>
-          Zur Übersicht
+          {$t("Zur Übersicht")}
         </Link>
       </div>
     </main>

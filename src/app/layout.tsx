@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { DomTranslationGuard } from "@/components/dom-translation-guard";
 import { Toaster } from "@/components/ui/sonner";
+import { LangProvider } from "@/lib/i18n-provider";
 import { RoleProvider } from "@/lib/role";
 import "./globals.css";
 
@@ -39,7 +40,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col bg-background text-foreground">
         <DomTranslationGuard />
         <RoleProvider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <LangProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+          </LangProvider>
         </RoleProvider>
         <Toaster position="top-center" />
       </body>

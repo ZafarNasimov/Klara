@@ -19,6 +19,7 @@ import type { CaseView, ChannelFeed, ConfirmView, Conversation, Turn } from "@/l
 import { ApiError, postJson, useApi } from "@/lib/use-api";
 import { uploadPhoto } from "@/lib/photo-client";
 import { cn } from "@/lib/utils";
+import { $t } from "@/lib/i18n";
 
 type Item =
   | { kind: "turn"; at: string; turn: Turn }
@@ -134,14 +135,14 @@ export function ChannelView({ teamId }: { teamId: string }) {
   return (
     <div className="flex h-dvh min-h-0 flex-col">
       <MobileHeader
-        title={feed?.team.name ?? "Teamkanal"}
+        title={feed?.team.name ?? $t("Teamkanal")}
         subtitle={feed?.project_name}
         backHref="/app"
-        backLabel="Zurück zu den Teamkanälen"
+        backLabel={$t("Zurück zu den Teamkanälen")}
         trailing={
           <Link
             href={`/app/call/new?team=${teamId}`}
-            aria-label="Klara anrufen"
+            aria-label={$t("Klara anrufen")}
             className="flex size-12 shrink-0 items-center justify-center rounded-lg text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Phone className="size-5" aria-hidden />
@@ -156,7 +157,7 @@ export function ChannelView({ teamId }: { teamId: string }) {
         {feed ? (
           <>
             {feed.llm_mode === "mock" ? (
-              <p className="mb-3 text-center text-xs text-muted-foreground">Testmodus: Klara versteht ohne KI-Schlüssel nur einfache Sätze.</p>
+              <p className="mb-3 text-center text-xs text-muted-foreground">{$t("Testmodus: Klara versteht ohne KI-Schlüssel nur einfache Sätze.")}</p>
             ) : null}
 
             {items.length === 0 && !pending ? <EmptyState compact={showMorning} /> : null}
@@ -194,7 +195,7 @@ export function ChannelView({ teamId }: { teamId: string }) {
               </AnimatePresence>
               {photo ? (
                 <li>
-                  <PhotoBubble src={photo.preview} label="Ihr Foto" uploading={!photo.error} />
+                  <PhotoBubble src={photo.preview} label={$t("Ihr Foto")} uploading={!photo.error} />
                   {photo.error ? (
                     <div className="mt-1.5 flex flex-wrap items-center justify-end gap-x-3 text-sm">
                       <span className="text-foreground">Nicht gesendet. {photo.error}</span>
@@ -203,7 +204,7 @@ export function ChannelView({ teamId }: { teamId: string }) {
                         onClick={() => void sendPhoto(photo.file, photo.preview)}
                         className="h-12 rounded-lg px-3 font-medium text-primary outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        Erneut senden
+                        {$t("Erneut senden")}
                       </button>
                     </div>
                   ) : null}
@@ -223,7 +224,7 @@ export function ChannelView({ teamId }: { teamId: string }) {
                         onClick={() => void send(pending.text)}
                         className="h-12 rounded-lg px-3 font-medium text-primary outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        Erneut senden
+                        {$t("Erneut senden")}
                       </button>
                     </div>
                   ) : null}
@@ -232,7 +233,7 @@ export function ChannelView({ teamId }: { teamId: string }) {
               {busy ? (
                 <li className="flex items-center gap-2 text-sm text-muted-foreground">
                   <KlaraAvatar size={28} mood="thinking" />
-                  Klara denkt …
+                  {$t("Klara denkt …")}
                 </li>
               ) : null}
             </ol>
@@ -328,13 +329,13 @@ export function ChannelView({ teamId }: { teamId: string }) {
           type="button"
           onClick={() => cameraRef.current?.click()}
           disabled={!!photo && !photo.error}
-          aria-label="Foto aufnehmen"
+          aria-label={$t("Foto aufnehmen")}
           className="flex size-12 shrink-0 items-center justify-center rounded-full border border-border bg-background text-foreground outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
         >
           <Camera className="size-5" aria-hidden />
         </button>
         <label htmlFor="klara-input" className="sr-only">
-          Nachricht an Klara
+          {$t("Nachricht an Klara")}
         </label>
         <input
           ref={inputRef}
@@ -344,7 +345,7 @@ export function ChannelView({ teamId }: { teamId: string }) {
             setDraft(e.target.value);
             if (!e.target.value) setComposer(NO_COMPOSER);
           }}
-          placeholder={composer.placeholder ?? "Nachricht an Klara"}
+          placeholder={composer.placeholder ?? $t("Nachricht an Klara")}
           autoComplete="off"
           enterKeyHint="send"
           inputMode={composer.numeric ? "decimal" : "text"}
@@ -354,7 +355,7 @@ export function ChannelView({ teamId }: { teamId: string }) {
           <button
             type="submit"
             disabled={busy}
-            aria-label="Senden"
+            aria-label={$t("Senden")}
             className="flex size-16 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50"
           >
             <ArrowUp className="size-7" aria-hidden />
@@ -362,7 +363,7 @@ export function ChannelView({ teamId }: { teamId: string }) {
         ) : (
           <Link
             href={`/app/call/new?team=${teamId}`}
-            aria-label="Klara anrufen"
+            aria-label={$t("Klara anrufen")}
             className="flex size-16 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground outline-none hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Mic className="size-7" aria-hidden />
@@ -379,8 +380,8 @@ const CARD_LINES_DE = cardLines("de");
 /** What went wrong, in words the Polier can act on. */
 function sendError(e: unknown): string {
   if (e instanceof ApiError && e.status < 500) return e.message;
-  if (e instanceof ApiError) return "Klara ist gerade nicht erreichbar. Ihre Nachricht bleibt hier.";
-  return "Keine Verbindung. Ihre Nachricht bleibt hier.";
+  if (e instanceof ApiError) return $t("Klara ist gerade nicht erreichbar. Ihre Nachricht bleibt hier.");
+  return $t("Keine Verbindung. Ihre Nachricht bleibt hier.");
 }
 
 /** Klara's newest line from this visit, for the screen reader (history is not re-announced). */
@@ -420,7 +421,7 @@ function showTimeAfter(it: Item, next: Item | undefined): boolean {
 
 function DaySeparator({ day, today }: { day: string; today: string }) {
   const yesterday = new Date(Date.parse(`${today}T12:00:00Z`) - 86400000).toISOString().slice(0, 10);
-  const word = day === today ? "Heute" : day === yesterday ? "Gestern" : null;
+  const word = day === today ? $t("Heute") : day === yesterday ? $t("Gestern") : null;
   return (
     <p className="mt-2 mb-3 text-center text-xs text-muted-foreground">
       <time dateTime={day}>
@@ -442,7 +443,7 @@ function FeedItem({ it, showTime }: { it: Item; showTime: boolean }) {
       >
         <Phone className="size-4 text-muted-foreground" aria-hidden />
         <span>
-          Anruf mit Klara,{" "}
+          {$t("Anruf mit Klara,")}{" "}
           <time dateTime={it.call.started_at} className="font-mono">
             {fmtTime(it.call.started_at)}
           </time>
@@ -494,7 +495,7 @@ function PhotoBubble({ src, href, label, at, uploading = false }: { src: string;
       </div>
       {uploading ? (
         <p className="mt-1 text-xs text-muted-foreground" aria-live="polite">
-          Foto wird gesendet …
+          {$t("Foto wird gesendet …")}
         </p>
       ) : at ? (
         <time dateTime={at} className="mt-1 font-mono text-[11px] text-muted-foreground">
@@ -511,7 +512,7 @@ function KlaraBubble({ text, subtitle, at, lang }: { text: string; subtitle: str
       <KlaraAvatar size={28} className="mt-0.5" />
       <div className="min-w-0 max-w-[85%]">
         <div lang={lang ?? undefined} className="rounded-2xl rounded-tl-md border border-border bg-background px-3.5 py-2.5 text-[15px] leading-snug text-foreground">
-          <span className="sr-only">Klara: </span>
+          <span className="sr-only">{$t("Klara:")} </span>
           {text}
         </div>
         {subtitle ? <Subtitle text={subtitle} /> : null}
@@ -550,7 +551,7 @@ function Subtitle({ text, align = "left" }: { text: string; align?: "left" | "ri
         onClick={() => setOpen((o) => !o)}
         className="-mx-2 h-12 rounded-lg px-2 text-sm font-medium text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {open ? "Deutsch ausblenden" : "Deutsch anzeigen"}
+        {open ? $t("Deutsch ausblenden") : $t("Deutsch anzeigen")}
       </button>
     </div>
   );
@@ -574,7 +575,7 @@ function KlaraCard({
       <KlaraAvatar size={28} className="mt-0.5" />
       <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-border bg-background p-3.5">
         <p lang={lang} className="text-[15px] leading-snug text-foreground">
-          <span className="sr-only">Klara: </span>
+          <span className="sr-only">{$t("Klara:")} </span>
           {text}
         </p>
         {subtitle ? (
@@ -609,9 +610,9 @@ function ConfirmCard({
   return (
     <div className="flex items-start gap-2">
       <KlaraAvatar size={28} className="mt-0.5" />
-      <section aria-label="Zusammenfassung prüfen" className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-border bg-background p-3.5">
+      <section aria-label={$t("Zusammenfassung prüfen")} className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-border bg-background p-3.5">
         <p lang={view.language} className="text-[15px] leading-snug text-foreground">
-          <span className="sr-only">Klara: </span>
+          <span className="sr-only">{$t("Klara:")} </span>
           {view.intro === "correct" ? turn.text_original : t.readbackIntro}
         </p>
         {view.intro === "correct" && !de && turn.text_de && turn.text_de !== turn.text_original ? <Subtitle text={turn.text_de} /> : null}
@@ -675,9 +676,9 @@ function EmptyState({ compact }: { compact: boolean }) {
   return (
     <div className={cn("flex flex-col items-center px-6 text-center", compact ? "py-6" : "py-12")}>
       <KlaraAvatar size={compact ? 56 : 72} />
-      <p className="mt-4 text-base font-medium text-foreground">Was ist auf der Baustelle passiert?</p>
+      <p className="mt-4 text-base font-medium text-foreground">{$t("Was ist auf der Baustelle passiert?")}</p>
       <p className="mt-1 max-w-[32ch] text-sm text-muted-foreground">
-        Tippen Sie auf das Mikrofon und sprechen Sie mit Klara, oder schreiben Sie in Ihrer Sprache.
+        {$t("Tippen Sie auf das Mikrofon und sprechen Sie mit Klara, oder schreiben Sie in Ihrer Sprache.")}
       </p>
     </div>
   );
@@ -686,10 +687,10 @@ function EmptyState({ compact }: { compact: boolean }) {
 function LoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center px-6 py-12 text-center">
-      <p className="text-base font-medium text-foreground">Der Teamkanal konnte nicht geladen werden.</p>
+      <p className="text-base font-medium text-foreground">{$t("Der Teamkanal konnte nicht geladen werden.")}</p>
       <p className="mt-1 text-sm text-muted-foreground">{message}</p>
       <button type="button" onClick={onRetry} className={cn(BTN_OUTLINE, "mt-4")}>
-        Erneut laden
+        {$t("Erneut laden")}
       </button>
     </div>
   );

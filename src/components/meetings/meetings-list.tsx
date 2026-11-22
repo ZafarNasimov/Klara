@@ -14,6 +14,8 @@ import { defaultTitle, fmtClock, MEETING_TYPE_DE, MEETING_TYPES, outcomeChips, t
 import { useProjectId } from "@/lib/project-choice";
 import { ApiError, postJson, useApi } from "@/lib/use-api";
 import { cn } from "@/lib/utils";
+import { $t, $tx } from "@/lib/i18n";
+import { localized } from "@/lib/labels";
 
 type ProjectResponse = ProjectContext & { now: string };
 
@@ -29,9 +31,10 @@ export function MeetingsList() {
     <main className="mx-auto w-full max-w-4xl px-6 py-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Besprechungen</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">{$t("Besprechungen")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {ctx ? `${ctx.project.name} · ` : ""}Klara hört mit, schreibt das Protokoll und füllt nur die Vorlagen, für die es einen Beleg im Gespräch gibt.
+            {ctx ? `${ctx.project.name} · ` : ""}
+            {$t("Klara hört mit, schreibt das Protokoll und füllt nur die Vorlagen, für die es einen Beleg im Gespräch gibt.")}
           </p>
         </div>
         <Button size="lg" onClick={() => setStarting(true)} disabled={!ctx}>
@@ -39,7 +42,7 @@ export function MeetingsList() {
         </Button>
       </header>
 
-      <section aria-label="Besprechungen" className="mt-6">
+      <section aria-label={$t("Besprechungen")} className="mt-6">
         {error ? (
           <p className="rounded-xl border border-border bg-background px-5 py-4 text-sm text-foreground">Besprechungen konnten nicht geladen werden: {error}</p>
         ) : !meetings ? (
@@ -49,8 +52,8 @@ export function MeetingsList() {
           </div>
         ) : meetings.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border bg-background px-5 py-8 text-center">
-            <p className="text-sm font-medium text-foreground">Noch keine Besprechung aufgenommen.</p>
-            <p className="mt-1 text-sm text-muted-foreground">Starten Sie die nächste Baubesprechung hier; Klara erstellt danach Protokoll, Aufgaben und Entwürfe.</p>
+            <p className="text-sm font-medium text-foreground">{$t("Noch keine Besprechung aufgenommen.")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{$t("Starten Sie die nächste Baubesprechung hier; Klara erstellt danach Protokoll, Aufgaben und Entwürfe.")}</p>
           </div>
         ) : (
           <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-background">
@@ -70,10 +73,10 @@ export function MeetingsList() {
                       {m.status !== "ready" ? <span className="ml-1 text-foreground"> · {STATUS_DE[m.status]}</span> : null}
                     </p>
                     {m.status === "ready" ? (
-                      <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Ergebnis">
+                      <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={$t("Ergebnis")}>
                         {outcomeChips(m).map((c) => (
                           <li key={c} className="rounded-md border border-border bg-surface px-2 py-0.5 text-xs text-foreground">
-                            {c}
+                            {$tx(c)}
                           </li>
                         ))}
                       </ul>
@@ -92,7 +95,7 @@ export function MeetingsList() {
   );
 }
 
-const STATUS_DE = { recording: "Aufnahme läuft", processing: "wird ausgewertet", ready: "fertig", failed: "Auswertung fehlgeschlagen" } as const;
+const STATUS_DE = localized({ recording: "Aufnahme läuft", processing: "wird ausgewertet", ready: "fertig", failed: "Auswertung fehlgeschlagen" });
 
 function candidates(ctx: ProjectResponse): (Participant & { key: string })[] {
   const own = ctx.users
@@ -137,7 +140,7 @@ function StartMeetingDialog({ open, onOpenChange, ctx }: { open: boolean; onOpen
       });
       router.push(`/admin/meetings/${m.id}?start=1`);
     } catch (e) {
-      setError(e instanceof ApiError || e instanceof Error ? e.message : "Die Besprechung konnte nicht gestartet werden.");
+      setError(e instanceof ApiError || e instanceof Error ? $tx(e.message) : $t("Die Besprechung konnte nicht gestartet werden."));
       setBusy(false);
     }
   }
@@ -146,13 +149,13 @@ function StartMeetingDialog({ open, onOpenChange, ctx }: { open: boolean; onOpen
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Meeting starten</DialogTitle>
-          <DialogDescription>Klara nimmt die Besprechung auf und wertet sie danach aus.</DialogDescription>
+          <DialogTitle>{$t("Meeting starten")}</DialogTitle>
+          <DialogDescription>{$t("Klara nimmt die Besprechung auf und wertet sie danach aus.")}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5">
           <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-foreground">Titel</span>
+            <span className="text-sm font-medium text-foreground">{$t("Titel")}</span>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
 
@@ -179,7 +182,7 @@ function StartMeetingDialog({ open, onOpenChange, ctx }: { open: boolean; onOpen
 
           {type === "intern" ? (
             <fieldset className="space-y-1.5">
-              <legend className="text-sm font-medium text-foreground">Team (optional)</legend>
+              <legend className="text-sm font-medium text-foreground">{$t("Team (optional)")}</legend>
               <div className="flex flex-wrap gap-1.5">
                 {[{ id: null, name: "Kein Team" }, ...ctx.teams].map((t) => (
                   <button
@@ -201,7 +204,7 @@ function StartMeetingDialog({ open, onOpenChange, ctx }: { open: boolean; onOpen
           ) : null}
 
           <fieldset className="space-y-1.5">
-            <legend className="text-sm font-medium text-foreground">Teilnehmer</legend>
+            <legend className="text-sm font-medium text-foreground">{$t("Teilnehmer")}</legend>
             <ul className="max-h-48 space-y-0.5 overflow-y-auto rounded-lg border border-border p-1.5">
               {people.map((p) => (
                 <li key={p.key}>
@@ -217,7 +220,7 @@ function StartMeetingDialog({ open, onOpenChange, ctx }: { open: boolean; onOpen
 
           <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border bg-surface px-3 py-2.5 text-sm">
             <input type="checkbox" className="mt-0.5 size-4 accent-primary" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
-            <span className="text-foreground">Alle Teilnehmer sind mit der Aufnahme einverstanden.</span>
+            <span className="text-foreground">{$t("Alle Teilnehmer sind mit der Aufnahme einverstanden.")}</span>
           </label>
 
           {error ? <p className="text-sm text-light-red-text" role="alert">{error}</p> : null}
@@ -225,9 +228,9 @@ function StartMeetingDialog({ open, onOpenChange, ctx }: { open: boolean; onOpen
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Abbrechen
+            {$t("Abbrechen")}
           </Button>
-          <Button onClick={start} disabled={!consent || !title.trim() || busy} title={!consent ? "Ohne Einverständnis aller Teilnehmer keine Aufnahme" : undefined}>
+          <Button onClick={start} disabled={!consent || !title.trim() || busy} title={!consent ? $t("Ohne Einverständnis aller Teilnehmer keine Aufnahme") : undefined}>
             <Mic aria-hidden /> Aufnahme starten
           </Button>
         </DialogFooter>

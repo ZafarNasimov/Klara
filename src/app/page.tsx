@@ -1,5 +1,6 @@
 import { KlaraAvatar } from "@/components/klara/klara-avatar";
 import { EntryLinks } from "./entry-links";
+import { LangSwitch, T } from "@/lib/i18n-provider";
 
 export default function Splash() {
   return (
@@ -8,10 +9,13 @@ export default function Splash() {
         <KlaraAvatar size={104} title="Klara" />
         <h1 className="mt-6 text-4xl font-semibold tracking-tight text-foreground">Klara</h1>
         <p className="mt-3 text-lg leading-relaxed text-muted-foreground">
-          Meldungen von der Baustelle in jeder Sprache. Deutsche Schreiben nach VOB/B, geprüft und versandbereit.
+          <T>Meldungen von der Baustelle in jeder Sprache. Deutsche Schreiben nach VOB/B, geprüft und versandbereit.</T>
         </p>
         <EntryLinks />
-        <p className="mt-10 text-xs text-muted-foreground">Prototyp mit fiktiven Daten der Muster Bau GmbH.</p>
+        <LangSwitch size="lg" className="mt-8" />
+        <p className="mt-6 text-xs text-muted-foreground">
+          <T>Prototyp mit fiktiven Daten der Muster Bau GmbH.</T>
+        </p>
       </div>
     </main>
   );

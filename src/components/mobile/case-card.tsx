@@ -7,10 +7,12 @@ import { ChevronRight, FileText } from "lucide-react";
 import { DeadlineBadge } from "@/components/klara/deadline-badge";
 import { LightSummary } from "@/components/klara/traffic-light";
 import { docTitle, getDocType } from "@/lib/doctypes";
+import { $t } from "@/lib/i18n";
+import { localized } from "@/lib/labels";
 import type { CaseStatus, CaseView } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const NEXT_STEP_DE: Record<CaseStatus, string> = {
+const NEXT_STEP_DE: Record<CaseStatus, string> = localized({
   entwurf: "Entwurf, noch nicht bestätigt.",
   unvollstaendig: "Liegt bei der Bauleitung, fehlende Angaben werden ergänzt.",
   bereit: "Liegt der Bauleitung zur Prüfung vor. Für Sie nichts zu tun.",
@@ -18,15 +20,15 @@ const NEXT_STEP_DE: Record<CaseStatus, string> = {
   versendet: "An den Auftraggeber versendet.",
   beantwortet: "Antwort des Auftraggebers ist eingegangen.",
   abgeschlossen: "Abgeschlossen.",
-};
+});
 
 /** What happens next, for the Polier. Office requests come first. */
 export function nextStepDe(c: Pick<CaseView, "status" | "flags" | "doc_type">): string {
-  if (c.flags.includes("returned")) return "Die Bauleitung braucht noch eine Angabe von Ihnen. Klara fragt im Chat.";
-  if (c.flags.includes("correcting")) return "Klara wartet im Chat auf Ihre Korrektur.";
-  if (c.flags.includes("collecting")) return "Klara braucht im Chat noch eine Angabe von Ihnen.";
+  if (c.flags.includes("returned")) return $t("Die Bauleitung braucht noch eine Angabe von Ihnen. Klara fragt im Chat.");
+  if (c.flags.includes("correcting")) return $t("Klara wartet im Chat auf Ihre Korrektur.");
+  if (c.flags.includes("collecting")) return $t("Klara braucht im Chat noch eine Angabe von Ihnen.");
   // Internal reports (Bautagesbericht, Meldung) are never sent.
-  if (c.status === "validiert" && getDocType(c.doc_type)?.recipient === "internal") return "Von der Bauleitung geprüft.";
+  if (c.status === "validiert" && getDocType(c.doc_type)?.recipient === "internal") return $t("Von der Bauleitung geprüft.");
   return NEXT_STEP_DE[c.status];
 }
 
