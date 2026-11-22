@@ -613,7 +613,7 @@ function Failure({ message, caseId }: { message: string; caseId: string | null }
           </Link>
         ) : null}
         <Link href="/admin/vorgaenge" className={buttonVariants({ variant: "ghost" })}>
-          {$t("Zur Übersicht")}
+          {$t("Zu den Vorgängen")}
         </Link>
       </div>
     </main>

@@ -736,6 +736,7 @@ const SCREENS: Record<string, string> = {
   "bereits vorhanden": "already exists",
   "Demo beenden": "End demo",
   Einstellungen: "Settings",
+  "Zu den Vorgängen": "To the cases",
   aktualisiert: "updated",
   festgehalten: "recorded",
   " Uhr": "",

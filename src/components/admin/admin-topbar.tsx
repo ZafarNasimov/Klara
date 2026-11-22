@@ -12,9 +12,10 @@ import { cn } from "@/lib/utils";
 import { $t } from "@/lib/i18n";
 import { LangSwitch } from "@/lib/i18n-provider";
 
-const NAV = [
-  { href: "/admin", label: "Übersicht", exact: true },
-  { href: "/admin/vorgaenge", label: "Vorgänge" },
+/** `also`: other routes that belong to the tab (a case or its e-mail is part of "Vorgänge", a site's dashboard of "Übersicht"). */
+const NAV: { href: string; label: string; exact?: boolean; also?: string[] }[] = [
+  { href: "/admin", label: "Übersicht", exact: true, also: ["/admin/project/"] },
+  { href: "/admin/vorgaenge", label: "Vorgänge", also: ["/admin/case/", "/admin/mail/"] },
   { href: "/admin/meetings", label: "Besprechungen" },
   { href: "/admin/demo", label: "Einstellungen" },
 ];
@@ -73,8 +74,7 @@ function Nav({ path }: { path: string | null }) {
     <nav aria-label="Bereiche" className="flex items-center gap-1">
       {NAV.map((n) => {
         const active =
-          path !== null &&
-          (n.exact ? path === n.href || path.startsWith("/admin/case") || path.startsWith("/admin/mail") : path.startsWith(n.href));
+          path !== null && ((n.exact ? path === n.href : path.startsWith(n.href)) || !!n.also?.some((p) => path.startsWith(p)));
         return (
           <Link
             key={n.href}
