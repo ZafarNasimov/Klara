@@ -1,5 +1,5 @@
 "use client";
-// "Finish demo" on Besprechungen: a dark circle grows from the button to full
+// "Finish demo" in the office top bar (centred): a dark circle grows from the button to full
 // screen, then the closing slide replaces the page in the same tab, dark on
 // dark (no white frame between). In demo mode (/demo) it leads to the demo's
 // close; otherwise (TEMPORARY, until the live demo always starts from /demo)
@@ -32,12 +32,16 @@ function FinishDemoButton({ target, label }: { target: string; label: string }) 
   const ref = useRef<HTMLButtonElement>(null);
   const [origin, setOrigin] = useState<Origin | null>(null);
 
-  // The close must be instant: its route, the robot scene and its image fallback.
+  // The close must be instant: its route at once; the robot scene and its image
+  // fallback (~3 MB) a moment later, so they never slow down the page's own data.
   useEffect(() => {
     router.prefetch(target);
-    preloadKlaraRobot();
-    const img = new Image();
-    img.src = KLARA_ROBOT_PNG;
+    const t = window.setTimeout(() => {
+      preloadKlaraRobot();
+      const img = new Image();
+      img.src = KLARA_ROBOT_PNG;
+    }, 3000);
+    return () => window.clearTimeout(t);
   }, [router, target]);
 
   const finish = () => {
@@ -60,17 +64,15 @@ function FinishDemoButton({ target, label }: { target: string; label: string }) 
 
   return (
     <>
-      {/* Room under the list, so the button never covers its last row. */}
-      <div aria-hidden className="h-24 shrink-0" />
       <button
         ref={ref}
         type="button"
         onClick={finish}
-        className="fixed right-8 bottom-8 z-40 inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-full bg-zinc-950 pr-5 pl-3 text-base font-medium text-white shadow-lg shadow-zinc-950/15 outline-none transition-[transform,box-shadow,background-color] duration-200 ease-out hover:-translate-y-0.5 hover:bg-zinc-800 hover:shadow-xl hover:shadow-zinc-950/20 focus-visible:ring-3 focus-visible:ring-ring/50 active:translate-y-0"
+        className="inline-flex h-9 shrink-0 cursor-pointer items-center gap-2 rounded-full bg-zinc-950 pr-4 pl-1.5 text-sm font-medium whitespace-nowrap text-white outline-none transition-[background-color,transform] duration-150 ease-out hover:bg-zinc-800 focus-visible:ring-3 focus-visible:ring-ring/50 active:scale-[0.97]"
       >
-        <KlaraAvatar size={26} />
+        <KlaraAvatar size={24} />
         {label}
-        <ArrowRight className="size-4" aria-hidden />
+        <ArrowRight className="size-3.5" aria-hidden />
       </button>
       {origin
         ? createPortal(

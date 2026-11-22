@@ -579,16 +579,16 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
       />
 
       {/* Stage: Klara and what she is doing */}
-      <section aria-label="Klara" className="flex shrink-0 flex-col items-center border-b border-border px-4 pt-5 pb-4">
-        <div className="relative flex size-[120px] items-center justify-center">
+      <section aria-label="Klara" className="flex shrink-0 flex-col items-center border-b border-border px-4 pt-2.5 pb-2">
+        <div className="relative flex size-[76px] items-center justify-center">
           {listeningNow ? (
             <span aria-hidden className="absolute inset-0 animate-[klara-ring_1.6s_var(--ease-out)_infinite] rounded-full border-2 border-primary/40" />
           ) : null}
-          <span aria-hidden className={cn("absolute inset-2 rounded-full border-2 transition-colors duration-200", phase === "recording" ? "border-primary" : "border-transparent")} />
-          <KlaraAvatar size={88} mood={mood} talking={phase === "speaking"} />
+          <span aria-hidden className={cn("absolute inset-1 rounded-full border-2 transition-colors duration-200", phase === "recording" ? "border-primary" : "border-transparent")} />
+          <KlaraAvatar size={58} mood={mood} talking={phase === "speaking"} />
         </div>
-        <div className="mt-2 flex h-9 items-center" aria-hidden={phase !== "recording"}>
-          <div ref={barsRef} className={cn("flex h-8 items-center gap-[3px]", phase === "recording" ? "opacity-100" : "hidden")}>
+        <div className="flex h-7 items-center" aria-hidden={phase !== "recording"}>
+          <div ref={barsRef} className={cn("flex h-6 items-center gap-[3px]", phase === "recording" ? "opacity-100" : "hidden")}>
             {Array.from({ length: BARS }, (_, i) => (
               <span key={i} className="h-full w-[3px] origin-center scale-y-[0.08] rounded-full bg-primary" />
             ))}
@@ -606,7 +606,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
         </div>
         {/* Fixed height, so the transcript does not jump each time the user starts speaking. */}
         <p className="min-h-5 text-center text-sm text-pretty text-muted-foreground">{hint}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{$t("Dieses Gespräch wird aufgezeichnet.")}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{$t("Dieses Gespräch wird aufgezeichnet.")}</p>
       </section>
 
       {/* Transcript */}
