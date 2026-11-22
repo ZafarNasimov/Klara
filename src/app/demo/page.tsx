@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
-import { DemoApp } from "@/components/pitch/DemoApp";
+import { Suspense } from "react";
+import { DemoApp, DemoPlaceholder } from "@/components/pitch/DemoApp";
 
 export const metadata: Metadata = { title: "Live demo" };
 
 /** Live demo: title → "Start live demo" → the app → "Finish demo" → close, in one tab. */
 export default function DemoPage() {
-  return <DemoApp />;
+  return (
+    <Suspense fallback={<DemoPlaceholder />}>
+      <DemoApp />
+    </Suspense>
+  );
 }

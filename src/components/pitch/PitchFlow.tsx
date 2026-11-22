@@ -45,8 +45,8 @@ function sceneIndex(scenes: PitchSceneDef[], key: string | null): number {
 }
 
 /** Rehearsal switches: ?scene=6b, ?transition=fade, ?reveal=auto, ?pace=auto, ?debug=1 (and ?step=… with `stepInUrl`). */
-function readOptions(scenes: PitchSceneDef[], stepInUrl: boolean): Options {
-  const params = new URLSearchParams(window.location.search);
+function readOptions(scenes: PitchSceneDef[], stepInUrl: boolean, search: string): Options {
+  const params = new URLSearchParams(search);
   const start = Math.max(0, sceneIndex(scenes, params.get("scene")));
   const step = Number(params.get("step"));
   return {
@@ -84,6 +84,12 @@ export type PitchFlowProps = {
   idleCursor?: boolean;
   /** Called with the scene id whenever a scene becomes current. */
   onSceneEnter?: (id: string) => void;
+  /**
+   * The URL's query on first render (default: window.location.search). Pass it
+   * from useSearchParams when the page is reached by a client-side navigation:
+   * the window URL updates only after the new page has rendered.
+   */
+  initialSearch?: string;
 };
 
 const IDLE_CURSOR_MS = 2000;
@@ -96,8 +102,9 @@ export function PitchFlow({
   fullscreenKey = false,
   idleCursor = false,
   onSceneEnter,
+  initialSearch,
 }: PitchFlowProps) {
-  const [options] = useState(() => readOptions(scenes, stepInUrl));
+  const [options] = useState(() => readOptions(scenes, stepInUrl, initialSearch ?? window.location.search));
   const reducedMotion = useReducedMotion();
   const [index, setIndex] = useState(options.start);
   const [steps, setSteps] = useState<number[]>(() => scenes.map((_, i) => (i === options.start ? options.startStep : 0)));
