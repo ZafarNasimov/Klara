@@ -7,15 +7,15 @@ import { StaticSpotlight } from "../StaticSpotlight";
 import { DARK_BG, EASE_OUT, u } from "../stage";
 import { ExitBlur, FadeUp, RevealWords, scheduleGlances, SILVER_TEXT, Stage, type SceneProps } from "./scene-parts";
 
-/** Pain points as stat rows (spec update 2026-11-21), revealed one per click. */
+/** Pain points as stat rows (spec update 2026-11-22), revealed one per click. */
 export const TITLE_STATS = [
-  { big: "7%", line: "Average margin. Every €10,000 claim you lose takes €143,000 of revenue to earn back." },
-  { big: "§ 6", line: "No written notice, no extra time. Miss one Behinderungsanzeige — the delay becomes your risk." },
-  { big: "80%", line: "of site managers already work beyond their contract. Documentation is the first thing that slips." },
+  { big: "€143k", line: "of revenue to earn back one lost €10,000 claim — at a 7 % average margin." },
+  { big: "0 days", line: "of extra time, as a rule, without a written Behinderungsanzeige (§ 6 Abs. 1 VOB/B)." },
+  { big: "80 %", line: "of site managers already work beyond their contract. Documentation is the first thing that slips." },
 ] as const;
 
 const SOURCES =
-  "Sources: HDB Brancheninfo Bau 03/2026 (margin 2024) · § 6 Abs. 1 VOB/B · Helmus et al., BBB 2023 (site manager survey)";
+  "Sources: HDB Brancheninfo Bau 03/2026 (Bauhauptgewerbe margin 2024: 7.0 %) · § 6 Abs. 1 VOB/B · Helmus et al., BBB 2023 (site manager survey)";
 
 /**
  * Robot box in design px, centred on the right column (45%). Wider than the
@@ -29,7 +29,7 @@ const SPOT = { x: 77, y: 30 };
 /**
  * Scene 1 – title. Dark, text left (~55%), Klara right (~45%).
  * Click mode: the three stat rows appear one per click (steps 1–3).
- * Auto mode: they follow the subline with a 120 ms stagger.
+ * Auto mode: they follow the subline 1.2 s apart.
  */
 export function TitleScene({ phase, step, revealMode, headRef, robotPaused }: SceneProps) {
   const show = phase !== "standby";
@@ -89,29 +89,27 @@ export function TitleScene({ phase, step, revealMode, headRef, robotPaused }: Sc
             <RevealWords text="Ask Klara" show={show} delay={0.08} stagger={0.04} wordClassName={SILVER_TEXT} />
           </h1>
 
-          <FadeUp
-            as="p"
-            show={show}
-            delay={0.32}
-            className="leading-[1.35] text-neutral-300"
-            style={{ fontSize: u(28), marginTop: u(36) }}
-          >
-            AI reporting for the whole construction site.
+          <FadeUp as="p" show={show} delay={0.32} className="leading-[1.3] text-neutral-200" style={{ fontSize: u(32), marginTop: u(32) }}>
+            The operating system for construction companies.
+          </FadeUp>
+          <FadeUp as="p" show={show} delay={0.4} className="leading-[1.4] text-neutral-500" style={{ fontSize: u(20), marginTop: u(10) }}>
+            Calls · Meetings · Emails → reports, notices, dashboards
           </FadeUp>
 
-          <ul className="flex flex-col" style={{ marginTop: u(60) }}>
+          <ul className="flex flex-col" style={{ marginTop: u(48) }}>
             {TITLE_STATS.map((stat, i) => (
               <FadeUp
                 key={stat.big}
                 as="li"
                 gaze={`point-${i}`}
                 show={show && (auto || step > i)}
-                delay={auto ? 0.6 + i * 0.12 : 0}
+                delay={auto ? 0.6 + i * 1.2 : 0}
                 duration={0.5}
-                className="grid items-baseline border-t border-neutral-800"
-                style={{ gridTemplateColumns: `${u(170)} 1fr`, columnGap: u(24), paddingBlock: u(20) }}
+                className="grid items-center border-t border-neutral-800"
+                style={{ gridTemplateColumns: `${u(236)} 1fr`, columnGap: u(24), paddingBlock: u(18) }}
               >
-                <span className="font-mono font-medium tracking-[-0.03em] [word-spacing:-0.3em] text-neutral-50" style={{ fontSize: u(56), lineHeight: 1 }}>
+                {/* Same size and weight for all three; the column fits "€143k" and "0 days" on one line. */}
+                <span className="font-mono font-medium tracking-[-0.03em] whitespace-nowrap [word-spacing:-0.2em] text-neutral-50" style={{ fontSize: u(56), lineHeight: 1 }}>
                   {stat.big}
                 </span>
                 <span className="text-pretty text-neutral-300" style={{ fontSize: u(22), lineHeight: 1.4 }}>
@@ -122,8 +120,8 @@ export function TitleScene({ phase, step, revealMode, headRef, robotPaused }: Sc
           </ul>
 
           <motion.p
-            className="absolute whitespace-nowrap text-zinc-600"
-            style={{ left: 0, bottom: u(34), fontSize: u(12) }}
+            className="absolute text-pretty text-zinc-600"
+            style={{ left: 0, right: 0, bottom: u(28), fontSize: u(12), lineHeight: 1.5 }}
             initial={{ opacity: 0 }}
             animate={{ opacity: show ? 1 : 0 }}
             transition={{ duration: 0.6, ease: EASE_OUT, delay: show ? 0.8 : 0 }}
