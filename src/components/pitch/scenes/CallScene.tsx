@@ -330,13 +330,13 @@ function TimingOverlay({ log }: { log: TurnLog[] }) {
 }
 
 /** Source languages shown in the badge (the call works in more). */
-const SOURCE_LANGS = ["EN", "PL", "RO", "TR", "HR", "RU"] as const;
-/** The one-pass scan while the call waits: PL → RO → TR → HR → RU → EN, 600 ms each. */
-const SCAN = ["PL", "RO", "TR", "HR", "RU", "EN"] as const;
-const SOURCES_TIP = "English · Polski · Română · Türkçe · Hrvatski/Bosanski/Srpski · Русский — und weitere Sprachen";
+const SOURCE_LANGS = ["EN", "PL", "RO", "TR", "HR"] as const;
+/** The one-pass scan while the call waits: PL → RO → TR → HR → EN, 600 ms each. */
+const SCAN = ["PL", "RO", "TR", "HR", "EN"] as const;
+const SOURCES_TIP = "English · Polski · Română · Türkçe · Hrvatski/Bosanski/Srpski — und weitere Sprachen";
 
 /**
- * "EN · PL · RO · TR · HR · RU → DE". While the call waits, the source chips
+ * "EN · PL · RO · TR · HR → DE". While the call waits, the source chips
  * light up one by one (one pass); with the first foreman message the
  * highlight locks on the detected language and "Sprache erkannt: EN" shows.
  * A later message in another language moves the highlight there.
