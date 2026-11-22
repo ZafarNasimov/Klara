@@ -31,7 +31,7 @@ describe("i18n", () => {
     expect($tx("Meldung unsicher erkannt (45 %) – bitte prüfen")).toBe("Report recognised with low confidence (45 %) – please check");
     expect($tx("Zugang belegt: Antwort des Bauherrn vom 21.11.2026")).toBe("Receipt proven: reply from the client of 21.11.2026");
     expect($tx("Fassade auf Baustelle B 6 Tage im Verzug")).toBe("Facade on site B 6 days late");
-    expect($tx("Elektro · Riem · Behinderung offen")).toBe("Electrical · Riem · hindrance open");
+    expect($tx("Elektro · Riem · Behinderung offen")).toBe("Electrical · Riem · Hindrance open");
     expect($tx("Bericht fehlt · Estrich · Schwabing")).toBe("Report missing · Screed · Schwabing");
     expect($tx("1 Behinderung")).toBe("1 hindrance");
     expect($tx("Antwort des Bauherrn: Zurückweisung – „Die Elektroarbeiten liegen im Zeitplan.“")).toBe(

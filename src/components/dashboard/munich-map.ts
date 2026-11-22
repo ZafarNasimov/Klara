@@ -34,3 +34,82 @@ export const ISAR = "M340.6,474.6 L359.8,419.5 L372.6,371.5 L387.0,335.6 L399.8,
 export function project(lat: number, lng: number): [number, number] {
   return [(lng - 11.34) * 0.667183 * 2397.0, (48.26 - lat) * 2397.0];
 }
+
+// ── Names, smoothing, hit test (for the interactive map card) ─────────────
+
+/** The 25 Stadtbezirke, in the order of DISTRICTS (official numbering 1–25). */
+export const DISTRICT_NAMES = [
+  "Altstadt-Lehel", "Ludwigsvorstadt-Isarvorstadt", "Maxvorstadt", "Schwabing-West", "Au-Haidhausen", "Sendling",
+  "Sendling-Westpark", "Schwanthalerhöhe", "Neuhausen-Nymphenburg", "Moosach", "Milbertshofen-Am Hart", "Schwabing-Freimann",
+  "Bogenhausen", "Berg am Laim", "Trudering-Riem", "Ramersdorf-Perlach", "Obergiesing-Fasangarten", "Untergiesing-Harlaching",
+  "Thalkirchen-Obersendling-Forstenried-Fürstenried-Solln", "Hadern", "Pasing-Obermenzing", "Aubing-Lochhausen-Langwied",
+  "Allach-Untermenzing", "Feldmoching-Hasenbergl", "Laim",
+];
+
+type Pt = [number, number];
+const pointsOf = (d: string): Pt[] => [...d.matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+const DISTRICT_POINTS = DISTRICTS.map(pointsOf);
+
+/** Area centroid of each district (label position). */
+export const DISTRICT_CENTROIDS: Pt[] = DISTRICT_POINTS.map((p) => {
+  let a = 0, cx = 0, cy = 0;
+  p.forEach(([x0, y0], i) => {
+    const [x1, y1] = p[(i + 1) % p.length];
+    const c = x0 * y1 - x1 * y0;
+    a += c;
+    cx += (x0 + x1) * c;
+    cy += (y0 + y1) * c;
+  });
+  return [cx / (3 * a), cy / (3 * a)];
+});
+
+/** Index of the district containing map point (x, y), or -1. */
+export function districtAt(x: number, y: number): number {
+  return DISTRICT_POINTS.findIndex((p) => {
+    let inside = false;
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+      const [xi, yi] = p[i];
+      const [xj, yj] = p[j];
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  });
+}
+
+/** Catmull-Rom through the points, as cubic Béziers (a smooth line through the same points). */
+function smooth(p: Pt[], closed: boolean): string {
+  const at = (i: number) => (closed ? p[(i + p.length) % p.length] : p[Math.max(0, Math.min(p.length - 1, i))]);
+  const n = closed ? p.length : p.length - 1;
+  let d = `M${p[0][0].toFixed(1)},${p[0][1].toFixed(1)}`;
+  for (let i = 0; i < n; i++) {
+    const [p0, p1, p2, p3] = [at(i - 1), at(i), at(i + 1), at(i + 2)];
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C${c1[0].toFixed(1)},${c1[1].toFixed(1)} ${c2[0].toFixed(1)},${c2[1].toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return closed ? `${d} Z` : d;
+}
+
+/** The Isar as a smooth curve (south → north). */
+export const ISAR_SMOOTH = smooth(pointsOf(ISAR), false);
+/** Where the "Isar" label sits, and its angle (along the river, south of the centre). */
+export const ISAR_LABEL = (() => {
+  const p = pointsOf(ISAR);
+  const [[x0, y0], [x1, y1]] = [p[3], p[4]];
+  const len = Math.hypot(x1 - x0, y1 - y0);
+  return { x: (x0 + x1) / 2 + ((y0 - y1) / len) * 11, y: (y0 + y1) / 2 + ((x1 - x0) / len) * 11, angle: (Math.atan2(y1 - y0, x1 - x0) * 180) / Math.PI };
+})();
+
+/** Mittlerer Ring (approximate course, clockwise from Landshuter Allee). */
+const RING_LATLNG: Pt[] = [
+  [48.176, 11.535], [48.1795, 11.565], [48.178, 11.586], [48.165, 11.604], [48.155, 11.615], [48.135, 11.617],
+  [48.12, 11.611], [48.108, 11.578], [48.111, 11.548], [48.117, 11.525], [48.132, 11.519], [48.145, 11.532], [48.16, 11.534],
+];
+export const RING = smooth(RING_LATLNG.map(([la, ln]) => project(la, ln)), true);
+export const RING_LABEL = (() => {
+  const [x, y] = project(48.1795, 11.565);
+  return { x, y: y - 9 };
+})();
+
+/** The city's bounding box (plus a margin), in map units. */
+export const BOUNDS = { x: 20, y: 16, w: 600, h: 471 };

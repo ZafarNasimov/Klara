@@ -94,6 +94,31 @@ describe("dashboard of the reset demo (all numbers computed)", () => {
     expect(seven.kpis[0].spark).toHaveLength(7);
   });
 
+  it("site list: why (worst trade), contract, today's teams, last event; the call turns B red", () => {
+    const site = (v: View, code: string) => v.site_map.find((s) => s.code === code)!;
+    expect(site(before, "A")).toMatchObject({ status: "green", status_text: "Im Plan", contract: "VOB/B", open: 1, delay: 0, teams_today: 2, missing_today: 0, hindrance: false });
+    expect(site(before, "B")).toMatchObject({ status: "amber", status_text: "≤ 2 Tage Verzug", delay: 1, teams_today: 1, missing_today: 1, hindrance: false });
+    expect(site(before, "C")).toMatchObject({ status: "amber", status_text: "Keine Mengenmeldung", contract: "BGB", open: 2, missing_today: 2 });
+    expect(site(after, "B")).toMatchObject({ status: "red", status_text: "Behinderung offen", hindrance: true, open: site(before, "B").open + 1 });
+    expect(site(after, "B").delay).toBeGreaterThan(site(before, "B").delay);
+    // Missing reports split by site add up to the KPI; the last event is the newest feed line, never in the future.
+    expect(before.site_map.reduce((n, s) => n + s.missing_today, 0)).toBe(kpi(before, "missing").value);
+    expect(site(before, "A").last_event).toEqual({ at: "2026-11-20T06:45:00.000Z", text: "Tagesbericht Rohbau validiert", ref: "BTB-20261119-ROHBAU" });
+    for (const s of before.site_map) expect(s.last_event!.at <= before.now).toBe(true);
+    // Every "Handlungsbedarf" line names its site (linked hover with the map).
+    expect(after.actions.items[0].project_id).toBe(IDS.project);
+    expect(before.actions.items.map((a) => before.site_map.find((s) => s.id === a.project_id)?.code)).toEqual(["B", "B", "C", "C", "A", "C", "C"]);
+  });
+
+  it("filters: sites outside the site, team or trade filter are ghosts on the map", () => {
+    expect(before.site_map.every((s) => s.in_filter && !s.selected)).toBe(true);
+    expect(dashboardFromSeed(seed, now, { trade: "Elektro" }).site_map.map((s) => s.in_filter)).toEqual([false, true, true]);
+    const b = dashboardFromSeed(seed, now, { project: IDS.project });
+    expect(b.site_map.map((s) => `${s.code}:${s.in_filter}:${s.selected}`)).toEqual(["A:false:false", "B:true:true", "C:false:false"]);
+    const bElektro = dashboardFromSeed(seed, now, { project: IDS.project, trade: "Elektro" });
+    expect(bElektro.site_map.map((s) => s.in_filter)).toEqual([false, true, false]);
+  });
+
   it("a draft of a running call does not count yet", () => {
     const draft = dashboardFromSeed({ ...seed, case: [...seed.case!, { ...callCase, status: "entwurf" }] }, now);
     expect(kpi(draft, "open").value).toBe(kpi(before, "open").value);

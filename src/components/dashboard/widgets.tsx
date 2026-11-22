@@ -10,7 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import type { CellStatus, DashboardView, FeedSource, Kpi } from "@/lib/dashboard/compute";
 import { fmtDayDe } from "@/lib/deadlines";
 import { cn } from "@/lib/utils";
-import { DISTRICTS, ISAR, MAP_H, MAP_W, OUTLINE, project } from "./munich-map";
+import { hoverState, siteHoverHandlers, useSiteHover } from "./site-hover";
 import { $t, $tx } from "@/lib/i18n";
 import { localized } from "@/lib/labels";
 
@@ -57,7 +57,7 @@ const SHAPE: Record<Exclude<CellStatus, "none">, string> = {
   amber: "rotate-45 rounded-[1px] bg-light-yellow",
   red: "rounded-[1px] bg-light-red",
 };
-const Shape = ({ status, className }: { status: Exclude<CellStatus, "none">; className?: string }) => (
+export const Shape = ({ status, className }: { status: Exclude<CellStatus, "none">; className?: string }) => (
   <span aria-hidden className={cn("inline-block size-2 shrink-0", SHAPE[status], className)} />
 );
 
@@ -169,107 +169,27 @@ function Sparkline({ values }: { values: number[] }) {
   );
 }
 
-// ── Map ─────────────────────────────────────────────────────────────────
-
-const PIN: Record<Exclude<CellStatus, "none">, string> = { green: "bg-light-green", amber: "bg-light-yellow", red: "bg-light-red" };
-
-export function SiteMap({ v, onPick }: { v: DashboardView; onPick: ((id: string) => void) | null }) {
-  const anySelected = v.site_map.some((s) => s.selected);
-  return (
-    // The card body is the container; the map box is the largest W:H box that fits, centred.
-    <div className="relative h-full min-h-[160px] w-full [container-type:size]">
-      <div
-        className="absolute inset-0 m-auto"
-        style={{ width: `min(100cqw, calc(100cqh * ${MAP_W / MAP_H}))`, height: `min(100cqh, calc(100cqw * ${MAP_H / MAP_W}))` }}
-      >
-        <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 size-full" aria-hidden>
-          <path d={OUTLINE} fill="var(--color-zinc-50)" stroke="var(--color-zinc-300)" strokeWidth={1.5} />
-          {DISTRICTS.map((d, i) => (
-            <path key={i} d={d} fill="none" stroke="var(--color-zinc-200)" strokeWidth={1} />
-          ))}
-          <path d={ISAR} fill="none" stroke="var(--color-blue-200)" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        {v.site_map.map((s) => {
-          const [x, y] = project(s.lat, s.lng);
-          const status = s.status === "none" ? "green" : s.status;
-          const dim = anySelected && !s.selected;
-          const label = $t(s.open === 1 ? "Baustelle {code} · {name}: {n} offener Vorgang, {d} Verzugstage" : "Baustelle {code} · {name}: {n} offene Vorgänge, {d} Verzugstage", {
-            code: s.code,
-            name: s.name,
-            n: s.open,
-            d: s.delay,
-          });
-          const pin = (
-            <span className={cn("relative flex items-center gap-1.5 transition-opacity duration-300", dim && "opacity-40")} data-pin={s.code} data-status={status} data-selected={s.selected || undefined}>
-              <Pulse status={status} />
-              <span
-                className={cn(
-                  "relative flex size-7 items-center justify-center rounded-full border-2 border-white font-mono text-xs font-semibold text-white shadow-sm transition-colors duration-300",
-                  PIN[status],
-                  status === "red" && "shadow-[0_0_0_6px_rgb(220_38_38_/_0.12)]",
-                )}
-              >
-                {s.code}
-              </span>
-              <span className={cn("text-xs whitespace-nowrap text-foreground", s.selected ? "font-semibold" : "font-medium")}>{s.short}</span>
-            </span>
-          );
-          return (
-            <div key={s.id} className="absolute -translate-y-1/2" style={{ left: `${(x / MAP_W) * 100}%`, top: `${(y / MAP_H) * 100}%`, marginLeft: -14 }}>
-              <Tip content={<span>{label}</span>}>
-                {onPick ? (
-                  <button type="button" onClick={() => onPick(s.id)} aria-pressed={s.selected} aria-label={$t("{what}. Filter setzen", { what: label })}  className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    {pin}
-                  </button>
-                ) : (
-                  <span role="img" aria-label={label}>
-                    {pin}
-                  </span>
-                )}
-              </Tip>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-/** A red pin pulses twice when it turns red, then keeps a soft glow. */
-function Pulse({ status }: { status: Exclude<CellStatus, "none"> }) {
-  const reduce = useReducedMotion();
-  const [prev, setPrev] = useState(status);
-  const [n, setN] = useState(0);
-  if (status !== prev) {
-    setPrev(status);
-    if (status === "red") setN((x) => x + 1);
-  }
-  if (!n || reduce || status !== "red") return null;
-  return (
-    <motion.span
-      key={n}
-      aria-hidden
-      className="absolute top-0 left-0 size-7 rounded-full bg-light-red"
-      initial={{ scale: 1, opacity: 0.5 }}
-      animate={{ scale: 2.4, opacity: 0 }}
-      transition={{ duration: 0.9, ease: "easeOut", repeat: 1 }}
-    />
-  );
-}
-
 // ── Handlungsbedarf ─────────────────────────────────────────────────────
 
 export function Actions({ v, linkable }: { v: DashboardView; linkable: boolean }) {
   const reduce = useReducedMotion();
+  const { hover, set } = useSiteHover();
   const top = v.actions.items.slice(0, 3);
   return (
     <div className="flex h-full flex-col justify-start gap-1.5">
       {top.length ? null : <Empty>{$t("Nichts zu tun.")}</Empty>}
-      <ul className="flex flex-col gap-1.5">
+      <ul className="flex flex-col gap-1.5" {...siteHoverHandlers(set, "actions")}>
         <AnimatePresence initial={false} mode="popLayout">
           {top.map((a) => {
+            const { active, dimmed } = hoverState(hover, a.project_id);
             const body = (
-              <span className="flex h-11 items-center gap-3 rounded-lg border border-border px-3 text-sm text-foreground transition-colors hover:bg-muted">
+              <span
+                className={cn(
+                  "flex h-11 items-center gap-3 rounded-lg border px-3 text-sm text-foreground transition-[background-color,border-color,opacity] duration-150 hover:bg-muted",
+                  active ? "border-zinc-300 bg-muted" : "border-border",
+                  dimmed && "opacity-50",
+                )}
+              >
                 <Shape status={a.status} />
                 <span className="min-w-0 flex-1 whitespace-nowrap">{$tx(a.text)}</span>
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
@@ -284,6 +204,7 @@ export function Actions({ v, linkable }: { v: DashboardView; linkable: boolean }
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.35, ease: EASE }}
                 data-action={a.kind}
+                data-site={a.project_id}
               >
                 <Tip content={<span>{$tx(a.detail)}</span>}>
                   {linkable ? (
@@ -328,6 +249,7 @@ const since = (iso: string, today: string) => (dayKey.format(new Date(iso)) === 
 
 export function Heatmap({ v, linkable }: { v: DashboardView; linkable: boolean }) {
   const reduce = useReducedMotion();
+  const { hover, set } = useSiteHover();
   const { trades, rows } = v.heatmap;
   if (!rows.length || !trades.length) return <Empty>{$t("Keine laufenden Arbeiten im Filter.")}</Empty>;
   const short = (pid: string) => v.site_map.find((s) => s.id === pid)?.short ?? "";
@@ -337,6 +259,7 @@ export function Heatmap({ v, linkable }: { v: DashboardView; linkable: boolean }
         role="table"
         aria-label={$t("Gewerke je Baustelle")}
         className="grid h-full content-start justify-start gap-1"
+        {...siteHoverHandlers(set, "heat")}
         style={{ gridTemplateColumns: `6rem repeat(${trades.length}, minmax(3.25rem, 220px))`, gridTemplateRows: `24px repeat(${rows.length}, minmax(28px, 40px))` }}
       >
         <span role="columnheader" />
@@ -347,13 +270,14 @@ export function Heatmap({ v, linkable }: { v: DashboardView; linkable: boolean }
         ))}
         {rows.map((r, ri) => {
           const fade = { initial: reduce ? false : { opacity: 0 }, animate: { opacity: 1 }, transition: { duration: 0.35, delay: 0.1 + ri * 0.03 } } as const;
+          const { active, dimmed } = hoverState(hover, r.project_id);
           return (
             <div key={r.project_id} role="row" className="contents">
-              <motion.span role="rowheader" aria-label={$t("Baustelle {code} · {name}", { code: r.code, name: r.name })} className="flex items-center text-sm whitespace-nowrap text-foreground" {...fade}>
-                {short(r.project_id)}
+              <motion.span role="rowheader" aria-label={$t("Baustelle {code} · {name}", { code: r.code, name: r.name })} className="flex items-center text-sm whitespace-nowrap text-foreground" data-site={r.project_id} {...fade}>
+                <span className={cn("transition-opacity duration-150", dimmed && "opacity-45", active && "font-semibold")}>{short(r.project_id)}</span>
               </motion.span>
               {r.cells.map((c) => {
-                if (c.status === "none") return <span key={c.trade} role="cell" aria-label={$t("{code} {trade}: keine laufenden Arbeiten", { code: r.code, trade: $t(c.trade) })} />;
+                if (c.status === "none") return <span key={c.trade} role="cell" data-site={r.project_id} aria-label={$t("{code} {trade}: keine laufenden Arbeiten", { code: r.code, trade: $t(c.trade) })} />;
                 const text = c.delay > 0 ? `+${c.delay}` : c.status === "red" ? "!" : "0";
                 const tip = c.hindrance
                   ? $t(c.delay ? "Behinderung {ref} · seit {since} · Prognose +{d} Tage" : "Behinderung {ref} · seit {since}", {
@@ -363,13 +287,13 @@ export function Heatmap({ v, linkable }: { v: DashboardView; linkable: boolean }
                     })
                   : `${r.code} ${$t(c.trade)}: ${$tx(c.reason)}`;
                 const body = (
-                  <span className={cn("flex h-full items-center justify-center gap-1.5 rounded-md font-mono text-sm tabular-nums transition-colors duration-300", CELL[c.status])}>
+                  <span className={cn("flex h-full items-center justify-center gap-1.5 rounded-md font-mono text-sm tabular-nums transition-[background-color,color,opacity] duration-300", CELL[c.status], dimmed && "opacity-45")}>
                     <Shape status={c.status} className={c.status === "red" ? "bg-white" : undefined} />
                     {text}
                   </span>
                 );
                 return (
-                  <motion.span key={c.trade} className="min-h-0" {...fade}>
+                  <motion.span key={c.trade} className="min-h-0" data-site={r.project_id} {...fade}>
                     <Tip content={<span>{tip}</span>}>
                       {linkable ? (
                         <Link
@@ -398,8 +322,8 @@ export function Heatmap({ v, linkable }: { v: DashboardView; linkable: boolean }
   );
 }
 
-/** One line: ● im Plan  ◆ ≤ 2 Tage  ■ > 2 Tage / Behinderung (in the heatmap card's title row). */
-export function HeatLegend() {
+/** One line: ● im Plan  ◆ ≤ 2 Tage  ■ > 2 Tage / Behinderung (title row of the heatmap and the map card). */
+export function StatusLegend({ children }: { children?: ReactNode }) {
   return (
     <p className="flex items-center gap-3 text-xs whitespace-nowrap text-muted-foreground">
       <span className="flex items-center gap-1.5">
@@ -411,8 +335,16 @@ export function HeatLegend() {
       <span className="flex items-center gap-1.5">
         <Shape status="red" /> {$t("> 2 Tage / Behinderung")}
       </span>
-      <InfoTip label={$t("Was die Zahl bedeutet")} text={$t("Zahl = prognostizierte Verzugstage. Ohne Mengenmeldung seit zwei Arbeitstagen: ◆.")} />
+      {children}
     </p>
+  );
+}
+
+export function HeatLegend() {
+  return (
+    <StatusLegend>
+      <InfoTip label={$t("Was die Zahl bedeutet")} text={$t("Zahl = prognostizierte Verzugstage. Ohne Mengenmeldung seit zwei Arbeitstagen: ◆.")} />
+    </StatusLegend>
   );
 }
 
