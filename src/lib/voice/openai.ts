@@ -28,14 +28,52 @@ const LANGUAGE_NAMES: Record<string, string> = {
   uk: "Ukrainian",
 };
 
-/** Speech to text. `language` (ISO 639-1) is a hint; the model detects otherwise. */
-export async function transcribe(audio: Blob, filename: string, language: string | null): Promise<string> {
+/** Vocabulary hint per language. Only German has one: a German list would pull other speakers towards German. */
+export const STT_GLOSSARY: Record<string, string> = {
+  de: "Baustelle, Bauleitung, Polier, Estrich, Trockenbau, Elektro, 2.OG, Behinderung, Mehrkosten, m².",
+};
+
+const words = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .split(" ")
+    .filter((w) => w.length > 1);
+
+/**
+ * The model returns its own hint when it hears nothing clear (a short answer,
+ * noise): e.g. "Baustelle, Bauleitung, Polier, …" for a spoken "five men".
+ */
+export function echoesPrompt(text: string, prompt: string): boolean {
+  const said = words(text);
+  if (said.length < 3) return false;
+  const hint = new Set(words(prompt));
+  const hits = said.filter((w) => hint.has(w)).length;
+  return hits >= 3 && hits / said.length >= 0.6;
+}
+
+/**
+ * Speech to text. `language` (ISO 639-1) is the speaker's language once known
+ * (a firm hint); before that, `promptLanguage` (the Polier's registered
+ * language) only picks the vocabulary hint. If the model answers with its hint
+ * instead of the words, it is asked again without one; still nothing clear → "".
+ */
+export async function transcribe(audio: Blob, filename: string, language: string | null, promptLanguage: string | null = null): Promise<string> {
+  const prompt = STT_GLOSSARY[language ?? promptLanguage ?? ""] ?? null;
+  const text = await sttRequest(audio, filename, language, prompt);
+  if (!prompt || !echoesPrompt(text, prompt)) return text;
+  const again = await sttRequest(audio, filename, language, null);
+  return Object.values(STT_GLOSSARY).some((p) => echoesPrompt(again, p)) ? "" : again;
+}
+
+async function sttRequest(audio: Blob, filename: string, language: string | null, prompt: string | null): Promise<string> {
   const form = new FormData();
   form.append("file", audio, filename);
   form.append("model", sttModel());
   form.append("response_format", "json");
   if (language && LANGUAGE_NAMES[language]) form.append("language", language);
-  form.append("prompt", "Baustelle, Bauleitung, Polier, Estrich, Trockenbau, Elektro, 2.OG, Behinderung, Mehrkosten, m².");
+  if (prompt) form.append("prompt", prompt);
   const res = await fetch(`${BASE}/audio/transcriptions`, {
     method: "POST",
     headers: { Authorization: `Bearer ${key()}` },

@@ -39,12 +39,14 @@ export async function POST(req: Request) {
       if (!(audio instanceof Blob) || audio.size === 0) throw new BadRequestError("audio fehlt");
       const conversationId = field(form, "conversation_id");
       const hint = field(form, "language");
+      // Before the first sentence the language is unknown: the Polier's registered one picks the vocabulary hint only.
+      const promptLanguage = field(form, "prompt_language");
       const name = audio instanceof File && audio.name ? audio.name : "segment.webm";
 
       // The turn's database reads do not need the words: they run while speech-to-text does.
       const loaded = conversationId ? loadTurn(conversationId) : null;
       loaded?.catch(() => {}); // a failure surfaces in runTurn; noise skips the turn
-      const text = await timed("stt", () => transcribe(audio, name, hint));
+      const text = await timed("stt", () => transcribe(audio, name, hint, promptLanguage));
       const language = hint ?? guessLanguage(text);
       const ignored = isNoise(text);
       if (ignored || !conversationId) return { transcript: { text, language }, ignored, turn: null };

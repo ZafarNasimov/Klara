@@ -61,6 +61,8 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
   const [photoBusy, setPhotoBusy] = useState(false);
 
   const convRef = useRef<Conversation | null>(null);
+  /** The language of Klara's greeting (the Polier's registered one): picks the speech-to-text vocabulary hint before the first sentence. */
+  const greetLangRef = useRef<string | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const speakerRef = useRef<Speaker | null>(null);
   const recRef = useRef<ReturnType<typeof startRecording> | null>(null);
@@ -117,6 +119,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
           if (off) return;
           setDetail(d);
           convRef.current = d.conversation;
+          greetLangRef.current = [...d.turns].reverse().find((t) => t.role === "klara")?.language ?? null;
           setTurns(d.turns);
           setCases(d.cases);
           setLang(d.conversation.language ?? "de");
@@ -197,6 +200,8 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
         return [...map.values()];
       });
       setLang(t.language);
+      // From now on speech-to-text gets the speaker's language as a firm hint.
+      if (convRef.current && t.language) convRef.current = { ...convRef.current, language: t.language };
       setAwaitingConfirm(t.awaiting_confirm);
       await say(t.reply, t.language);
       if (t.ended) finish();
@@ -279,6 +284,7 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
       }
       if (!d) throw new ApiError($t("Das Gespräch konnte nicht geladen werden."), 500);
       convRef.current = d.conversation;
+      greetLangRef.current = [...d.turns].reverse().find((t) => t.role === "klara")?.language ?? null;
       setStartedAt(Date.now());
       const greeting = isNew ? [...d.turns].reverse().find((t) => t.role === "klara") : null;
       if (greeting) await say(greeting.text_original, greeting.language ?? "de");
@@ -323,7 +329,9 @@ export function CallView({ callId, teamId, teamName, incoming }: { callId: strin
       const form = new FormData();
       form.append("audio", blob, filename);
       form.append("conversation_id", convRef.current.id);
-      if (convRef.current.language) form.append("language", lang);
+      // The speaker's language once known; before the first sentence, Klara's greeting language picks the vocabulary hint only.
+      if (convRef.current.language) form.append("language", convRef.current.language);
+      else if (greetLangRef.current) form.append("prompt_language", greetLangRef.current);
       const r = await fetch("/api/voice", { method: "POST", body: form });
       const out = await r.json().catch(() => null);
       if (!r.ok) throw new ApiError(out?.error ?? `Fehler ${r.status}`, r.status);
