@@ -162,7 +162,7 @@ Idea, not in SPEC (ask Zafar first): seed a few closed history cases KL-2026-003
 
 - **What changed for everyone:**
   - `/admin` is now the portfolio dashboard "Alle Baustellen";
-  - the case board moved to `/admin/vorgaenge` (nav: Übersicht, Vorgänge, Besprechungen, Demo);
+  - the case board moved to `/admin/vorgaenge` (nav: Übersicht, Vorgänge, Besprechungen, Einstellungen / Settings at `/admin/demo`);
   - `/admin/project/[id]` is the dashboard of one site;
   - "Besprechungen" is built: record or upload in any language, get a German protocol, and only the evidenced letters are drafted.
   - New doc types from meetings only: `maengelanzeige`, `bedenken`.

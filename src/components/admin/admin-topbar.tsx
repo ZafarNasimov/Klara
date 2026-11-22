@@ -16,7 +16,7 @@ const NAV = [
   { href: "/admin", label: "Übersicht", exact: true },
   { href: "/admin/vorgaenge", label: "Vorgänge" },
   { href: "/admin/meetings", label: "Besprechungen" },
-  { href: "/admin/demo", label: "Demo" },
+  { href: "/admin/demo", label: "Einstellungen" },
 ];
 
 type ProjectResponse = ProjectContext & { now: string; llm_mode: "live" | "mock"; backend: "memory" | "supabase" };

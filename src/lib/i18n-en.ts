@@ -735,6 +735,7 @@ const SCREENS: Record<string, string> = {
   "Voraussetzung für:": "Prerequisite for:",
   "bereits vorhanden": "already exists",
   "Demo beenden": "End demo",
+  Einstellungen: "Settings",
   aktualisiert: "updated",
   festgehalten: "recorded",
   " Uhr": "",
