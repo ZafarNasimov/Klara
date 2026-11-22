@@ -32,8 +32,8 @@ export function PortfolioScene({ phase, step, revealMode }: SceneProps) {
 
       <FitBox left={160} top={196} width={1600} height={752}>
         <TooltipProvider>
-          <div inert aria-hidden className="pointer-events-none">
-            {v ? <Overview v={v} linkable={false} /> : null}
+          <div inert aria-hidden className="pointer-events-none h-full">
+            {v ? <Overview v={v} linkable={false} className="mt-0" /> : null}
           </div>
         </TooltipProvider>
       </FitBox>
@@ -74,10 +74,14 @@ function FitBox({ left, top, width, height, children }: { left: number; top: num
   return (
     <div
       ref={ref}
-      className="absolute overflow-hidden mask-[linear-gradient(to_bottom,#000_90%,transparent)]"
+      className="absolute overflow-hidden"
       style={{ left: u(left), top: u(top), width: u(width), height: u(height) }}
     >
-      <div className="origin-top-left" style={{ ...native, width: NATIVE_W, transform: `scale(${scale})`, visibility: scale ? "visible" : "hidden" }}>
+      {/* The same fitted grid as the app: a definite native height, so the map and rows size like on a laptop. */}
+      <div
+        className="origin-top-left"
+        style={{ ...native, width: NATIVE_W, height: (height * NATIVE_W) / width, transform: `scale(${scale})`, visibility: scale ? "visible" : "hidden" }}
+      >
         {children}
       </div>
     </div>

@@ -73,9 +73,9 @@ export function Dashboard({ initial, fixedProject = null }: { initial: Dashboard
 }
 
 /** Tab "Überblick": KPIs, map + Handlungsbedarf, heatmap + Plan und Ist (also the pitch, without links). */
-export function Overview({ v, linkable, onPick = null }: { v: DashboardView; linkable: boolean; onPick?: ((id: string) => void) | null }) {
+export function Overview({ v, linkable, onPick = null, className }: { v: DashboardView; linkable: boolean; onPick?: ((id: string) => void) | null; className?: string }) {
   return (
-    <div className="mt-3 grid gap-4 [@media(min-height:760px)]:h-full [@media(min-height:760px)]:grid-rows-[auto_minmax(220px,1fr)_minmax(200px,1fr)]">
+    <div className={cn("mt-3 grid gap-4 [@media(min-height:760px)]:h-full [@media(min-height:760px)]:grid-rows-[auto_minmax(220px,1fr)_minmax(200px,1fr)]", className)}>
       <div className="grid grid-cols-4 gap-4">
         {v.kpis
           .filter((k) => k.key !== "claims")
