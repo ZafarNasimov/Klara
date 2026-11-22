@@ -22,5 +22,5 @@ export const PITCH_SCENES: PitchSceneDef[] = [
   { id: "portfolio", key: "5", label: "Every site at a glance", theme: "light", steps: 1, Component: PortfolioScene },
   // strike-through, line 2, inputs, outputs, people
   { id: "ecosystem", key: "6a", label: "An operating system", theme: "light", steps: 5, Component: EcosystemScene },
-  { id: "close", key: "6b", label: "No lost money", theme: "dark", steps: 4, Component: ClosingScene },
+  { id: "close", key: "6b", label: "No lost money", theme: "dark", steps: 1, Component: ClosingScene },
 ];

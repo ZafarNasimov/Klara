@@ -4,7 +4,7 @@
 // Measures real DOM changes (MutationObserver), not the app's own clock, and
 // asserts for every turn:
 //   foreman message → document update      1500 ms ± 100 ms
-//   typing indicator visible               1500 ms ± 100 ms
+//   typing indicator visible               1000 ms ± 100 ms
 //   Klara's message appears in one frame   full text when first inserted
 //
 // Needs the app running (npm run dev or npm start) and Google Chrome.
@@ -20,6 +20,7 @@ const BASE = arg("--base", "http://localhost:3000");
 const VIDEO = arg("--video", null);
 const CHROME = arg("--chrome", process.env.CHROME_PATH);
 const TARGET = 1500;
+const TYPING_TARGET = 1000;
 const TOL = 100;
 const TURNS = 4;
 
@@ -56,8 +57,10 @@ await page.addInitScript(() => {
   }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-state"] });
 });
 
-await page.goto(`${BASE}/pitch?scene=2&pace=auto&debug=1`);
-// AUTO: the whole call plays by itself; wait for Klara's last reply, then the document move.
+await page.goto(`${BASE}/pitch?scene=2&debug=1`);
+// One press starts the call; it then plays by itself. Wait for Klara's last reply, then the document move.
+await page.waitForTimeout(1200);
+await page.keyboard.press("Space");
 await page.waitForFunction((n) => window.__checkEvents.filter((e) => e.type === "klara").length >= n, TURNS, { timeout: 60_000 });
 await page.waitForTimeout(2500);
 
@@ -83,7 +86,7 @@ for (let k = 1; k <= TURNS; k++) {
   const docToTyping = typing && doc ? typing.t - doc.t : NaN;
   const typingFor = klara && typing ? klara.t - typing.t : NaN;
   const oneFrame = !!klara && klara.text === finalTexts[klaraLine] && klara.text.length > 0;
-  const ok = Math.abs(docGap - TARGET) <= TOL && Math.abs(typingFor - TARGET) <= TOL && oneFrame;
+  const ok = Math.abs(docGap - TARGET) <= TOL && Math.abs(typingFor - TYPING_TARGET) <= TOL && oneFrame;
   if (!ok) failed = true;
   const app = appLog[k - 1] ?? {};
   rows.push({

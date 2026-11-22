@@ -2,13 +2,13 @@
 // One policy for REPLAY and LIVE: the screen never runs faster than a real
 // conversation. Per turn:
 //   foreman's message → (≥ 1.5 s) document update + Klara typing
-//   → (≥ 1.5 s of typing) Klara's full reply.
+//   → (≥ 1 s of typing) Klara's full reply.
 
 export const CALL_TIMING = {
   /** Document update, at the earliest, after the foreman's final words. */
   docAfterForemanMs: 1500,
   /** Klara's typing indicator stays up at least this long. */
-  typingMinMs: 1500,
+  typingMinMs: 1000,
   /** A press during a turn queues the next foreman line this long after Klara's reply. */
   queueGapMs: 400,
   /** After Klara's last reply, before the document moves left. */
@@ -36,7 +36,7 @@ export type TurnSchedule = {
 /**
  * When to show each part of a turn, in ms on one clock.
  *
- * REPLAY passes no backend times and gets the exact minimums (1500 / 3000 ms
+ * REPLAY passes no backend times and gets the exact minimums (1500 / 2500 ms
  * after the foreman). LIVE passes when the backend's document update and
  * reply actually arrived: nothing is shown earlier than the minimums, and a
  * slower backend simply keeps the typing indicator up until its reply lands.

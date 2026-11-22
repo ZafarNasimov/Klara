@@ -3,7 +3,7 @@
 Handover file: read this first when you pick the build up (locally or in a new session).
 Updated at every checkpoint. Spec: [SPEC.md](SPEC.md). UI rules: [CLAUDE.md](CLAUDE.md), [DESIGN.md](DESIGN.md), [PRODUCT.md](PRODUCT.md).
 
-Last update: 2026-11-22 (EN/DE switch, views Baustelle/Bauleitung; interactive Baustellen map card) · branch `claude/project-thread-jrqak8`, not yet on `main`
+Last update: 2026-11-22 (EN/DE switch, views Baustelle/Bauleitung; interactive Baustellen map card) · on `main` (merged with the pitch updates)
 
 ## Milestones (SPEC §11)
 

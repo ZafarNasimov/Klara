@@ -76,10 +76,10 @@ export function Dashboard({ initial, fixedProject = null }: { initial: Dashboard
 }
 
 /** Tab "Überblick": KPIs, map + Handlungsbedarf, heatmap + Plan und Ist (also the pitch, without links). Hovering a site highlights it in every widget. */
-export function Overview({ v, linkable }: { v: DashboardView; linkable: boolean }) {
+export function Overview({ v, linkable, className }: { v: DashboardView; linkable: boolean; className?: string }) {
   return (
     <SiteHoverProvider>
-    <div className="mt-3 grid gap-4 [@media(min-height:760px)_and_(min-width:1200px)]:h-full [@media(min-height:760px)_and_(min-width:1200px)]:grid-rows-[auto_minmax(220px,1fr)_minmax(200px,1fr)]">
+    <div className={cn("mt-3 grid gap-4 [@media(min-height:760px)_and_(min-width:1200px)]:h-full [@media(min-height:760px)_and_(min-width:1200px)]:grid-rows-[auto_minmax(220px,1fr)_minmax(200px,1fr)]", className)}>
       <div className="grid grid-cols-4 gap-4">
         {v.kpis
           .filter((k) => k.key !== "claims")

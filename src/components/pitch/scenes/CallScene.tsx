@@ -3,7 +3,6 @@
 import { Check, Phone } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { KlaraAvatar } from "@/components/klara/klara-avatar";
 import { cn } from "@/lib/utils";
 import { CALL_TIMING, readingTimeMs, turnSchedule } from "../call-timing";
@@ -33,19 +32,21 @@ declare global {
 /**
  * Scene 2 – the call (REPLAY), paced like a real conversation.
  * Each turn: the foreman's message appears; 1.5 s later the document fields it
- * mentions fill and Klara starts typing; 1.5 s after that her full reply
+ * mentions fill and Klara starts typing; 1 s after that her full reply
  * replaces the dots. 1 s after her last reply the document moves left.
  *
- * MANUAL (default): a press shows the next foreman message, so the screen
- * follows the teammate speaking; a press during a turn queues the next one
- * (it never skips the latency). AUTO ("A"): the next foreman message follows
- * Klara's reply after reading time.
+ * One press starts the call and the whole dialogue plays by itself: the next
+ * foreman message follows Klara's reply after reading time. Presses during
+ * the call are ignored; the press after it moves on. AUTO ("A") also starts
+ * the call without a press.
  */
 export function CallScene({ phase, autoPace = false, debug = false, arrivedBack = false, registerController }: SceneProps) {
   const [tl, setTl] = useState<Timeline>(arrivedBack ? END : START);
   const requested = useRef(arrivedBack ? CALL_EXCHANGES : 0);
   const tlRef = useRef(tl);
   const autoRef = useRef(autoPace);
+  // Set by the first press: the rest of the dialogue then runs by itself.
+  const [running, setRunning] = useState(arrivedBack);
   useEffect(() => {
     tlRef.current = tl;
     autoRef.current = autoPace;
@@ -59,20 +60,19 @@ export function CallScene({ phase, autoPace = false, debug = false, arrivedBack 
       onNext: () => {
         const t = tlRef.current;
         if (t.after) return false; // done: PitchFlow moves on
-        if (autoRef.current) {
-          if (t.turn === 0) start(1);
-          return true;
+        // First press: the whole call plays; later presses wait for its end.
+        if (t.turn === 0) {
+          requested.current = CALL_EXCHANGES;
+          setRunning(true);
+          start(1);
         }
-        // All turns asked for, or one already queued: the press waits its turn.
-        if (requested.current >= CALL_EXCHANGES || requested.current > t.turn) return true;
-        requested.current += 1;
-        if (t.stage === 2) start(t.turn + 1); // between turns: go now; else it is queued
         return true;
       },
       onBack: () => {
         const t = tlRef.current;
         if (t.turn === 0) return false;
         requested.current = 0;
+        setRunning(false);
         setTl(START);
         return true;
       },
@@ -95,7 +95,7 @@ export function CallScene({ phase, autoPace = false, debug = false, arrivedBack 
       after(s.replyAt - s.typingAt, () => setTl({ turn, stage: 2, after: false }));
     } else if (turn >= CALL_EXCHANGES) {
       after(CALL_TIMING.afterLastReplyMs, () => setTl(END));
-    } else if (autoPace) {
+    } else if (autoPace || running) {
       after(readingTimeMs(CALL_SCRIPT[turn * 2 - 1].text), () => {
         requested.current = Math.max(requested.current, turn + 1);
         start(turn + 1);
@@ -104,7 +104,7 @@ export function CallScene({ phase, autoPace = false, debug = false, arrivedBack 
       after(CALL_TIMING.queueGapMs, () => start(turn + 1));
     }
     return () => window.clearTimeout(timer);
-  }, [phase, tl, autoPace, start]);
+  }, [phase, tl, autoPace, running, start]);
 
   // Measure when each part actually reached the screen (next frame after commit).
   const [log, setLog] = useState<TurnLog[]>([]);
@@ -146,9 +146,10 @@ export function CallScene({ phase, autoPace = false, debug = false, arrivedBack 
   return (
     <LightScene label="Scene 2 – the call" phase={phase}>
       <div className="absolute flex items-center gap-4" style={{ left: u(160), top: u(72) }}>
-        <Badge variant="outline" className="h-auto border-zinc-300 bg-white px-3 py-1 font-mono text-sm text-zinc-900">
-          EN → DE
-        </Badge>
+        <LanguageBadge
+          waiting={phase === "enter" && turn === 0}
+          detected={turn === 0 ? null : (CALL_SCRIPT[foremanLine]?.lang ?? "en").toUpperCase()}
+        />
         <span className="flex items-center gap-2 text-sm text-zinc-600">
           <Phone className="size-4 text-primary" aria-hidden />
           Call · Foreman, Team Estrich · Wohnanlage Riem
@@ -324,6 +325,66 @@ function TimingOverlay({ log }: { log: TurnLog[] }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+/** Source languages shown in the badge (the call works in more). */
+const SOURCE_LANGS = ["EN", "PL", "RO", "TR", "HR", "RU"] as const;
+/** The one-pass scan while the call waits: PL → RO → TR → HR → RU → EN, 600 ms each. */
+const SCAN = ["PL", "RO", "TR", "HR", "RU", "EN"] as const;
+const SOURCES_TIP = "English · Polski · Română · Türkçe · Hrvatski/Bosanski/Srpski · Русский — und weitere Sprachen";
+
+/**
+ * "EN · PL · RO · TR · HR · RU → DE". While the call waits, the source chips
+ * light up one by one (one pass); with the first foreman message the
+ * highlight locks on the detected language and "Sprache erkannt: EN" shows.
+ * A later message in another language moves the highlight there.
+ */
+function LanguageBadge({ waiting, detected }: { waiting: boolean; detected: string | null }) {
+  const [scan, setScan] = useState<number>(-1);
+  useEffect(() => {
+    if (!waiting) return;
+    const timers = SCAN.map((_, i) => window.setTimeout(() => setScan(i), 300 + i * 600));
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [waiting]);
+  const lit = detected ?? (waiting && scan >= 0 ? SCAN[scan] : null);
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-2">
+        <span className="flex items-center gap-1" title={SOURCES_TIP} aria-label={`Quellsprachen: ${SOURCES_TIP}`}>
+          {SOURCE_LANGS.map((l) => (
+            <span
+              key={l}
+              className={cn(
+                "rounded-md border px-1.5 py-0.5 font-mono text-xs transition-colors duration-200",
+                l === lit ? "border-primary bg-primary text-white" : detected ? "border-zinc-200 bg-white text-zinc-400" : "border-zinc-300 bg-white text-zinc-700",
+              )}
+            >
+              {l}
+            </span>
+          ))}
+        </span>
+        <span aria-hidden className="text-zinc-500">
+          →
+        </span>
+        <span className="rounded-md bg-zinc-900 px-1.5 py-0.5 font-mono text-xs text-white">DE</span>
+      </div>
+      <AnimatePresence>
+        {detected ? (
+          <motion.span
+            key="detected"
+            role="status"
+            className="absolute top-full left-0 mt-1.5 whitespace-nowrap font-mono text-xs text-zinc-500"
+            initial={{ opacity: 0, y: -2 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.25, ease: EASE_OUT }}
+          >
+            Sprache erkannt: {detected}
+          </motion.span>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
