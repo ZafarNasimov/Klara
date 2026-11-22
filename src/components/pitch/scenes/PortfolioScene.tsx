@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { Overview } from "@/components/dashboard/dashboard";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import type { DashboardView } from "@/lib/dashboard/compute";
+import { $tx } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
 import { DOC_REFERENCE } from "../pitch-story";
 import { EASE_OUT, u } from "../stage";
@@ -48,7 +49,7 @@ export function PortfolioScene({ phase, step, revealMode }: SceneProps) {
       >
         <span aria-hidden className="rounded-[2px] bg-light-red" style={{ width: u(14), height: u(14) }} />
         <span>
-          After the call: <span lang="de">{DOC_REFERENCE}</span> is on the dashboard, {hot ? `${hot.c.trade} on site ${hot.r.code}` : "the trade"} turns red
+          After the call: <span lang="de">{DOC_REFERENCE}</span> is on the dashboard, {hot ? `${$tx(hot.c.trade)} on site ${hot.r.code}` : "the trade"} turns red
           {hot?.c.delay ? ` (+${hot.c.delay} days)` : ""}
         </span>
       </motion.p>
