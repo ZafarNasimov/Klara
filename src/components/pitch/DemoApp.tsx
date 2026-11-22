@@ -21,10 +21,14 @@ export function DemoPlaceholder() {
 
 export function DemoApp() {
   // "Finish demo" arrives by a client-side navigation: read ?scene= from the router, not the window.
-  const search = useSearchParams().toString();
+  const params = useSearchParams();
+  const search = params.toString();
+  // A new ?go= token ("Finish demo") starts the flow afresh, also when Next
+  // kept this page alive from earlier in the tab.
+  const go = params.get("go") ?? "";
   // Reaching the close ends demo mode ("Finish demo" disappears from the app).
   const onSceneEnter = useCallback((id: string) => {
     if (id === "close") clearDemoMode();
   }, []);
-  return <PitchFlow scenes={DEMO_SCENES} stepInUrl resetToStart fullscreenKey idleCursor onSceneEnter={onSceneEnter} initialSearch={search} />;
+  return <PitchFlow key={go} scenes={DEMO_SCENES} stepInUrl resetToStart fullscreenKey idleCursor onSceneEnter={onSceneEnter} initialSearch={search} />;
 }

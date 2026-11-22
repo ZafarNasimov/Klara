@@ -20,6 +20,8 @@ export function PitchPlaceholder() {
 export function PitchApp() {
   // Links into the pitch ("Demo beenden" → ?scene=6b) are client-side navigations:
   // read ?scene= from the router; the window URL may still be the previous page's.
-  const search = useSearchParams().toString();
-  return <PitchFlow initialSearch={search} />;
+  const params = useSearchParams();
+  // A new ?go= token ("Demo beenden") starts the flow afresh, also when Next
+  // kept this page alive from earlier in the tab.
+  return <PitchFlow key={params.get("go") ?? ""} initialSearch={params.toString()} />;
 }

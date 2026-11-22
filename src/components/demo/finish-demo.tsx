@@ -59,7 +59,10 @@ function FinishDemoButton({ target, label }: { target: string; label: string }) 
     // Keep the page dark under everything until the slide paints.
     document.documentElement.style.background = DARK_BG;
     document.body.style.background = DARK_BG;
-    router.push(target);
+    // A fresh token every time: Next keeps a visited page alive in the
+    // background, so /demo (or /pitch) would otherwise resume where it was left
+    // (e.g. on "Start live demo") instead of opening the close.
+    router.push(`${target}&go=${Date.now()}`);
   };
 
   return (

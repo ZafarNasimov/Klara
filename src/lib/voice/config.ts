@@ -18,4 +18,5 @@ export function voiceConfig(vad?: VadSettings | null): VoiceConfig {
 
 export const sttModel = () => process.env.STT_MODEL || "gpt-4o-transcribe";
 export const ttsModel = () => process.env.TTS_MODEL || "gpt-4o-mini-tts";
-export const ttsVoice = () => process.env.TTS_VOICE || "alloy";
+/** Klara's voice: "coral", a warm female voice. */
+export const ttsVoice = () => process.env.TTS_VOICE || "coral";
