@@ -44,14 +44,17 @@ type RoleCtx = {
 
 const Ctx = createContext<RoleCtx | null>(null);
 
+/** Stores the role (also outside a RoleProvider, e.g. the live demo's start button). */
+export function storeRole(r: UiRole) {
+  try {
+    localStorage.setItem(KEY, r);
+  } catch {}
+  listeners.forEach((l) => l());
+}
+
 export function RoleProvider({ children, fallback = "bauleiter" }: { children: ReactNode; fallback?: UiRole }) {
   const stored = useSyncExternalStore(subscribe, read, () => null);
-  const setRole = useCallback((r: UiRole) => {
-    try {
-      localStorage.setItem(KEY, r);
-    } catch {}
-    listeners.forEach((l) => l());
-  }, []);
+  const setRole = useCallback((r: UiRole) => storeRole(r), []);
   const value = useMemo(() => {
     const role = stored ?? fallback;
     const def = ROLES.find((r) => r.id === role)!;

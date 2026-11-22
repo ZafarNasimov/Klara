@@ -18,13 +18,13 @@ import {
   type RefCallback,
 } from "react";
 import { cn } from "@/lib/utils";
-import { hasWebGL, loadKlaraScene, SPLINE_WASM_PATH } from "./klara-robot-loader";
+import { hasWebGL, KLARA_ROBOT_PNG, loadKlaraScene, SPLINE_WASM_PATH } from "./klara-robot-loader";
 import { EASE_IN_OUT, EASE_OUT, u } from "./stage";
 
 const Spline = dynamic(() => import("@splinetool/react-spline"), { ssr: false });
 
 /** Transparent 2× capture of the scene's first frame (head close-up), 2160×2040. */
-export const KLARA_ROBOT_PNG = "/pitch/klara-robot.png";
+export { KLARA_ROBOT_PNG } from "./klara-robot-loader";
 
 /**
  * Head (visor) position in % of the robot box, tuned for the 1080×1020 design

@@ -59,6 +59,12 @@ export type PitchSceneDef = {
   keyBeats?: Record<string, number>;
   /** Clicks a scene consumes before the next click changes scene (click mode). */
   steps: number;
+  /** The value in ?scene= (default: `key`). */
+  slug?: string;
+  /** Next presses do nothing here (the scene has its own action, e.g. a button). */
+  holdNext?: boolean;
+  /** Back does nothing on this scene's first beat. */
+  holdBackAtStart?: boolean;
   Component: ComponentType<SceneProps>;
 };
 

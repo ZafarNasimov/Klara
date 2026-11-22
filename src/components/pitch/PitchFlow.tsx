@@ -35,20 +35,23 @@ const T = {
 const NEXT_KEYS = new Set(["ArrowRight", "ArrowDown", "PageDown", " ", "Enter"]);
 const BACK_KEYS = new Set(["ArrowLeft", "ArrowUp", "PageUp", "Backspace"]);
 
-type Options = { start: number; fadeOnly: boolean; reveal: RevealMode; autoPace: boolean; debug: boolean };
+type Options = { start: number; startStep: number; fadeOnly: boolean; reveal: RevealMode; autoPace: boolean; debug: boolean };
 
-/** Scene for a key like "3" or "6b" (a bare digit picks the first scene starting with it). */
+/** Scene for a key like "3" or "6b" (a bare digit picks the first scene starting with it), or a slug. */
 function sceneIndex(scenes: PitchSceneDef[], key: string | null): number {
   if (!key) return -1;
-  const exact = scenes.findIndex((s) => s.key === key);
+  const exact = scenes.findIndex((s) => s.key === key || s.slug === key);
   return exact >= 0 ? exact : scenes.findIndex((s) => s.key.startsWith(key));
 }
 
-/** Rehearsal switches: ?scene=6b, ?transition=fade, ?reveal=auto, ?pace=auto, ?debug=1 */
-function readOptions(scenes: PitchSceneDef[]): Options {
+/** Rehearsal switches: ?scene=6b, ?transition=fade, ?reveal=auto, ?pace=auto, ?debug=1 (and ?step=… with `stepInUrl`). */
+function readOptions(scenes: PitchSceneDef[], stepInUrl: boolean): Options {
   const params = new URLSearchParams(window.location.search);
+  const start = Math.max(0, sceneIndex(scenes, params.get("scene")));
+  const step = Number(params.get("step"));
   return {
-    start: Math.max(0, sceneIndex(scenes, params.get("scene"))),
+    start,
+    startStep: stepInUrl && Number.isInteger(step) ? Math.min(Math.max(step, 0), scenes[start].steps) : 0,
     fadeOnly: params.get("transition") === "fade",
     reveal: params.get("reveal") === "auto" ? "auto" : "click",
     autoPace: params.get("pace") === "auto" || params.get("reveal") === "auto",
@@ -69,12 +72,35 @@ function centerOf(el: Element | undefined) {
   return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 }
 
+export type PitchFlowProps = {
+  scenes?: PitchSceneDef[];
+  /** Keep the beat in the URL too (?step=…), so a reload stays on it. */
+  stepInUrl?: boolean;
+  /** "R" goes back to the first scene, from scratch (instead of replaying the current one). */
+  resetToStart?: boolean;
+  /** "F" toggles fullscreen. */
+  fullscreenKey?: boolean;
+  /** The pointer shows on movement and hides after 2 s idle (instead of hidden on every slide). */
+  idleCursor?: boolean;
+  /** Called with the scene id whenever a scene becomes current. */
+  onSceneEnter?: (id: string) => void;
+};
+
+const IDLE_CURSOR_MS = 2000;
+
 /** Client-only (mounted via PitchApp with ssr: false): reads the URL on first render. */
-export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] }) {
-  const [options] = useState(() => readOptions(scenes));
+export function PitchFlow({
+  scenes = PITCH_SCENES,
+  stepInUrl = false,
+  resetToStart = false,
+  fullscreenKey = false,
+  idleCursor = false,
+  onSceneEnter,
+}: PitchFlowProps) {
+  const [options] = useState(() => readOptions(scenes, stepInUrl));
   const reducedMotion = useReducedMotion();
   const [index, setIndex] = useState(options.start);
-  const [steps, setSteps] = useState<number[]>(() => scenes.map(() => 0));
+  const [steps, setSteps] = useState<number[]>(() => scenes.map((_, i) => (i === options.start ? options.startStep : 0)));
   const [tx, setTx] = useState<Transition | null>(null);
   const [incomingPhase, setIncomingPhase] = useState<ScenePhase>("standby");
   // "A": AUTO pacing for self-paced scenes (Scene 2), for rehearsals and video.
@@ -116,11 +142,35 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
   );
 
   // Keep the scene in the URL so a reload (or a clicker's F5) stays on it.
+  const step = steps[index];
   useEffect(() => {
     const url = new URL(window.location.href);
-    url.searchParams.set("scene", scenes[index].key);
+    url.searchParams.set("scene", scenes[index].slug ?? scenes[index].key);
+    if (stepInUrl) url.searchParams.set("step", String(step));
     window.history.replaceState(window.history.state, "", url);
-  }, [index, scenes]);
+  }, [index, scenes, stepInUrl, step]);
+
+  const sceneId = scenes[index].id;
+  useEffect(() => {
+    onSceneEnter?.(sceneId);
+  }, [sceneId, onSceneEnter]);
+
+  // Idle pointer: shows on movement, hides after 2 s.
+  const [pointerIdle, setPointerIdle] = useState(true);
+  useEffect(() => {
+    if (!idleCursor) return;
+    let timer = 0;
+    const onMove = () => {
+      setPointerIdle(false);
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => setPointerIdle(true), IDLE_CURSOR_MS);
+    };
+    window.addEventListener("pointermove", onMove);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.clearTimeout(timer);
+    };
+  }, [idleCursor]);
 
   // Start the robot download the moment /pitch mounts.
   useEffect(() => {
@@ -128,7 +178,7 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
   }, []);
 
   const go = useCallback(
-    (to: number) => {
+    (to: number, fresh = false) => {
       if (tx || to < 0 || to >= scenes.length || to === index) return;
       const from = index;
       const a = scenes[from].theme;
@@ -136,8 +186,10 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
       const plain = options.fadeOnly || reducedMotion === true;
       const kind: Kind = a === b ? "swap" : plain ? "fade" : a === "dark" ? "reveal" : "collapse";
       // Forward starts a scene from scratch; going back shows it fully revealed.
-      setSteps((s) => s.map((v, i) => (i === to ? (to > from ? 0 : scenes[to].steps) : v)));
-      setArrivedBack((a) => a.map((v, i) => (i === to ? to < from : v)));
+      const forward = fresh || to > from;
+      setSteps((s) => s.map((v, i) => (i === to ? (forward ? 0 : scenes[to].steps) : v)));
+      setArrivedBack((a) => a.map((v, i) => (i === to ? !forward : v)));
+      if (fresh) setResetTokens((t) => t.map((v, i) => (i === to ? v + 1 : v)));
       setIncomingPhase("standby");
       setTx({ id: Date.now(), from, to, kind });
     },
@@ -148,6 +200,7 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
     if (tx) return;
     // A self-paced scene takes the press first (e.g. queues the next turn).
     if (controllers.current.get(index)?.onNext?.()) return;
+    if (scenes[index].holdNext) return;
     const maxStep = options.reveal === "click" ? scenes[index].steps : 0;
     if (steps[index] < maxStep) {
       setSteps((s) => s.map((v, i) => (i === index ? v + 1 : v)));
@@ -165,15 +218,25 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
       setSteps((s) => s.map((v, i) => (i === index ? v - 1 : v)));
       return;
     }
+    if (scenes[index].holdBackAtStart) return;
     go(index - 1);
-  }, [tx, options.reveal, steps, index, go]);
+  }, [tx, options.reveal, steps, index, go, scenes]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const key = e.key.toLowerCase();
       const keyBeat = scenes[index].keyBeats?.[key];
-      if (key === "r") {
+      if (key === "f" && fullscreenKey) {
+        e.preventDefault();
+        if (e.repeat) return;
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else document.documentElement.requestFullscreen().catch(() => {});
+      } else if (key === "r" && resetToStart && index !== 0) {
+        // Back to the first scene, from scratch.
+        e.preventDefault();
+        if (!e.repeat) go(0, true);
+      } else if (key === "r") {
         // Reset the current scene to its first beat (REPLAY rehearsal).
         e.preventDefault();
         if (!tx) {
@@ -203,7 +266,7 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [advance, back, go, scenes, index, steps, tx]);
+  }, [advance, back, go, scenes, index, steps, tx, fullscreenKey, resetToStart]);
 
   // Run one transition. Input is ignored until it finishes (no double skips).
   useEffect(() => {
@@ -298,7 +361,14 @@ export function PitchFlow({ scenes = PITCH_SCENES }: { scenes?: PitchSceneDef[] 
     <MotionConfig reducedMotion="user">
       <div
         lang="en"
-        className={cn("fixed inset-0 overflow-hidden select-none", !current.pointer && "cursor-none")}
+        className={cn(
+          "fixed inset-0 overflow-hidden select-none",
+          idleCursor
+            ? pointerIdle
+              ? "cursor-none [&_*]:cursor-none!"
+              : "[&_.cursor-none]:cursor-auto!"
+            : !current.pointer && "cursor-none",
+        )}
         style={{ "--pitch-u": PITCH_UNIT, background: current.theme === "dark" ? DARK_BG : LIGHT_BG } as CSSProperties}
         onClick={(e) => {
           if (e.button !== 0) return;

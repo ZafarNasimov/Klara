@@ -6,6 +6,8 @@
 // fallback when the local file is missing.
 
 export const LOCAL_SCENE_URL = "/pitch/klara-robot.splinecode";
+/** Still image of Klara, shown where WebGL is missing or the scene fails. */
+export const KLARA_ROBOT_PNG = "/pitch/klara-robot.png";
 export const REMOTE_SCENE_URL = "https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode";
 
 /** The runtime's wasm helpers (bevel, process), served locally for offline use. */
