@@ -7,7 +7,7 @@ export const maxDuration = 60;
 
 type Body = { conversation_id?: string; text_original?: string; language?: string | null };
 
-/** One turn with Klara (SPEC §6.2): `{ conversation_id, text_original, language }`. Logs step timings (`Server-Timing`). */
+/** One turn with Klara (SPEC §6.2): `{ conversation_id, text_original, language }`. Logs step timings (`Server-Timing`). a*/
 export async function POST(req: Request) {
   return withTiming("POST /api/agent/turn", () =>
     handle(async () => {
